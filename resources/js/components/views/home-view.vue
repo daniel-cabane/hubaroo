@@ -9,8 +9,8 @@
         <div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
           <PlusCircle class="h-8 w-8" />
         </div>
-        <h2 class="text-xl font-bold text-text-main">Create a Session</h2>
-        <p class="text-sm text-text-muted text-center">Pick a paper and start a new Kangourou session for your students.</p>
+        <h2 class="text-xl font-bold text-text-main">Créer une session</h2>
+        <p class="text-sm text-text-muted text-center">Choisissez un sujet et lancez une nouvelle session Kangourou pour vos élèves.</p>
       </router-link>
 
       <!-- Join Session -->
@@ -21,8 +21,8 @@
         <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary transition-colors group-hover:bg-secondary group-hover:text-white">
           <LogIn class="h-8 w-8" />
         </div>
-        <h2 class="text-xl font-bold text-text-main">Join a Session</h2>
-        <p class="text-sm text-text-muted text-center">Enter a session code to join an existing Kangourou session.</p>
+        <h2 class="text-xl font-bold text-text-main">Rejoindre une session</h2>
+        <p class="text-sm text-text-muted text-center">Entrez un code de session pour rejoindre une session Kangourou existante.</p>
       </router-link>
     </div>
   </div>

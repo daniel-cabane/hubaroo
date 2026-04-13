@@ -68,7 +68,7 @@
     /* Custom Brand Colors */
     --primary: hsl(20 88% 44%);
     --primary-hover: hsl(21 97% 60%);
-    --secondary: hsl(23 57% 67%);
+    --secondary: hsl(23, 75%, 24%);
     --secondary-light: hsl(27 84% 80%);
 
     /* Functional Colors */

@@ -2,8 +2,7 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Node",
-    "baseUrl": ".",
+    "moduleResolution": "Bundler",
     "paths": {
       "@/*": ["./resources/js/*"]
     }

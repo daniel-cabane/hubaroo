@@ -35,10 +35,11 @@ Route::patch('/api/attempts/{attempt}/answer', [AttemptController::class, 'updat
 Route::post('/api/attempts/{attempt}/submit', [AttemptController::class, 'submit'])->name('attempts.submit');
 Route::get('/api/attempts/recover/{code}', [AttemptController::class, 'recover'])->name('attempts.recover');
 
-// Auth-only history routes
+// Auth-only routes
 Route::middleware(['auth'])->group(function () {
     Route::get('/api/my/kangourou-sessions', [KangourouSessionController::class, 'myIndex'])->name('kangourou-sessions.myIndex');
     Route::get('/api/my/attempts', [AttemptController::class, 'myIndex'])->name('attempts.myIndex');
+    Route::patch('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'update'])->name('kangourou-sessions.update');
 });
 
 Route::fallback(function () {

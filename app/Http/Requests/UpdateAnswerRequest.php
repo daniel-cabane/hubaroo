@@ -25,6 +25,7 @@ class UpdateAnswerRequest extends FormRequest
         return [
             'question_index' => ['required', 'integer', 'min:0', 'max:25'],
             'answer' => ['nullable', 'in:A,B,C,D,E'],
+            'timer' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

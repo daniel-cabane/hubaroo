@@ -4,10 +4,10 @@
       <div class="bg-surface dark:bg-gray-900 shadow-lg rounded-lg p-8">
         <div class="mb-8">
           <router-link to="/login" class="text-text-muted dark:text-text-muted/70 hover:text-text-main dark:hover:text-surface text-sm flex items-center mb-4">
-            ← Back to Login
+            ← Retour à la connexion
           </router-link>
-          <h1 class="text-3xl font-bold text-text-main dark:text-surface">Reset Password</h1>
-          <p class="text-text-muted dark:text-text-muted/70 mt-2">Enter your email address and we'll send you a link to reset your password</p>
+          <h1 class="text-3xl font-bold text-text-main dark:text-surface">Réinitialiser le mot de passe</h1>
+          <p class="text-text-muted dark:text-text-muted/70 mt-2">Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe</p>
         </div>
 
         <form v-if="!submitted" @submit.prevent="handleForgotPassword" class="space-y-6">
@@ -17,7 +17,7 @@
               for="email"
               class="block text-sm font-medium text-text-main dark:text-surface/80"
             >
-              Email Address
+              Email
             </label>
             <input
               id="email"
@@ -40,29 +40,29 @@
             :disabled="authStore.isLoading"
             class="w-full bg-primary hover:bg-primary-hover dark:bg-primary-hover dark:hover:bg-primary text-surface dark:text-text-main font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
           >
-            {{ authStore.isLoading ? 'Sending...' : 'Send Reset Link' }}
+            {{ authStore.isLoading ? 'Envoi...' : 'Envoyer le lien' }}
           </button>
         </form>
 
         <!-- Success Message -->
         <div v-else class="space-y-4">
           <div class="bg-success/10 dark:bg-success/20 border border-success/30 dark:border-success/40 text-success dark:text-success px-4 py-3 rounded-lg">
-            <p class="font-medium">Check your email</p>
-            <p class="text-sm mt-1">We've sent a password reset link to <strong>{{ form.email }}</strong></p>
+            <p class="font-medium">Vérifiez vos e-mails</p>
+            <p class="text-sm mt-1">Nous avons envoyé un lien de réinitialisation à <strong>{{ form.email }}</strong></p>
           </div>
 
           <button
             @click="submitted = false; authStore.clearError()"
             class="w-full bg-border dark:bg-border/30 hover:bg-border/80 dark:hover:bg-border/50 text-text-main dark:text-surface font-medium py-2 px-4 rounded-lg transition-colors"
           >
-            Send Another Link
+            Envoyer un autre lien
           </button>
 
           <router-link
             to="/login"
             class="block text-center text-text-muted dark:text-text-muted/70 hover:text-text-main dark:hover:text-surface text-sm"
           >
-            Back to Login
+            Retour à la connexion
           </router-link>
         </div>
       </div>

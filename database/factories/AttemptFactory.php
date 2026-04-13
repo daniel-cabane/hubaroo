@@ -22,10 +22,13 @@ class AttemptFactory extends Factory
         return [
             'kangourou_session_id' => KangourouSession::factory(),
             'user_id' => null,
+            'name' => null,
             'code' => strtoupper(fake()->bothify('??????')),
             'answers' => Attempt::defaultAnswers(),
             'status' => 'inProgress',
             'score' => null,
+            'timer' => null,
+            'termination' => 'none',
         ];
     }
 

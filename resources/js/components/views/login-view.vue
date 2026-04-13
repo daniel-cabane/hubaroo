@@ -3,8 +3,8 @@
     <div class="w-full max-w-md">
       <div class="bg-surface dark:bg-gray-900 shadow-lg rounded-lg p-8">
         <div class="mb-8 text-center">
-          <h1 class="text-3xl font-bold text-text-main dark:text-surface">Welcome</h1>
-          <p class="text-text-muted dark:text-text-muted/70 mt-2">Sign in to your account</p>
+          <h1 class="text-3xl font-bold text-text-main dark:text-surface">Bienvenue</h1>
+          <p class="text-text-muted dark:text-text-muted/70 mt-2">Connectez-vous à votre compte</p>
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-6">
@@ -14,7 +14,7 @@
               for="email"
               class="block text-sm font-medium text-text-main dark:text-surface/80"
             >
-              Email Address
+              Email
             </label>
             <input
               id="email"
@@ -31,7 +31,7 @@
               for="password"
               class="block text-sm font-medium text-text-main dark:text-surface/80"
             >
-              Password
+              Mot de passe
             </label>
             <input
               id="password"
@@ -53,7 +53,7 @@
             :disabled="authStore.isLoading"
             class="w-full bg-primary hover:bg-primary-hover dark:bg-primary-hover dark:hover:bg-primary text-surface dark:text-text-main font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
           >
-            {{ authStore.isLoading ? 'Signing in...' : 'Sign In' }}
+            {{ authStore.isLoading ? 'Connexion...' : 'Se connecter' }}
           </button>
         </form>
 
@@ -63,7 +63,7 @@
             to="/forgot-password"
             class="text-text-muted dark:text-text-muted/70 hover:text-text-main dark:hover:text-surface text-sm"
           >
-            Forgot your password?
+            Mot de passe oublié ?
           </router-link>
         </div>
       </div>

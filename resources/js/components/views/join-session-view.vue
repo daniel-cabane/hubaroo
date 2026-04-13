@@ -1,26 +1,26 @@
 <template>
   <div class="container mx-auto p-6 max-w-lg">
-    <h2 class="text-2xl font-bold mb-6 text-text-main dark:text-surface">Join a Kangourou Session</h2>
+    <h2 class="text-2xl font-bold mb-6 text-text-main dark:text-surface">Rejoindre une session Kangourou</h2>
 
     <!-- Recovery banner -->
     <div v-if="storedAttempt" class="mb-6 p-4 bg-info/10 border border-info/30 rounded-lg">
-      <p class="text-sm text-text-main dark:text-surface">You have an active attempt.</p>
+      <p class="text-sm text-text-main dark:text-surface">Vous avez une tentative en cours.</p>
       <button
         @click="resumeAttempt"
         class="mt-2 text-sm text-primary hover:text-primary-hover underline"
       >
-        Resume attempt
+        Reprendre la tentative
       </button>
     </div>
 
     <form @submit.prevent="handleJoin" class="space-y-6">
       <div class="space-y-2">
-        <label class="block text-sm font-medium text-text-main dark:text-surface/80">Session Code</label>
+        <label class="block text-sm font-medium text-text-main dark:text-surface/80">Code de session</label>
         <input
           v-model="code"
           type="text"
           maxlength="6"
-          placeholder="Enter 6-character code"
+          placeholder="Entrez le code à 6 caractères"
           class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-center text-2xl font-mono tracking-widest uppercase"
           required
         />
@@ -34,7 +34,7 @@
         type="submit"
         class="w-full bg-primary hover:bg-primary-hover text-surface font-medium py-2 px-4 rounded-lg transition-colors"
       >
-        Join Session
+        Rejoindre
       </button>
     </form>
   </div>
@@ -57,7 +57,7 @@ onMounted(() => {
 
 function handleJoin() {
   if (code.value.length !== 6) {
-    error.value = 'Please enter a 6-character code.';
+    error.value = 'Veuillez entrer un code à 6 caractères.';
     return;
   }
   router.push({ name: 'Session', params: { code: code.value.toUpperCase() } });

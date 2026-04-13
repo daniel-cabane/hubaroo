@@ -19,10 +19,13 @@ class Attempt extends Model
     protected $fillable = [
         'kangourou_session_id',
         'user_id',
+        'name',
         'code',
         'answers',
         'status',
         'score',
+        'timer',
+        'termination',
     ];
 
     /**
@@ -33,6 +36,7 @@ class Attempt extends Model
         return [
             'answers' => 'array',
             'score' => 'integer',
+            'timer' => 'integer',
         ];
     }
 

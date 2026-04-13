@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CreateKangourouSessionRequest;
+use App\Http\Requests\UpdateKangourouSessionRequest;
 use App\Models\KangourouSession;
 use App\Models\Paper;
 use Illuminate\Http\JsonResponse;
@@ -36,14 +37,22 @@ class KangourouSessionController extends Controller
 
         $data = $session->toArray();
 
-        // Hide correct answers while session is active, unless the user's attempt is finished
-        $shouldHideAnswers = $session->isActive();
+        $preferences = $session->getEffectivePreferences();
+        $correctionMode = $preferences['correction'] ?? 'delayed';
 
-        if ($shouldHideAnswers && $request->has('attempt_id')) {
-            $attempt = $session->attempts()->find($request->query('attempt_id'));
-            if ($attempt && $attempt->status === 'finished') {
-                $shouldHideAnswers = false;
+        // Determine whether to reveal correct answers
+        if ($correctionMode === 'immediate') {
+            // Show answers once the user's attempt is finished
+            $shouldHideAnswers = true;
+            if ($request->has('attempt_id')) {
+                $attempt = $session->attempts()->find($request->query('attempt_id'));
+                if ($attempt && $attempt->status === 'finished') {
+                    $shouldHideAnswers = false;
+                }
             }
+        } else {
+            // Delayed: only show answers when session is expired
+            $shouldHideAnswers = ! $session->isExpired();
         }
 
         if ($shouldHideAnswers) {
@@ -66,6 +75,32 @@ class KangourouSessionController extends Controller
         return response()->json([
             'message' => 'Session activated.',
             'session' => $kangourouSession->fresh(),
+        ]);
+    }
+
+    public function update(UpdateKangourouSessionRequest $request, KangourouSession $kangourouSession): JsonResponse
+    {
+        $data = [];
+
+        if ($request->has('privacy')) {
+            $data['privacy'] = $request->validated('privacy');
+        }
+
+        if ($request->has('preferences')) {
+            $current = $kangourouSession->preferences ?? [];
+            $incoming = $request->validated('preferences');
+
+            // Preserve time_limit — not editable
+            unset($incoming['time_limit']);
+
+            $data['preferences'] = array_replace_recursive($current, $incoming);
+        }
+
+        $kangourouSession->update($data);
+
+        return response()->json([
+            'message' => 'Session updated.',
+            'session' => $kangourouSession->fresh()->load('paper'),
         ]);
     }
 

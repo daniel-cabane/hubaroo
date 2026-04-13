@@ -3,8 +3,8 @@
     <div class="w-full max-w-md">
       <div class="bg-surface dark:bg-gray-900 shadow-lg rounded-lg p-8">
         <div class="mb-8">
-          <h1 class="text-3xl font-bold text-text-main dark:text-surface">Create New Password</h1>
-          <p class="text-text-muted dark:text-text-muted/70 mt-2">Enter your new password below</p>
+          <h1 class="text-3xl font-bold text-text-main dark:text-surface">Créer un nouveau mot de passe</h1>
+          <p class="text-text-muted dark:text-text-muted/70 mt-2">Entrez votre nouveau mot de passe ci-dessous</p>
         </div>
 
         <form v-if="!submitted" @submit.prevent="handleResetPassword" class="space-y-6">
@@ -14,7 +14,7 @@
               for="email"
               class="block text-sm font-medium text-text-main dark:text-surface/80"
             >
-              Email Address
+              Email
             </label>
             <input
               id="email"
@@ -32,7 +32,7 @@
               for="password"
               class="block text-sm font-medium text-text-main dark:text-surface/80"
             >
-              New Password
+              Nouveau mot de passe
             </label>
             <input
               id="password"
@@ -42,7 +42,7 @@
               class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-primary-hover"
               required
             />
-            <p class="text-xs text-text-muted dark:text-text-muted/70">Must be at least 8 characters</p>
+            <p class="text-xs text-text-muted dark:text-text-muted/70">Doit contenir au moins 8 caractères</p>
           </div>
 
           <!-- Password Confirmation Field -->
@@ -51,7 +51,7 @@
               for="password-confirmation"
               class="block text-sm font-medium text-text-main dark:text-surface/80"
             >
-              Confirm Password
+              Confirmer le mot de passe
             </label>
             <input
               id="password-confirmation"
@@ -74,22 +74,22 @@
             :disabled="authStore.isLoading"
             class="w-full bg-primary hover:bg-primary-hover dark:bg-primary-hover dark:hover:bg-primary text-surface dark:text-text-main font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
           >
-            {{ authStore.isLoading ? 'Resetting...' : 'Reset Password' }}
+            {{ authStore.isLoading ? 'Réinitialisation...' : 'Réinitialiser' }}
           </button>
         </form>
 
         <!-- Success Message -->
         <div v-else class="space-y-4">
           <div class="bg-success/10 dark:bg-success/20 border border-success/30 dark:border-success/40 text-success dark:text-success px-4 py-3 rounded-lg">
-            <p class="font-medium">Password reset successfully</p>
-            <p class="text-sm mt-1">You can now log in with your new password</p>
+            <p class="font-medium">Mot de passe réinitialisé</p>
+            <p class="text-sm mt-1">Vous pouvez maintenant vous connecter avec votre nouveau mot de passe</p>
           </div>
 
           <router-link
             to="/login"
             class="block text-center bg-primary hover:bg-primary-hover dark:bg-primary-hover dark:hover:bg-primary text-surface dark:text-text-main font-medium py-2 px-4 rounded-lg transition-colors"
           >
-            Back to Login
+            Retour à la connexion
           </router-link>
         </div>
       </div>

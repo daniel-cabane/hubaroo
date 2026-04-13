@@ -14,7 +14,7 @@
         :class="showTimer || isLastMinute ? 'bg-error/10 text-error font-bold' : 'bg-gray-100 dark:bg-gray-800 text-text-muted'"
       >
         <span v-if="showTimer || isLastMinute">{{ formattedTime }}</span>
-        <span v-else>Show Timer</span>
+        <span v-else>Afficher le chrono</span>
       </button>
     </div>
 
@@ -25,8 +25,8 @@
     >
       <div class="bg-surface dark:bg-gray-900 rounded-2xl p-8 text-center max-w-sm mx-4">
         <div class="text-6xl font-bold text-error mb-4 font-mono">{{ blurCountdown }}</div>
-        <p class="text-lg text-text-main dark:text-surface mb-2">Come back!</p>
-        <p class="text-sm text-text-muted">Your attempt will be auto-submitted if you don't return.</p>
+        <p class="text-lg text-text-main dark:text-surface mb-2">Revenez !</p>
+        <p class="text-sm text-text-muted">Votre tentative sera soumise automatiquement si vous ne revenez pas.</p>
       </div>
     </div>
 
@@ -98,7 +98,7 @@
         @click="showSubmitModal = true"
         class="px-6 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors"
       >
-        Submit
+        Soumettre
       </button>
     </div>
 
@@ -109,7 +109,7 @@
       @click.self="showJumpModal = false"
     >
       <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-xs mx-4 shadow-xl">
-        <h3 class="text-lg font-bold text-text-main dark:text-surface mb-4">Jump to Question</h3>
+        <h3 class="text-lg font-bold text-text-main dark:text-surface mb-4">Aller à la question</h3>
         <input
           ref="jumpInput"
           v-model="jumpNumber"
@@ -126,13 +126,13 @@
             @click="showJumpModal = false"
             class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
           >
-            Cancel
+            Annuler
           </button>
           <button
             @click="confirmJump"
             class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors"
           >
-            Go
+            Aller
           </button>
         </div>
       </div>
@@ -144,26 +144,26 @@
       class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
     >
       <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
-        <h3 class="text-lg font-bold text-text-main dark:text-surface mb-2">Submit Attempt?</h3>
+        <h3 class="text-lg font-bold text-text-main dark:text-surface mb-2">Soumettre la tentative ?</h3>
         <p class="text-sm text-text-muted mb-1">
-          Answered: {{ answeredCount }} / 26
+          Répondu : {{ answeredCount }} / 26
         </p>
         <p class="text-sm text-text-muted mb-4">
-          You cannot change your answers after submitting.
+          Vous ne pourrez plus modifier vos réponses après la soumission.
         </p>
         <div class="flex gap-3">
           <button
             @click="showSubmitModal = false"
             class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
           >
-            Cancel
+            Annuler
           </button>
           <button
             @click="handleSubmit"
             :disabled="attemptStore.isLoading"
             class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
           >
-            {{ attemptStore.isLoading ? 'Submitting...' : 'Submit' }}
+            {{ attemptStore.isLoading ? 'Soumission...' : 'Soumettre' }}
           </button>
         </div>
       </div>
@@ -279,7 +279,7 @@ async function selectAnswer(letter) {
   const newAnswer = currentAnswer === letter ? null : letter;
 
   try {
-    await attemptStore.updateAnswer(attemptStore.attempt.id, currentIndex.value, newAnswer);
+    await attemptStore.updateAnswer(attemptStore.attempt.id, currentIndex.value, newAnswer, remainingSeconds.value);
   } catch {
     // error handled by store
   }
@@ -288,7 +288,7 @@ async function selectAnswer(letter) {
 async function handleSubmit() {
   showSubmitModal.value = false;
   try {
-    const result = await attemptStore.submitAttempt(attemptStore.attempt.id);
+    const result = await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, 'submitted');
     router.replace({
       name: 'Results',
       params: { code: route.params.code, attemptId: attemptStore.attempt.id },
@@ -387,10 +387,10 @@ function startCountdown(timeLimitMinutes) {
   }, 1000);
 }
 
-async function autoSubmit() {
+async function autoSubmit(termination = 'timeout') {
   if (!isInProgress.value) return;
   try {
-    await attemptStore.submitAttempt(attemptStore.attempt.id);
+    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, termination);
     router.replace({
       name: 'Results',
       params: { code: route.params.code, attemptId: attemptStore.attempt.id },
@@ -409,7 +409,7 @@ function handleBlur() {
       if (blurCountdown.value <= 0) {
         clearInterval(blurInterval);
         showBlurAlarm.value = false;
-        autoSubmit();
+        autoSubmit('blurred');
       }
     }, 1000);
   }

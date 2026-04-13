@@ -31,11 +31,13 @@ export const useAttemptStore = defineStore('attempt', () => {
     localStorage.removeItem(STORAGE_KEY);
   }
 
-  async function createAttempt(sessionCode) {
+  async function createAttempt(sessionCode, name = null) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await axios.post(`/api/kangourou-sessions/${sessionCode}/attempts`);
+      const response = await axios.post(`/api/kangourou-sessions/${sessionCode}/attempts`, {
+        name,
+      });
       attempt.value = response.data.attempt;
       saveToLocalStorage(response.data.attempt, sessionCode);
       return response.data.attempt;
@@ -62,11 +64,12 @@ export const useAttemptStore = defineStore('attempt', () => {
     }
   }
 
-  async function updateAnswer(attemptId, questionIndex, answer) {
+  async function updateAnswer(attemptId, questionIndex, answer, timer = null) {
     try {
       const response = await axios.patch(`/api/attempts/${attemptId}/answer`, {
         question_index: questionIndex,
         answer: answer,
+        timer,
       });
       attempt.value = response.data.attempt;
       return response.data.attempt;
@@ -76,11 +79,14 @@ export const useAttemptStore = defineStore('attempt', () => {
     }
   }
 
-  async function submitAttempt(attemptId) {
+  async function submitAttempt(attemptId, timer = null, termination = 'submitted') {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await axios.post(`/api/attempts/${attemptId}/submit`);
+      const response = await axios.post(`/api/attempts/${attemptId}/submit`, {
+        timer,
+        termination,
+      });
       attempt.value = response.data.attempt;
       clearLocalStorage();
       return response.data;

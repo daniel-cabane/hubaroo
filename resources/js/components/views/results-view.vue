@@ -1,11 +1,11 @@
 <template>
   <div class="container mx-auto p-6 max-w-2xl">
-    <div v-if="isLoading" class="text-center text-text-muted">Loading results...</div>
+    <div v-if="isLoading" class="text-center text-text-muted">Chargement des résultats...</div>
 
     <div v-else-if="attempt">
       <!-- Score Summary -->
       <div class="text-center mb-8">
-        <h2 class="text-2xl font-bold text-text-main dark:text-surface mb-2">Results</h2>
+        <h2 class="text-2xl font-bold text-text-main dark:text-surface mb-2">Résultats</h2>
         <p class="text-sm text-text-muted mb-4">{{ session?.paper?.title }}</p>
         <div class="inline-block bg-surface dark:bg-gray-900 border border-border rounded-2xl px-8 py-6 shadow-md">
           <div class="text-5xl font-bold text-primary">{{ attempt.score }}</div>
@@ -13,8 +13,13 @@
         </div>
       </div>
 
+      <!-- Delayed correction notice -->
+      <div v-if="!correctionAvailable" class="mb-8 p-4 bg-info/10 border border-info/30 rounded-lg text-center">
+        <p class="text-sm text-text-main dark:text-surface">La correction sera disponible à la fin de la session.</p>
+      </div>
+
       <!-- Question Review -->
-      <div class="space-y-4">
+      <div v-if="correctionAvailable" class="space-y-4">
         <div
           v-for="(answer, idx) in attempt.answers"
           :key="idx"
@@ -28,14 +33,14 @@
           </div>
 
           <div class="flex-1 text-sm">
-            <span class="text-text-main dark:text-surface">Your answer: </span>
+            <span class="text-text-main dark:text-surface">Votre réponse : </span>
             <span class="font-bold" :class="answer.status === 'correct' ? 'text-success' : answer.status === 'incorrect' ? 'text-error' : 'text-text-muted'">
               {{ answer.answer || '—' }}
             </span>
           </div>
 
           <div class="text-sm text-text-muted">
-            Correct: <span class="font-bold text-success">{{ correctAnswers[idx] }}</span>
+            Correct : <span class="font-bold text-success">{{ correctAnswers[idx] }}</span>
           </div>
         </div>
       </div>
@@ -46,7 +51,7 @@
           to="/"
           class="inline-block px-6 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors"
         >
-          Back to Home
+          Retour à l'accueil
         </router-link>
       </div>
     </div>
@@ -70,6 +75,10 @@ const attempt = ref(null);
 const correctAnswers = computed(() => {
   if (!session.value?.paper?.questions) return [];
   return session.value.paper.questions.map(q => q.correct_answer);
+});
+
+const correctionAvailable = computed(() => {
+  return correctAnswers.value.length > 0 && correctAnswers.value[0] != null;
 });
 
 function reviewRowClass(answer) {

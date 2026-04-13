@@ -21,12 +21,18 @@ class AttemptController extends Controller
             return response()->json(['message' => 'This session is no longer active.'], 403);
         }
 
+        $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+        ]);
+
         $attempt = Attempt::create([
             'kangourou_session_id' => $session->id,
             'user_id' => $request->user()?->id,
+            'name' => $request->user() ? null : $request->input('name'),
             'code' => Attempt::generateCode(),
             'answers' => Attempt::defaultAnswers(),
             'status' => 'inProgress',
+            'termination' => 'none',
         ]);
 
         return response()->json([
@@ -37,7 +43,9 @@ class AttemptController extends Controller
 
     public function show(Attempt $attempt): JsonResponse
     {
-        return response()->json(['attempt' => $attempt->load('kangourouSession.paper')]);
+        $attempt->load('kangourouSession.paper');
+
+        return response()->json(['attempt' => $this->maskCorrectionIfNeeded($attempt)]);
     }
 
     public function updateAnswer(UpdateAnswerRequest $request, Attempt $attempt): JsonResponse
@@ -58,7 +66,10 @@ class AttemptController extends Controller
         $answers[$index]['answer'] = $answer;
         $answers[$index]['status'] = $answer ? 'answered' : 'unanswered';
 
-        $attempt->update(['answers' => $answers]);
+        $attempt->update([
+            'answers' => $answers,
+            'timer' => $request->validated('timer'),
+        ]);
 
         return response()->json([
             'message' => 'Answer saved.',
@@ -66,18 +77,28 @@ class AttemptController extends Controller
         ]);
     }
 
-    public function submit(Attempt $attempt): JsonResponse
+    public function submit(Attempt $attempt, Request $request): JsonResponse
     {
         if ($attempt->status === 'finished') {
             return response()->json(['message' => 'This attempt has already been submitted.'], 403);
         }
+
+        $request->validate([
+            'timer' => ['nullable', 'integer', 'min:0'],
+            'termination' => ['nullable', 'in:submitted,blurred,timeout'],
+        ]);
+
+        $attempt->update([
+            'timer' => $request->input('timer'),
+            'termination' => $request->input('termination', 'submitted'),
+        ]);
 
         $score = $this->gradingService->gradeAndSave($attempt);
 
         return response()->json([
             'message' => 'Attempt submitted and graded.',
             'score' => $score,
-            'attempt' => $attempt->fresh(),
+            'attempt' => $this->maskCorrectionIfNeeded($attempt->fresh()),
         ]);
     }
 
@@ -99,5 +120,30 @@ class AttemptController extends Controller
             ->get();
 
         return response()->json(['attempts' => $attempts]);
+    }
+
+    /**
+     * Mask answer statuses when correction is delayed and session is still active.
+     */
+    private function maskCorrectionIfNeeded(Attempt $attempt): Attempt
+    {
+        $session = $attempt->kangourouSession;
+        if (! $session) {
+            return $attempt;
+        }
+
+        $preferences = $session->getEffectivePreferences();
+
+        if ($preferences['correction'] === 'delayed' && ! $session->isExpired()) {
+            $answers = array_map(function ($answer) {
+                $answer['status'] = $answer['answer'] !== null ? 'answered' : 'unanswered';
+
+                return $answer;
+            }, $attempt->answers);
+
+            $attempt->setAttribute('answers', $answers);
+        }
+
+        return $attempt;
     }
 }
