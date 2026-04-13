@@ -86,7 +86,7 @@ const form = ref({
 
 async function handleLogin() {
   try {
-    await authStore.login(form.email, form.password);
+    await authStore.login(form.value.email, form.value.password);
     router.push('/');
   } catch (error) {
     // Error is handled by the store

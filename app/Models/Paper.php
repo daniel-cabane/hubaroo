@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use Database\Factories\PaperFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Paper extends Model
 {
+    /** @use HasFactory<PaperFactory> */
+    use HasFactory;
+
     /**
      * The attributes that are mass assignable.
      *

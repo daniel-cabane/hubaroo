@@ -1,9 +1,33 @@
 <template>
-    <div class="container mx-auto p-6">
-        <h2 class="text-2xl font-bold mb-4">Welcome to Hubaroo</h2>
-        <p class="text-gray-600">This is the home page content below the toolbar.</p>
+  <div class="flex items-center justify-center min-h-[calc(100vh-64px)] p-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl w-full">
+      <!-- Create Session -->
+      <router-link
+        to="/kangourou/create"
+        class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-primary/20 bg-surface p-10 shadow-sm transition-all hover:border-primary hover:shadow-lg hover:-translate-y-1"
+      >
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+          <PlusCircle class="h-8 w-8" />
+        </div>
+        <h2 class="text-xl font-bold text-text-main">Create a Session</h2>
+        <p class="text-sm text-text-muted text-center">Pick a paper and start a new Kangourou session for your students.</p>
+      </router-link>
+
+      <!-- Join Session -->
+      <router-link
+        to="/kangourou/join"
+        class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-secondary/20 bg-surface p-10 shadow-sm transition-all hover:border-secondary hover:shadow-lg hover:-translate-y-1"
+      >
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary transition-colors group-hover:bg-secondary group-hover:text-white">
+          <LogIn class="h-8 w-8" />
+        </div>
+        <h2 class="text-xl font-bold text-text-main">Join a Session</h2>
+        <p class="text-sm text-text-muted text-center">Enter a session code to join an existing Kangourou session.</p>
+      </router-link>
     </div>
+  </div>
 </template>
+
 <script setup>
-    console.log('home view loaded');
+import { PlusCircle, LogIn } from 'lucide-vue-next';
 </script>

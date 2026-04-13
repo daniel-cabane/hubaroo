@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\KangourouSessionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -21,7 +23,24 @@ Route::middleware(['web'])->group(function () {
     });
 });
 
+// Kangourou Session API Routes (guests allowed)
+Route::get('/api/papers', [KangourouSessionController::class, 'papers'])->name('papers.index');
+Route::post('/api/kangourou-sessions', [KangourouSessionController::class, 'store'])->name('kangourou-sessions.store');
+Route::get('/api/kangourou-sessions/{code}', [KangourouSessionController::class, 'show'])->name('kangourou-sessions.show');
+Route::patch('/api/kangourou-sessions/{kangourouSession}/activate', [KangourouSessionController::class, 'activate'])->name('kangourou-sessions.activate');
 
-Route::fallback(function() {
+Route::post('/api/kangourou-sessions/{code}/attempts', [AttemptController::class, 'store'])->name('attempts.store');
+Route::get('/api/attempts/{attempt}', [AttemptController::class, 'show'])->name('attempts.show');
+Route::patch('/api/attempts/{attempt}/answer', [AttemptController::class, 'updateAnswer'])->name('attempts.updateAnswer');
+Route::post('/api/attempts/{attempt}/submit', [AttemptController::class, 'submit'])->name('attempts.submit');
+Route::get('/api/attempts/recover/{code}', [AttemptController::class, 'recover'])->name('attempts.recover');
+
+// Auth-only history routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/api/my/kangourou-sessions', [KangourouSessionController::class, 'myIndex'])->name('kangourou-sessions.myIndex');
+    Route::get('/api/my/attempts', [AttemptController::class, 'myIndex'])->name('attempts.myIndex');
+});
+
+Route::fallback(function () {
     return view('welcome');
 });
