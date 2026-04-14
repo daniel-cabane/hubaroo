@@ -25,10 +25,25 @@ class AttemptController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
         ]);
 
+        // Check if authenticated user already has an attempt for this session
+        $userId = $request->user()?->id;
+        if ($userId) {
+            $existingAttempt = Attempt::where('kangourou_session_id', $session->id)
+                ->where('user_id', $userId)
+                ->first();
+
+            if ($existingAttempt) {
+                return response()->json([
+                    'message' => 'You already have an attempt for this session.',
+                    'attempt' => $existingAttempt,
+                ], 409);
+            }
+        }
+
         $attempt = Attempt::create([
             'kangourou_session_id' => $session->id,
-            'user_id' => $request->user()?->id,
-            'name' => $request->user() ? null : $request->input('name'),
+            'user_id' => $userId,
+            'name' => $userId ? null : $request->input('name'),
             'code' => Attempt::generateCode(),
             'answers' => Attempt::defaultAnswers(),
             'status' => 'inProgress',

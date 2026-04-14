@@ -4,7 +4,7 @@
 
     <div v-else-if="attempt">
       <!-- Score Summary -->
-      <div class="text-center mb-8">
+      <div v-if="correctionAvailable" class="text-center mb-8">
         <h2 class="text-2xl font-bold text-text-main dark:text-surface mb-2">Résultats</h2>
         <p class="text-sm text-text-muted mb-4">{{ session?.paper?.title }}</p>
         <div class="inline-block bg-surface dark:bg-gray-900 border border-border rounded-2xl px-8 py-6 shadow-md">

@@ -86,6 +86,10 @@ class KangourouSessionController extends Controller
             $data['privacy'] = $request->validated('privacy');
         }
 
+        if ($request->has('expires_at')) {
+            $data['expires_at'] = $request->validated('expires_at');
+        }
+
         if ($request->has('preferences')) {
             $current = $kangourouSession->preferences ?? [];
             $incoming = $request->validated('preferences');
@@ -113,6 +117,29 @@ class KangourouSessionController extends Controller
             ->get();
 
         return response()->json(['sessions' => $sessions]);
+    }
+
+    public function details(Request $request, KangourouSession $kangourouSession): JsonResponse
+    {
+        $this->authorize('view', $kangourouSession);
+
+        $kangourouSession->load(['paper', 'attempts' => function ($query) {
+            $query->latest()->select('id', 'kangourou_session_id', 'user_id', 'name', 'code', 'status', 'score', 'timer', 'termination', 'answers', 'created_at', 'updated_at');
+        }]);
+
+        return response()->json(['session' => $kangourouSession]);
+    }
+
+    public function changeCode(Request $request, KangourouSession $kangourouSession): JsonResponse
+    {
+        $this->authorize('view', $kangourouSession);
+
+        $kangourouSession->update(['code' => KangourouSession::generateCode()]);
+
+        return response()->json([
+            'message' => 'Session code changed.',
+            'session' => $kangourouSession->fresh()->load('paper'),
+        ]);
     }
 
     public function papers(): JsonResponse

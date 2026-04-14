@@ -2,7 +2,7 @@
   <div class="container mx-auto p-6 max-w-lg">
     <h2 class="text-2xl font-bold mb-6 text-text-main dark:text-surface">Créer une session Kangourou</h2>
 
-    <form @submit.prevent="handleCreate" class="space-y-6">
+    <form v-if="!createdSession" @submit.prevent="handleCreate" class="space-y-6">
       <!-- Paper Selection -->
       <div class="space-y-2">
         <label class="block text-sm font-medium text-text-main dark:text-surface/80">Sujet</label>
@@ -188,6 +188,6 @@ async function handleCreate() {
 }
 
 function goToSession() {
-  router.push({ name: 'Session', params: { code: createdSession.value.code } });
+  router.push({ name: 'SessionDetails', params: { id: createdSession.value.id } });
 }
 </script>

@@ -262,3 +262,71 @@ test('guest cannot update session', function () {
 
     $response->assertUnauthorized();
 });
+
+test('author can fetch session details with attempts', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    // Create some attempts
+    Attempt::factory()->count(2)->create(['kangourou_session_id' => $session->id]);
+    Attempt::factory()->finished()->create(['kangourou_session_id' => $session->id]);
+
+    $response = $this->actingAs($user)->getJson("/api/kangourou-sessions/{$session->id}/details");
+
+    $response->assertOk();
+    $response->assertJsonStructure(['session' => ['id', 'code', 'paper', 'attempts']]);
+    expect(count($response->json('session.attempts')))->toBe(3);
+});
+
+test('non-author cannot fetch session details', function () {
+    $author = User::factory()->create();
+    $other = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($author)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    $response = $this->actingAs($other)->getJson("/api/kangourou-sessions/{$session->id}/details");
+
+    $response->assertForbidden();
+});
+
+test('guest cannot fetch session details', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    $response = $this->getJson("/api/kangourou-sessions/{$session->id}/details");
+
+    $response->assertUnauthorized();
+});
+
+test('author can change session code', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+    $oldCode = $session->code;
+
+    $response = $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}/change-code");
+
+    $response->assertOk();
+    $newCode = $response->json('session.code');
+    expect($newCode)->not->toBe($oldCode);
+    expect(strlen($newCode))->toBe(6);
+    expect($session->fresh()->code)->toBe($newCode);
+});
+
+test('non-author cannot change session code', function () {
+    $author = User::factory()->create();
+    $other = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($author)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    $response = $this->actingAs($other)->patchJson("/api/kangourou-sessions/{$session->id}/change-code");
+
+    $response->assertForbidden();
+});

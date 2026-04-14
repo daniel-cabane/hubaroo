@@ -87,6 +87,21 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     }
   }
 
+  async function fetchSessionDetails(sessionId) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await axios.get(`/api/kangourou-sessions/${sessionId}/details`);
+      session.value = response.data.session;
+      return response.data.session;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to fetch session details';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   async function updateSession(sessionId, data) {
     isLoading.value = true;
     error.value = null;
@@ -106,6 +121,25 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     }
   }
 
+  async function changeSessionCode(sessionId) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await axios.patch(`/api/kangourou-sessions/${sessionId}/change-code`);
+      const updated = response.data.session;
+      const idx = mySessions.value.findIndex(s => s.id === sessionId);
+      if (idx !== -1) {
+        mySessions.value[idx] = updated;
+      }
+      return updated;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to change session code';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   function clearError() {
     error.value = null;
   }
@@ -119,9 +153,11 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     fetchPapers,
     createSession,
     fetchSession,
+    fetchSessionDetails,
     activateSession,
     fetchMySessions,
     updateSession,
+    changeSessionCode,
     clearError,
   };
 });

@@ -144,8 +144,17 @@ test('validates answer update with invalid answer letter', function () {
 
 test('authenticated user can fetch their attempts', function () {
     $user = User::factory()->create();
-    Attempt::factory()->count(2)->create([
+    $paper = Paper::factory()->withQuestions()->create();
+
+    // Create 2 attempts in different sessions
+    Attempt::factory()->create([
         'kangourou_session_id' => $this->session->id,
+        'user_id' => $user->id,
+    ]);
+
+    $session2 = KangourouSession::factory()->create(['paper_id' => $paper->id]);
+    Attempt::factory()->create([
+        'kangourou_session_id' => $session2->id,
         'user_id' => $user->id,
     ]);
 
@@ -319,4 +328,42 @@ test('new attempt has default termination of none', function () {
 
     $response->assertCreated();
     expect($response->json('attempt.termination'))->toBe('none');
+});
+
+test('authenticated user cannot create multiple attempts for the same session', function () {
+    $user = User::factory()->create();
+
+    // Create first attempt
+    $response1 = $this->actingAs($user)
+        ->postJson("/api/kangourou-sessions/{$this->session->code}/attempts");
+
+    $response1->assertCreated();
+    $firstAttemptId = $response1->json('attempt.id');
+
+    // Attempt to create second attempt
+    $response2 = $this->actingAs($user)
+        ->postJson("/api/kangourou-sessions/{$this->session->code}/attempts");
+
+    $response2->assertStatus(409);
+    $response2->assertJson([
+        'message' => 'You already have an attempt for this session.',
+        'attempt' => ['id' => $firstAttemptId],
+    ]);
+});
+
+test('guest users can create multiple attempts for the same session', function () {
+    // Create first guest attempt
+    $response1 = $this->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
+        'name' => 'Guest 1',
+    ]);
+
+    $response1->assertCreated();
+
+    // Create second guest attempt
+    $response2 = $this->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
+        'name' => 'Guest 2',
+    ]);
+
+    $response2->assertCreated();
+    expect($response2->json('attempt.name'))->toBe('Guest 2');
 });

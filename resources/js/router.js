@@ -6,6 +6,7 @@ import ResetPasswordView from "./components/views/reset-password-view.vue";
 import CreateSessionView from "./components/views/create-session-view.vue";
 import JoinSessionView from "./components/views/join-session-view.vue";
 import SessionView from "./components/views/session-view.vue";
+import SessionDetailsView from "./components/views/session-details-view.vue";
 import AttemptView from "./components/views/attempt-view.vue";
 import ResultsView from "./components/views/results-view.vue";
 import MySessionsView from "./components/views/my-sessions-view.vue";
@@ -65,6 +66,12 @@ const routes = [
         path: "/my/sessions",
         name: "MySessions",
         component: MySessionsView,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: "/my/sessions/:id",
+        name: "SessionDetails",
+        component: SessionDetailsView,
         meta: { requiresAuth: true }
     },
     {

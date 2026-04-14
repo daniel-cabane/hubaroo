@@ -40,6 +40,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/my/kangourou-sessions', [KangourouSessionController::class, 'myIndex'])->name('kangourou-sessions.myIndex');
     Route::get('/api/my/attempts', [AttemptController::class, 'myIndex'])->name('attempts.myIndex');
     Route::patch('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'update'])->name('kangourou-sessions.update');
+    Route::get('/api/kangourou-sessions/{kangourouSession}/details', [KangourouSessionController::class, 'details'])->name('kangourou-sessions.details');
+    Route::patch('/api/kangourou-sessions/{kangourouSession}/change-code', [KangourouSessionController::class, 'changeCode'])->name('kangourou-sessions.changeCode');
 });
 
 Route::fallback(function () {

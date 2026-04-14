@@ -24,6 +24,7 @@ class UpdateKangourouSessionRequest extends FormRequest
     {
         return [
             'privacy' => ['sometimes', 'in:public,private'],
+            'expires_at' => ['sometimes', 'date'],
             'preferences' => ['sometimes', 'array'],
             'preferences.correction' => ['sometimes', 'in:immediate,delayed'],
             'preferences.grading' => ['sometimes', 'array'],
