@@ -51,7 +51,7 @@
       <button
         @click="prevQuestion"
         :disabled="currentIndex === 0"
-        class="flex-shrink-0 w-12 h-12 rounded-full bg-secondary hover:bg-secondary/80 text-white disabled:opacity-30 transition-colors flex items-center justify-center"
+        class="flex-shrink-0 w-12 h-12 rounded-full bg-primary hover:bg-primary-hover cursor-pointer text-white disabled:opacity-30 transition-colors flex items-center justify-center"
       >
         <ChevronLeft class="w-6 h-6" />
       </button>
@@ -86,7 +86,7 @@
       <button
         @click="nextQuestion"
         :disabled="currentIndex === 25"
-        class="flex-shrink-0 w-12 h-12 rounded-full bg-secondary hover:bg-secondary/80 text-white disabled:opacity-30 transition-colors flex items-center justify-center"
+        class="flex-shrink-0 w-12 h-12 rounded-full bg-primary hover:bg-primary-hover cursor-pointer text-white disabled:opacity-30 transition-colors flex items-center justify-center"
       >
         <ChevronRight class="w-6 h-6" />
       </button>

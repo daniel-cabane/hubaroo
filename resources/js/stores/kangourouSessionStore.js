@@ -22,11 +22,11 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     }
   }
 
-  async function createSession(paperId, privacy = 'public', preferences = null) {
+  async function createSession(paperId, privacy = 'public', preferences = null, status = 'draft') {
     isLoading.value = true;
     error.value = null;
     try {
-      const payload = { paper_id: paperId, privacy };
+      const payload = { paper_id: paperId, privacy, status };
       if (preferences) {
         payload.preferences = preferences;
       }

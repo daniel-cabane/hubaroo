@@ -37,6 +37,12 @@ class DatabaseSeeder extends Seeder
                 ->withSecretPassword()
                 ->create()
                 ->each(fn (User $user) => $user->assignRole('Student'));
+
+            // Seed Kangourou sessions and attempts
+            $this->call(KangourouSessionSeeder::class);
+
+            // Seed divisions with students
+            $this->call(DivisionSeeder::class);
         }
     }
 }

@@ -1,8 +1,12 @@
 <template>
   <div class="flex items-center justify-center min-h-[calc(100vh-64px)] p-6">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl w-full">
+    <div 
+      class=" gap-8 max-w-3xl w-full justify-items-center"
+      :class="authStore.isAuthenticated ? 'grid grid-cols-1 md:grid-cols-2' : 'grid grid-cols-1'"
+    >
       <!-- Create Session -->
       <router-link
+        v-if="authStore.isAuthenticated"
         to="/kangourou/create"
         class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-primary/20 bg-surface p-10 shadow-sm transition-all hover:border-primary hover:shadow-lg hover:-translate-y-1"
       >
@@ -30,4 +34,7 @@
 
 <script setup>
 import { PlusCircle, LogIn } from 'lucide-vue-next';
+import { useAuthStore } from '@/stores/authStore';
+
+const authStore = useAuthStore();
 </script>

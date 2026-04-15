@@ -18,104 +18,17 @@
         </select>
       </div>
 
-      <!-- Privacy -->
+      <!-- Status -->
       <div class="space-y-2">
-        <label class="block text-sm font-medium text-text-main dark:text-surface/80">Confidentialité</label>
+        <label class="block text-sm font-medium text-text-main dark:text-surface/80">Statut</label>
         <select
-          v-model="form.privacy"
+          v-model="form.status"
           class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          <option value="public">Public</option>
-          <option value="private">Privé</option>
+          <option value="draft">Brouillon</option>
+          <option value="active">Active</option>
         </select>
       </div>
-
-      <!-- Time Limit -->
-      <div class="space-y-2">
-        <label class="block text-sm font-medium text-text-main dark:text-surface/80">Durée limite (minutes)</label>
-        <input
-          v-model.number="form.preferences.time_limit"
-          type="number"
-          min="1"
-          max="180"
-          class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </div>
-
-      <!-- Correction Mode -->
-      <div class="space-y-2">
-        <label class="block text-sm font-medium text-text-main dark:text-surface/80">Correction</label>
-        <select
-          v-model="form.preferences.correction"
-          class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="delayed">Différée (après soumission)</option>
-          <option value="immediate">Immédiate</option>
-        </select>
-      </div>
-
-      <!-- Grading Rules -->
-      <fieldset class="space-y-3 border border-border rounded-lg p-4">
-        <legend class="text-sm font-medium text-text-main dark:text-surface/80 px-1">Barème</legend>
-
-        <div class="grid grid-cols-3 gap-3">
-          <div class="space-y-1">
-            <label class="block text-xs text-text-muted">Palier 1 (Q1–8)</label>
-            <input
-              v-model.number="form.preferences.grading.tier1"
-              type="number"
-              min="0"
-              step="1"
-              class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div class="space-y-1">
-            <label class="block text-xs text-text-muted">Palier 2 (Q9–16)</label>
-            <input
-              v-model.number="form.preferences.grading.tier2"
-              type="number"
-              min="0"
-              step="1"
-              class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div class="space-y-1">
-            <label class="block text-xs text-text-muted">Palier 3 (Q17–24)</label>
-            <input
-              v-model.number="form.preferences.grading.tier3"
-              type="number"
-              min="0"
-              step="1"
-              class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1">
-            <label class="block text-xs text-text-muted">Fraction de pénalité</label>
-            <input
-              v-model.number="form.preferences.grading.penalty_fraction"
-              type="number"
-              min="0"
-              max="1"
-              step="0.05"
-              class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <p class="text-xs text-text-muted">ex. 0,25 = 1/4 des points déduits</p>
-          </div>
-          <div class="space-y-1">
-            <label class="block text-xs text-text-muted">Bonus palier 4 (Q25–26)</label>
-            <input
-              v-model.number="form.preferences.grading.tier4_bonus"
-              type="number"
-              min="0"
-              step="1"
-              class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-        </div>
-      </fieldset>
 
       <!-- Error Message -->
       <div v-if="sessionStore.error" class="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg text-sm">
@@ -148,26 +61,17 @@
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/authStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const sessionStore = useKangourouSessionStore();
 const createdSession = ref(null);
 
 const form = reactive({
   paper_id: '',
-  privacy: 'public',
-  preferences: {
-    time_limit: 50,
-    correction: 'delayed',
-    grading: {
-      tier1: 3,
-      tier2: 4,
-      tier3: 5,
-      tier4_bonus: 1,
-      penalty_fraction: 0.25,
-    },
-  },
+  status: 'draft',
 });
 
 onMounted(() => {
@@ -178,8 +82,9 @@ async function handleCreate() {
   try {
     const session = await sessionStore.createSession(
       form.paper_id,
-      form.privacy,
-      form.preferences,
+      'public',
+      null,
+      form.status,
     );
     createdSession.value = session;
   } catch {
@@ -188,6 +93,11 @@ async function handleCreate() {
 }
 
 function goToSession() {
-  router.push({ name: 'SessionDetails', params: { id: createdSession.value.id } });
+  // Guests navigate using code, authenticated users navigate to details page
+  if (authStore.isAuthenticated) {
+    router.push({ name: 'SessionDetails', params: { id: createdSession.value.id } });
+  } else {
+    router.push({ name: 'Session', params: { code: createdSession.value.code } });
+  }
 }
 </script>

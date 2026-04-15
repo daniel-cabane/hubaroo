@@ -53,7 +53,7 @@
     --color-secondary-light: hsl(27 84% 80%);
     --color-success: hsl(143 63% 48%);
     --color-info: hsl(202 89% 54%);
-    --color-warning: hsl(46 90% 63%);
+    --color-warning: hsl(45, 48%, 47%);
     --color-error: hsl(0 96% 56%);
     --color-bg: hsl(37 67% 98%);
     --color-surface: hsl(0 0% 100%);
@@ -74,7 +74,7 @@
     /* Functional Colors */
     --success: hsl(143 63% 48%);
     --info: hsl(202 89% 54%);
-    --warning: hsl(46 90% 63%);
+    --warning: hsl(45, 48%, 47%);
     --error: hsl(0 96% 56%);
 
     /* Neutral Colors */

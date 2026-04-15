@@ -9,16 +9,12 @@ beforeEach(function () {
     $this->paper = Paper::factory()->withQuestions()->create();
 });
 
-test('guest can create a kangourou session', function () {
+test('guest cannot create a kangourou session', function () {
     $response = $this->postJson('/api/kangourou-sessions', [
         'paper_id' => $this->paper->id,
     ]);
 
-    $response->assertCreated();
-    $response->assertJsonStructure(['message', 'session' => ['id', 'code', 'status']]);
-    expect($response->json('session.author_id'))->toBeNull();
-    expect($response->json('session.status'))->toBe('active');
-    expect(strlen($response->json('session.code')))->toBe(6);
+    $response->assertUnauthorized();
 });
 
 test('authenticated user can create a session with author_id', function () {
@@ -155,14 +151,16 @@ test('can activate a session', function () {
 });
 
 test('create session validates paper_id required', function () {
-    $response = $this->postJson('/api/kangourou-sessions', []);
+    $user = User::factory()->create();
+    $response = $this->actingAs($user)->postJson('/api/kangourou-sessions', []);
 
     $response->assertUnprocessable();
     $response->assertJsonValidationErrors(['paper_id']);
 });
 
 test('create session validates paper exists', function () {
-    $response = $this->postJson('/api/kangourou-sessions', ['paper_id' => 9999]);
+    $user = User::factory()->create();
+    $response = $this->actingAs($user)->postJson('/api/kangourou-sessions', ['paper_id' => 9999]);
 
     $response->assertUnprocessable();
     $response->assertJsonValidationErrors(['paper_id']);

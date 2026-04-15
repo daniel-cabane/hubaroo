@@ -254,7 +254,7 @@ test('guest can create attempt with a name', function () {
     expect($response->json('attempt.name'))->toBe('Jean Dupont');
 });
 
-test('authenticated user attempt has null name', function () {
+test('authenticated user attempt uses account name', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
@@ -262,7 +262,7 @@ test('authenticated user attempt has null name', function () {
     ]);
 
     $response->assertCreated();
-    expect($response->json('attempt.name'))->toBeNull();
+    expect($response->json('attempt.name'))->toBe($user->name);
 });
 
 test('timer is saved when updating an answer', function () {

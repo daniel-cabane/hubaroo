@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "./components/views/home-view.vue";
 import LoginView from "./components/views/login-view.vue";
+import RegisterView from "./components/views/register-view.vue";
 import ForgotPasswordView from "./components/views/forgot-password-view.vue";
 import ResetPasswordView from "./components/views/reset-password-view.vue";
 import CreateSessionView from "./components/views/create-session-view.vue";
@@ -11,6 +12,8 @@ import AttemptView from "./components/views/attempt-view.vue";
 import ResultsView from "./components/views/results-view.vue";
 import MySessionsView from "./components/views/my-sessions-view.vue";
 import MyAttemptsView from "./components/views/my-attempts-view.vue";
+import MyDivisionsView from "./components/views/my-divisions-view.vue";
+import DivisionDetailsView from "./components/views/division-details-view.vue";
 import { useAuthStore } from "./stores/authStore";
 
 const routes = [
@@ -23,6 +26,12 @@ const routes = [
         path: "/login",
         name: "Login",
         component: LoginView,
+        meta: { requiresGuest: true }
+    },
+    {
+        path: "/register",
+        name: "Register",
+        component: RegisterView,
         meta: { requiresGuest: true }
     },
     {
@@ -41,6 +50,7 @@ const routes = [
         path: "/kangourou/create",
         name: "CreateSession",
         component: CreateSessionView,
+        meta: { requiresAuth: true }
     },
     {
         path: "/kangourou/join",
@@ -78,6 +88,18 @@ const routes = [
         path: "/my/attempts",
         name: "MyAttempts",
         component: MyAttemptsView,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: "/my/divisions",
+        name: "MyDivisions",
+        component: MyDivisionsView,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: "/my/divisions/:id",
+        name: "DivisionDetails",
+        component: DivisionDetailsView,
         meta: { requiresAuth: true }
     },
 ];

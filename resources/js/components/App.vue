@@ -48,7 +48,8 @@
               @click="showAccountMenu = !showAccountMenu"
               class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface/20 transition-colors"
             >
-              <CircleUserRound class="w-6 h-6" />
+              <User v-if="!authStore.isAuthenticated" class="w-5 h-5" />
+              <CircleUserRound v-else class="w-7 h-7" />
             </button>
 
             <div
@@ -74,6 +75,13 @@
                 >
                   Mes tentatives
                 </router-link>
+                <router-link
+                  to="/my/divisions"
+                  @click="showAccountMenu = false"
+                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Mes classes
+                </router-link>
                 <div class="border-t border-border">
                   <button
                     @click="handleLogout"
@@ -91,6 +99,13 @@
                 >
                   Connexion
                 </router-link>
+                <router-link
+                  to="/register"
+                  @click="showAccountMenu = false"
+                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Inscription
+                </router-link>
               </template>
             </div>
           </div>
@@ -107,7 +122,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { CircleUserRound, ChevronDown } from 'lucide-vue-next';
+import { CircleUserRound, ChevronDown, User } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 

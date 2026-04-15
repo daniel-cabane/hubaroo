@@ -9,7 +9,7 @@ A logged in user has a session history and an attempt history, but guest users c
 Make a KangourouSession model. The model should have
 - paper_id (has one relationship)
 - a code (6 alphanumeric characters)
-- author_id (nullable)
+- author_id
 - a status (draft, active, expired)
 - a privacy setting (public, private)
 - an expiry datetime (default 120 minutes after creation)

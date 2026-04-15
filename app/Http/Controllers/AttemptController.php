@@ -43,7 +43,7 @@ class AttemptController extends Controller
         $attempt = Attempt::create([
             'kangourou_session_id' => $session->id,
             'user_id' => $userId,
-            'name' => $userId ? null : $request->input('name'),
+            'name' => $userId ? $request->user()->name : $request->input('name'),
             'code' => Attempt::generateCode(),
             'answers' => Attempt::defaultAnswers(),
             'status' => 'inProgress',

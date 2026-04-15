@@ -11,15 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('kangourou_sessions', function (Blueprint $table) {
+        Schema::create('divisions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('paper_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('teacher_id')->constrained('users')->cascadeOnDelete();
+            $table->string('name');
             $table->string('code', 6)->unique();
-            $table->foreignId('author_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('status')->default('draft')->comment('draft, active, expired');
-            $table->string('privacy')->default('private')->comment('public, private');
-            $table->dateTime('expires_at');
             $table->json('preferences')->nullable();
+            $table->boolean('accepting_students')->default(true);
+            $table->boolean('archived')->default(false);
             $table->timestamps();
         });
     }
@@ -29,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('kangourou_sessions');
+        Schema::dropIfExists('divisions');
     }
 };
