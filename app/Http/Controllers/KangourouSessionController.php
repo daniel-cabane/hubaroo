@@ -17,7 +17,7 @@ class KangourouSessionController extends Controller
             'paper_id' => $request->validated('paper_id'),
             'code' => KangourouSession::generateCode(),
             'author_id' => $request->user()?->id,
-            'status' => 'active',
+            'status' => $request->validated('status', 'draft'),
             'privacy' => $request->validated('privacy', 'public'),
             'expires_at' => now()->addMinutes(120),
             'preferences' => $request->validated('preferences', KangourouSession::DEFAULT_PREFERENCES),
@@ -150,5 +150,14 @@ class KangourouSessionController extends Controller
             ->get();
 
         return response()->json(['papers' => $papers]);
+    }
+
+    public function destroy(KangourouSession $kangourouSession, Request $request): JsonResponse
+    {
+        $this->authorize('view', $kangourouSession);
+
+        $kangourouSession->delete();
+
+        return response()->json(['message' => 'Session deleted.']);
     }
 }

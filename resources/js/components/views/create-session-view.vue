@@ -60,11 +60,12 @@
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 const sessionStore = useKangourouSessionStore();
 const createdSession = ref(null);
@@ -76,6 +77,9 @@ const form = reactive({
 
 onMounted(() => {
   sessionStore.fetchPapers();
+  if (route.query.paper_id) {
+    form.paper_id = Number(route.query.paper_id);
+  }
 });
 
 async function handleCreate() {

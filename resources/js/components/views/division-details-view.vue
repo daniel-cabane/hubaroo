@@ -196,7 +196,7 @@
           <h3 class="font-semibold text-text-main dark:text-surface mb-3">Sessions Kangourou</h3>
           <p class="text-sm text-text-muted mb-3">Ouvrir ou fermer vos sessions pour cette classe.</p>
           <div v-if="teacherSessions.length === 0" class="text-sm text-text-muted">
-            Aucune session.
+            Aucune session active.
           </div>
           <ul v-else class="space-y-3">
             <li
@@ -232,7 +232,7 @@
     <template v-else-if="!isTeacher && divisionStore.division">
       <div class="mb-6">
         <h2 class="text-2xl font-bold text-text-main dark:text-surface">{{ divisionStore.division.name }}</h2>
-        <p class="text-text-muted text-sm mt-1">Enseignant·e : {{ divisionStore.division.teacher?.name }}</p>
+        <p class="text-text-muted text-sm mt-1">{{ divisionStore.division.teacher?.name }}</p>
       </div>
 
       <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-3">Sessions disponibles</h3>
@@ -408,7 +408,9 @@ const pendingInvites = computed(() =>
   (divisionStore.division?.invites ?? []).filter(i => i.status === 'pending')
 );
 
-const teacherSessions = computed(() => sessionStore.mySessions ?? []);
+const teacherSessions = computed(() =>
+  (sessionStore.mySessions ?? []).filter(s => s.status === 'active')
+);
 
 const openSessionIds = computed(() =>
   (divisionStore.division?.kangourou_sessions ?? []).map(s => s.id)

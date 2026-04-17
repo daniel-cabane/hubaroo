@@ -19,11 +19,15 @@ class DivisionController extends Controller
 
         if ($user->hasRole('Teacher')) {
             $divisions = $user->teacherDivisions()
+                ->with('teacher')
+                ->with('kangourouSessions', fn ($q) => $q->where('status', 'active')->with('paper'))
                 ->withCount('students')
                 ->latest()
                 ->get();
         } else {
             $divisions = $user->divisions()
+                ->with('teacher')
+                ->with('kangourouSessions', fn ($q) => $q->where('status', 'active')->with('paper'))
                 ->withCount('students')
                 ->latest()
                 ->get();
@@ -43,12 +47,14 @@ class DivisionController extends Controller
 
         if ($isTeacher) {
             $division->load([
+                'teacher',
                 'students',
                 'invites',
                 'kangourouSessions.paper',
             ]);
         } else {
             $division->load([
+                'teacher',
                 'kangourouSessions' => fn ($q) => $q->where('status', 'active'),
                 'kangourouSessions.paper',
             ]);
@@ -69,7 +75,7 @@ class DivisionController extends Controller
 
         return response()->json([
             'message' => 'Division created successfully.',
-            'division' => $division,
+            'division' => $division->load('teacher'),
         ], 201);
     }
 
@@ -80,7 +86,7 @@ class DivisionController extends Controller
 
         return response()->json([
             'message' => 'Division updated.',
-            'division' => $division->fresh(),
+            'division' => $division->fresh(['teacher']),
         ]);
     }
 
@@ -101,7 +107,7 @@ class DivisionController extends Controller
 
         return response()->json([
             'message' => 'Code changed.',
-            'division' => $division->fresh(),
+            'division' => $division->fresh(['teacher']),
         ]);
     }
 

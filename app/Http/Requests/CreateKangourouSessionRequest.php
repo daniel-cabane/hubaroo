@@ -24,6 +24,7 @@ class CreateKangourouSessionRequest extends FormRequest
     {
         return [
             'paper_id' => ['required', 'exists:papers,id'],
+            'status' => ['sometimes', 'in:draft,active'],
             'privacy' => ['sometimes', 'in:public,private'],
             'preferences' => ['sometimes', 'array'],
             'preferences.time_limit' => ['sometimes', 'integer', 'min:1', 'max:180'],

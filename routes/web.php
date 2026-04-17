@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\KangourouSessionController;
+use App\Http\Controllers\PaperController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -27,6 +28,7 @@ Route::middleware(['web'])->group(function () {
 
 // Kangourou Session API Routes (guests allowed)
 Route::get('/api/papers', [KangourouSessionController::class, 'papers'])->name('papers.index');
+Route::get('/api/papers/{paper}', [PaperController::class, 'show'])->name('papers.show');
 Route::get('/api/kangourou-sessions/{code}', [KangourouSessionController::class, 'show'])->name('kangourou-sessions.show');
 
 Route::post('/api/kangourou-sessions/{code}/attempts', [AttemptController::class, 'store'])->name('attempts.store');
@@ -41,11 +43,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/my/kangourou-sessions', [KangourouSessionController::class, 'myIndex'])->name('kangourou-sessions.myIndex');
     Route::get('/api/my/attempts', [AttemptController::class, 'myIndex'])->name('attempts.myIndex');
     Route::patch('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'update'])->name('kangourou-sessions.update');
+    Route::delete('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'destroy'])->name('kangourou-sessions.destroy');
     Route::get('/api/kangourou-sessions/{kangourouSession}/details', [KangourouSessionController::class, 'details'])->name('kangourou-sessions.details');
     Route::patch('/api/kangourou-sessions/{kangourouSession}/change-code', [KangourouSessionController::class, 'changeCode'])->name('kangourou-sessions.changeCode');
     Route::patch('/api/kangourou-sessions/{kangourouSession}/activate', [KangourouSessionController::class, 'activate'])->name('kangourou-sessions.activate');
-
-    // Division routes
     Route::get('/api/my/divisions', [DivisionController::class, 'myIndex'])->name('divisions.myIndex');
     Route::post('/api/divisions', [DivisionController::class, 'store'])->name('divisions.store');
     Route::get('/api/divisions/{division}', [DivisionController::class, 'show'])->name('divisions.show');
@@ -64,31 +65,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/my/invites', [DivisionController::class, 'myInvites'])->name('divisions.myInvites');
     Route::post('/api/invites/{invite}/accept', [DivisionController::class, 'acceptInvite'])->name('divisions.acceptInvite');
     Route::post('/api/invites/{invite}/decline', [DivisionController::class, 'declineInvite'])->name('divisions.declineInvite');
-});
-
-Route::fallback(function () {
-    return view('welcome');
-});
-
-// Kangourou Session API Routes (guests allowed)
-Route::get('/api/papers', [KangourouSessionController::class, 'papers'])->name('papers.index');
-Route::get('/api/kangourou-sessions/{code}', [KangourouSessionController::class, 'show'])->name('kangourou-sessions.show');
-Route::patch('/api/kangourou-sessions/{kangourouSession}/activate', [KangourouSessionController::class, 'activate'])->name('kangourou-sessions.activate');
-
-Route::post('/api/kangourou-sessions/{code}/attempts', [AttemptController::class, 'store'])->name('attempts.store');
-Route::get('/api/attempts/{attempt}', [AttemptController::class, 'show'])->name('attempts.show');
-Route::patch('/api/attempts/{attempt}/answer', [AttemptController::class, 'updateAnswer'])->name('attempts.updateAnswer');
-Route::post('/api/attempts/{attempt}/submit', [AttemptController::class, 'submit'])->name('attempts.submit');
-Route::get('/api/attempts/recover/{code}', [AttemptController::class, 'recover'])->name('attempts.recover');
-
-// Auth-only routes
-Route::middleware(['auth'])->group(function () {
-    Route::post('/api/kangourou-sessions', [KangourouSessionController::class, 'store'])->name('kangourou-sessions.store');
-    Route::get('/api/my/kangourou-sessions', [KangourouSessionController::class, 'myIndex'])->name('kangourou-sessions.myIndex');
-    Route::get('/api/my/attempts', [AttemptController::class, 'myIndex'])->name('attempts.myIndex');
-    Route::patch('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'update'])->name('kangourou-sessions.update');
-    Route::get('/api/kangourou-sessions/{kangourouSession}/details', [KangourouSessionController::class, 'details'])->name('kangourou-sessions.details');
-    Route::patch('/api/kangourou-sessions/{kangourouSession}/change-code', [KangourouSessionController::class, 'changeCode'])->name('kangourou-sessions.changeCode');
 });
 
 Route::fallback(function () {

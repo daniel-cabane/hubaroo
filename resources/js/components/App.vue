@@ -46,10 +46,11 @@
           <div v-if="!isAttemptView" class="relative" ref="menuContainer">
             <button
               @click="showAccountMenu = !showAccountMenu"
-              class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface/20 transition-colors"
+              class="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer hover:bg-surface/20 transition-colors"
+              :class="!authStore.isAuthenticated ? 'bg-surface/30' : ''"
             >
               <User v-if="!authStore.isAuthenticated" class="w-5 h-5" />
-              <CircleUserRound v-else class="w-7 h-7" />
+              <CircleUserRound v-else class="w-9 h-9" />
             </button>
 
             <div
@@ -81,6 +82,13 @@
                   class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   Mes classes
+                </router-link>
+                <router-link
+                  to="/papers"
+                  @click="showAccountMenu = false"
+                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Voir un sujet
                 </router-link>
                 <div class="border-t border-border">
                   <button

@@ -14,6 +14,7 @@ import MySessionsView from "./components/views/my-sessions-view.vue";
 import MyAttemptsView from "./components/views/my-attempts-view.vue";
 import MyDivisionsView from "./components/views/my-divisions-view.vue";
 import DivisionDetailsView from "./components/views/division-details-view.vue";
+import PaperView from "./components/views/paper-view.vue";
 import { useAuthStore } from "./stores/authStore";
 
 const routes = [
@@ -100,6 +101,12 @@ const routes = [
         path: "/my/divisions/:id",
         name: "DivisionDetails",
         component: DivisionDetailsView,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: "/papers",
+        name: "Papers",
+        component: PaperView,
         meta: { requiresAuth: true }
     },
 ];

@@ -140,6 +140,20 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     }
   }
 
+  async function deleteSession(sessionId) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      await axios.delete(`/api/kangourou-sessions/${sessionId}`);
+      mySessions.value = mySessions.value.filter(s => s.id !== sessionId);
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to delete session';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   function clearError() {
     error.value = null;
   }
@@ -158,6 +172,7 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     fetchMySessions,
     updateSession,
     changeSessionCode,
+    deleteSession,
     clearError,
   };
 });
