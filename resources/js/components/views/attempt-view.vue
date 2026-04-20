@@ -56,13 +56,13 @@
         <ChevronLeft class="w-6 h-6" />
       </button>
 
-      <div class="max-w-2xl mx-4 flex-1 relative overflow-hidden">
+      <div class="max-w-2xl mx-4 flex-1 relative overflow-visible">
         <Transition :name="slideDirection" mode="out-in">
           <div v-if="currentQuestion" :key="currentIndex" class="w-full">
             <img
               :src="'/' + currentQuestion.image"
               :alt="'Question ' + (currentIndex + 1)"
-              class="mx-auto max-w-full rounded-lg shadow-md mb-6"
+              class="mx-auto max-w-full rounded-lg all-around-shadow mb-6"
             />
 
             <!-- Answer Buttons -->
@@ -72,7 +72,7 @@
                 :key="letter"
                 @click="selectAnswer(letter)"
                 :disabled="!isInProgress"
-                class="w-14 h-14 rounded-xl text-lg font-bold transition-all"
+                class="w-16 h-16 rounded-xl text-xl font-bold transition-all shadow-lg"
                 :class="answerButtonClass(letter)"
               >
                 {{ letter }}
@@ -476,5 +476,9 @@ onUnmounted(() => {
 .slide-right-leave-to {
   transform: translateX(40px);
   opacity: 0;
+}
+.all-around-shadow {
+    /* 0 offset x, 0 offset y, 15px blur, 5px spread */
+    box-shadow: 0 0 15px 5px rgba(0, 0, 0, 0.1);
 }
 </style>
