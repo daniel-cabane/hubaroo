@@ -192,8 +192,9 @@
         </div>
 
         <!-- Right column: sessions -->
-        <div v-if="!divisionStore.division.archived" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
-          <h3 class="font-semibold text-text-main dark:text-surface mb-3">Sessions Kangourou</h3>
+        <div v-if="!divisionStore.division.archived" class="space-y-4">
+        <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
+          <h3 class="font-semibold text-text-main dark:text-surface">Sessions Actives</h3>
           <p class="text-sm text-text-muted mb-3">Ouvrir ou fermer vos sessions pour cette classe.</p>
           <div v-if="teacherSessions.length === 0" class="text-sm text-text-muted">
             Aucune session active.
@@ -225,6 +226,30 @@
             </li>
           </ul>
         </div>
+
+        <!-- Expired Sessions with Attempts -->
+        <div v-if="expiredSessionsWithAttempts.length > 0" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
+          <h3 class="font-semibold text-text-main dark:text-surface">Sessions expirées</h3>
+          <p class="text-sm text-text-muted mb-3">Sessions terminées avec des tentatives d'élèves.</p>
+          <ul class="space-y-3">
+            <li
+              v-for="session in expiredSessionsWithAttempts"
+              :key="session.id"
+            >
+              <button
+                @click="openExpiredSessionModal(session)"
+                class="w-full flex items-center cursor-pointer justify-between group hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 py-1 rounded-lg transition-colors text-left"
+              >
+                <div>
+                  <p class="text-sm font-medium text-text-main dark:text-surface group-hover:text-primary transition-colors">{{ session.paper?.title }}</p>
+                  <p class="text-xs text-text-muted">{{ session.attempts_count }} tentative{{ session.attempts_count > 1 ? 's' : '' }}</p>
+                </div>
+                <span class="text-xs bg-gray-100 dark:bg-gray-800 text-text-muted px-2 py-0.5 rounded-full">{{ formatExpiredTime(session.expires_at) }}</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+        </div>
       </div>
     </template>
 
@@ -251,6 +276,29 @@
         </router-link>
       </div>
     </template>
+
+    <!-- Expired Session Attempts Modal -->
+    <div
+      v-if="showExpiredSessionModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      @click.self="showExpiredSessionModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-border">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface">{{ expiredSessionDetail?.paper?.title }}</h3>
+          <button @click="showExpiredSessionModal = false" class="text-text-muted hover:text-text-main transition-colors">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1">
+          <div v-if="isLoadingExpiredSession" class="text-text-muted text-center py-8">Chargement...</div>
+          <AttemptsTable
+            v-else
+            :attempts="divisionAttempts"
+          />
+        </div>
+      </div>
+    </div>
 
     <!-- Archive Confirmation Modal -->
     <div
@@ -381,6 +429,7 @@ import { ChevronLeft, RefreshCw, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
+import AttemptsTable from '@/components/AttemptsTable.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -403,6 +452,9 @@ const showUnarchiveConfirm = ref(false);
 const showChangeCodeConfirm = ref(false);
 const showRemoveStudentConfirm = ref(false);
 const studentIdToRemove = ref(null);
+const showExpiredSessionModal = ref(false);
+const expiredSessionDetail = ref(null);
+const isLoadingExpiredSession = ref(false);
 
 const pendingInvites = computed(() =>
   (divisionStore.division?.invites ?? []).filter(i => i.status === 'pending')
@@ -412,8 +464,20 @@ const teacherSessions = computed(() =>
   (sessionStore.mySessions ?? []).filter(s => s.status === 'active')
 );
 
+const expiredSessionsWithAttempts = computed(() =>
+  (divisionStore.division?.kangourou_sessions ?? []).filter(s => s.status === 'expired' && s.attempts_count > 0)
+);
+
 const openSessionIds = computed(() =>
   (divisionStore.division?.kangourou_sessions ?? []).map(s => s.id)
+);
+
+const divisionStudentIds = computed(() =>
+  new Set((divisionStore.division?.students ?? []).map(s => s.id))
+);
+
+const divisionAttempts = computed(() =>
+  (expiredSessionDetail.value?.attempts ?? []).filter(a => divisionStudentIds.value.has(a.user_id))
 );
 
 function isSessionOpen(sessionId) {
@@ -486,6 +550,20 @@ async function handleInvite() {
   }
 }
 
+async function openExpiredSessionModal(session) {
+  showExpiredSessionModal.value = true;
+  isLoadingExpiredSession.value = true;
+  expiredSessionDetail.value = null;
+  try {
+    const data = await sessionStore.fetchSessionDetails(session.id);
+    expiredSessionDetail.value = data;
+  } catch (err) {
+    // error handled by store
+  } finally {
+    isLoadingExpiredSession.value = false;
+  }
+}
+
 async function handleToggleSession(session) {
   if (isSessionOpen(session.id)) {
     await divisionStore.closeSessionForDivision(session.id, divisionId.value);
@@ -493,5 +571,26 @@ async function handleToggleSession(session) {
     await divisionStore.openSessionForDivision(session.id, divisionId.value);
   }
   await divisionStore.fetchDivision(divisionId.value);
+}
+
+function formatExpiredTime(expiresAt) {
+  if (!expiresAt) return 'Expirée';
+
+  const expiryDate = new Date(expiresAt);
+  const now = new Date();
+  const diffMs = now - expiryDate;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+
+  if (diffMins < 1) return 'À l\'instant';
+  if (diffMins < 60) return `il y a ${diffMins} minute${diffMins > 1 ? 's' : ''}`;
+  if (diffHours < 24) return `il y a ${diffHours} heure${diffHours > 1 ? 's' : ''}`;
+  if (diffDays < 7) return `il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
+  if (diffWeeks < 4) return `il y a ${diffWeeks} semaine${diffWeeks > 1 ? 's' : ''}`;
+  return `il y a ${diffMonths} mois`;
 }
 </script>

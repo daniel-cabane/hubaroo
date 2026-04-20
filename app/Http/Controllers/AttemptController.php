@@ -142,6 +142,73 @@ class AttemptController extends Controller
         return response()->json(['attempts' => $attempts]);
     }
 
+    public function update(Request $request, Attempt $attempt): JsonResponse
+    {
+        // Authorize user (session owner or admin can edit)
+        $session = $attempt->kangourouSession;
+        $this->authorize('update', $session);
+
+        $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $attempt->update([
+            'name' => $request->input('name'),
+        ]);
+
+        return response()->json([
+            'message' => 'Attempt updated successfully.',
+            'attempt' => $attempt,
+        ]);
+    }
+
+    public function destroy(Attempt $attempt): JsonResponse
+    {
+        // Authorize user (session owner or admin can delete)
+        $session = $attempt->kangourouSession;
+        $this->authorize('delete', $session);
+
+        $attempt->delete();
+
+        return response()->json([
+            'message' => 'Attempt deleted successfully.',
+        ]);
+    }
+
+    public function claim(Request $request): JsonResponse
+    {
+        $request->validate([
+            'attempt_ids' => ['required', 'array', 'min:1'],
+            'attempt_ids.*' => ['required', 'integer', 'exists:attempts,id'],
+        ]);
+
+        $user = $request->user();
+        $claimed = 0;
+
+        // Get session IDs where user already has an attempt
+        $existingSessionIds = Attempt::where('user_id', $user->id)
+            ->pluck('kangourou_session_id')
+            ->toArray();
+
+        $attempts = Attempt::whereIn('id', $request->input('attempt_ids'))
+            ->whereNull('user_id')
+            ->whereNotIn('kangourou_session_id', $existingSessionIds)
+            ->get();
+
+        foreach ($attempts as $attempt) {
+            $attempt->update([
+                'user_id' => $user->id,
+                'name' => $user->name,
+            ]);
+            $claimed++;
+        }
+
+        return response()->json([
+            'message' => "$claimed attempt(s) claimed successfully.",
+            'claimed' => $claimed,
+        ]);
+    }
+
     /**
      * Mask answer statuses when correction is delayed and session is still active.
      */

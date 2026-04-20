@@ -35,7 +35,7 @@
               />
               <button
                 @click="showChangeCodeModal = true"
-                class="text-text-main dark:text-surface hover:text-primary transition-colors"
+                class="text-text-main dark:text-surface hover:text-primary cursor-pointer transition-colors"
                 title="Changer le code"
               >
                 <RefreshCw class="w-5 h-5" />
@@ -46,13 +46,26 @@
           <!-- Status -->
           <div class="space-y-1">
             <label class="block text-sm font-medium text-text-main dark:text-surface/80">Statut</label>
-            <input
-              :value="statusLabel(session.status)"
-              disabled
-              :class="`w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface/50 bg-gray-50 cursor-not-allowed font-medium ${
-                session.status === 'active' ? 'text-success' : ''
-              }`"
-            />
+            <div class="flex gap-2">
+              <input
+                :value="statusLabel(session.status)"
+                disabled
+                :class="`flex-1 px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface/50 bg-gray-50 cursor-not-allowed font-medium ${
+                  session.status === 'active' ? 'text-success' : ''
+                }`"
+              />
+              <button
+                v-if="session.status === 'draft'"
+                @click="showActivateModal = true"
+                title="Activer la session"
+                class="flex items-center justify-center text-text-main dark:text-surface hover:text-success cursor-pointer transition-colors"
+              >
+                <Play class="w-5 h-5" />
+              </button>
+              <div v-else class="flex items-center justify-center text-text-muted/30">
+                <Play class="w-5 h-5" />
+              </div>
+            </div>
           </div>
 
           <!-- Created At -->
@@ -76,7 +89,7 @@
               />
               <button
                 @click="showExpiryModal = true"
-                class="text-text-main dark:text-surface hover:text-primary transition-colors"
+                class="text-text-main dark:text-surface hover:text-primary cursor-pointer transition-colors"
                 title="Gérer l'expiration"
               >
                 <Clock class="w-5 h-5" />
@@ -94,7 +107,7 @@
             <label class="block text-sm font-medium text-text-main dark:text-surface/80">Confidentialité</label>
             <select
               v-model="editForm.privacy"
-              :disabled="session.status !== 'active'"
+              :disabled="session.status !== 'draft'"
               class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="public">Public</option>
@@ -107,7 +120,7 @@
             <label class="block text-sm font-medium text-text-main dark:text-surface/80">Correction</label>
             <select
               v-model="editForm.preferences.correction"
-              :disabled="session.status !== 'active'"
+              :disabled="session.status !== 'draft'"
               class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="delayed">Différée (après expiration)</option>
@@ -126,7 +139,7 @@
                   type="number"
                   min="0"
                   step="1"
-                  :disabled="session.status !== 'active'"
+                  :disabled="session.status !== 'draft'"
                   class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -137,7 +150,7 @@
                   type="number"
                   min="0"
                   step="1"
-                  :disabled="session.status !== 'active'"
+                  :disabled="session.status !== 'draft'"
                   class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -148,7 +161,7 @@
                   type="number"
                   min="0"
                   step="1"
-                  :disabled="session.status !== 'active'"
+                  :disabled="session.status !== 'draft'"
                   class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -162,7 +175,7 @@
                   min="0"
                   max="1"
                   step="0.05"
-                  :disabled="session.status !== 'active'"
+                  :disabled="session.status !== 'draft'"
                   class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <p class="text-xs text-text-muted">ex. 0,25 = 1/4 des points déduits</p>
@@ -174,7 +187,7 @@
                   type="number"
                   min="0"
                   step="1"
-                  :disabled="session.status !== 'active'"
+                  :disabled="session.status !== 'draft'"
                   class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -182,7 +195,7 @@
           </fieldset>
 
           <!-- Save Button -->
-          <div v-if="session.status === 'active'" class="flex gap-3 pt-4">
+          <div v-if="session.status === 'draft'" class="flex gap-3 pt-4">
             <button
               @click="reloadSessionDetails"
               class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
@@ -201,74 +214,38 @@
       </div>
 
       <!-- Attempts Section -->
-      <div class="bg-surface dark:bg-gray-900 rounded-lg border border-border p-6 space-y-4">
-        <h2 class="text-xl font-bold text-text-main dark:text-surface">Tentatives ({{ session.attempts?.length || 0 }})</h2>
+      <AttemptsTable
+        :attempts="session.attempts || []"
+        :editable="true"
+        @edit="openEditNameModal"
+        @delete="openDeleteModal"
+      />
+    </div>
 
-        <div v-if="!session.attempts || session.attempts.length === 0" class="text-text-muted py-8 text-center">
-          Aucune tentative pour cette session.
-        </div>
+    <!-- Activate Session Modal -->
+    <div
+      v-if="showActivateModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+      @click.self="showActivateModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-5">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface">Activer la session ?</h3>
+        <p class="text-sm text-text-muted">Une fois activée, la session sera visible aux étudiants et ils pourront commencer leurs tentatives.</p>
 
-        <div v-else class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="border-b border-border">
-              <tr class="text-left">
-                <th class="px-4 py-3 font-semibold text-text-main dark:text-surface/80">Participant</th>
-                <th class="px-4 py-3 font-semibold text-text-main dark:text-surface/80">Statut</th>
-                <th class="px-4 py-3 font-semibold text-text-main dark:text-surface/80">Score</th>
-                <th class="px-4 py-3 font-semibold text-text-main dark:text-surface/80">Temps</th>
-                <th class="px-4 py-3 font-semibold text-text-main dark:text-surface/80">Termination</th>
-                <th class="px-4 py-3 font-semibold text-text-main dark:text-surface/80">Date</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-              <template v-for="attempt in session.attempts" :key="attempt.id">
-                <tr>
-                  <td rowspan="2" class="px-4 py-3">
-                    <span class="font-medium text-text-main dark:text-surface">{{ attempt.name || `Utilisateur #${attempt.user_id}` }}</span>
-                  </td>
-                  <td class="px-4 py-3">
-                    <span
-                      :class="`px-2 py-1 rounded text-xs font-semibold ${
-                        attempt.status === 'finished'
-                          ? 'bg-success/10 text-success'
-                          : 'bg-warning/10 text-warning'
-                      }`"
-                    >
-                      {{ statusLabel(attempt.status) }}
-                    </span>
-                  </td>
-                  <td class="px-4 py-3 font-semibold text-text-main dark:text-surface">
-                    {{ attempt.score !== null ? attempt.score : '—' }}
-                  </td>
-                  <td class="px-4 py-3 text-text-muted">
-                    {{ attempt.timer !== null ? `${Math.floor(attempt.timer / 60)}:${String(attempt.timer % 60).padStart(2, '0')}` : '—' }}
-                  </td>
-                  <td class="px-4 py-3 text-text-muted">{{ terminationLabel(attempt.termination) }}</td>
-                  <td class="px-4 py-3 text-text-muted text-xs text-center">
-                    <div>{{ new Date(attempt.created_at).toLocaleDateString('fr-FR') }}</div>
-                    <div>{{ new Date(attempt.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</div>
-                  </td>
-                </tr>
-                <tr>
-                  <td colspan="7" class="px-4 py-4">
-                    <div class="flex flex-wrap gap-2">
-                      <div
-                        v-for="(answer, idx) in attempt.answers"
-                        :key="idx"
-                        :title="`Q${idx + 1}: ${answer.status == 'unanswered' ? 'Pas de réponse' : answer.status}`"
-                        :class="`
-                          w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-help
-                          ${getAnswerColorClass(answer.status)}
-                        `"
-                      >
-                        {{ answer.answer || '' }}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
+        <div class="flex gap-3">
+          <button
+            @click="showActivateModal = false"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            @click="activateSessionHandler"
+            :disabled="isActivating"
+            class="flex-1 px-4 py-2 rounded-lg bg-success hover:bg-success/80 text-white font-medium transition-colors disabled:opacity-50"
+          >
+            {{ isActivating ? 'Activation...' : 'Activer' }}
+          </button>
         </div>
       </div>
     </div>
@@ -387,14 +364,88 @@
         </div>
       </div>
     </div>
+
+    <!-- Edit Name Modal -->
+    <div
+      v-if="showEditNameModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+      @click.self="closeEditNameModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-5">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface">Éditer le nom du participant</h3>
+        
+        <input
+          v-model="editedName"
+          type="text"
+          class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg bg-white dark:bg-gray-800 text-text-main dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+
+        <div class="flex gap-3">
+          <button
+            @click="closeEditNameModal"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            @click="saveEditedName"
+            :disabled="isLoading || !editedName.trim()"
+            class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
+          >
+            {{ isLoading ? 'Enregistrement...' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Attempt Modal -->
+    <div
+      v-if="showDeleteModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+      @click.self="closeDeleteModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-5">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface">Supprimer la tentative ?</h3>
+        
+        <p class="text-sm text-text-muted">
+          Êtes-vous sûr de vouloir supprimer la tentative de <span class="font-semibold">{{ selectedAttempt?.name || `Utilisateur #${selectedAttempt?.user_id}` }}</span> ?
+        </p>
+
+        <label class="flex items-center gap-3 p-3 bg-error/10 border border-error/30 rounded-lg">
+          <input
+            v-model="deleteConfirmed"
+            type="checkbox"
+            class="w-4 h-4"
+          />
+          <span class="text-sm text-error font-medium">Je confirme la suppression</span>
+        </label>
+
+        <div class="flex gap-3">
+          <button
+            @click="closeDeleteModal"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            @click="confirmDeleteAttempt"
+            :disabled="isLoading || !deleteConfirmed"
+            class="flex-1 px-4 py-2 rounded-lg bg-error hover:bg-error-hover text-surface font-medium transition-colors disabled:opacity-50"
+          >
+            {{ isLoading ? 'Suppression...' : 'Supprimer' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronLeft, RefreshCw, Clock } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, Clock, Play } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
+import AttemptsTable from '@/components/AttemptsTable.vue';
 
 const route = useRoute();
 const sessionStore = useKangourouSessionStore();
@@ -406,6 +457,13 @@ const showChangeCodeModal = ref(false);
 const isLoadingCodeChange = ref(false);
 const showExpiryModal = ref(false);
 const isManagingExpiry = ref(false);
+const showActivateModal = ref(false);
+const isActivating = ref(false);
+const showEditNameModal = ref(false);
+const showDeleteModal = ref(false);
+const selectedAttempt = ref(null);
+const editedName = ref('');
+const deleteConfirmed = ref(false);
 
 const editForm = reactive({
   privacy: 'public',
@@ -419,19 +477,6 @@ const statusLabels = { active: 'Active', expired: 'Expirée', draft: 'Brouillon'
 
 function statusLabel(status) {
   return statusLabels[status] || status;
-}
-
-const terminationLabels = { none: 'Aucune', submitted: 'Soumise', blurred: 'Floutée', timeout: 'Timeout' };
-
-function terminationLabel(termination) {
-  return terminationLabels[termination] || termination;
-}
-
-function getAnswerColorClass(status) {
-  if (status === 'correct') return 'bg-success text-white';
-  if (status === 'incorrect') return 'bg-error text-white';
-  if (status === 'unanswered') return 'bg-gray-200 text-text-muted dark:bg-gray-700';
-  return 'bg-gray-300 text-text-muted dark:bg-gray-600'; // pending or default
 }
 
 function initializeForm() {
@@ -482,6 +527,34 @@ async function saveChanges() {
   }
 }
 
+async function activateSession() {
+  try {
+    isActivating.value = true;
+    error.value = null;
+    await sessionStore.activateSession(session.value.id);
+    await loadSessionDetails();
+    showActivateModal.value = false;
+  } catch (err) {
+    error.value = err.message || 'Failed to activate session';
+  } finally {
+    isActivating.value = false;
+  }
+}
+
+async function activateSessionHandler() {
+  try {
+    isActivating.value = true;
+    error.value = null;
+    await sessionStore.activateSession(session.value.id);
+    await loadSessionDetails();
+    showActivateModal.value = false;
+  } catch (err) {
+    error.value = err.message || 'Failed to activate session';
+  } finally {
+    isActivating.value = false;
+  }
+}
+
 async function changeSessionCode() {
   try {
     isLoadingCodeChange.value = true;
@@ -518,6 +591,60 @@ function getTimeRemaining(attempt) {
 }
 
 const inProgressAttempts = computed(() => getInProgressAttempts());
+
+function openEditNameModal(attempt) {
+  selectedAttempt.value = attempt;
+  editedName.value = attempt.name || '';
+  showEditNameModal.value = true;
+}
+
+function closeEditNameModal() {
+  showEditNameModal.value = false;
+  selectedAttempt.value = null;
+  editedName.value = '';
+}
+
+async function saveEditedName() {
+  if (!selectedAttempt.value || !editedName.value.trim()) return;
+  
+  try {
+    isLoading.value = true;
+    await sessionStore.updateAttemptName(selectedAttempt.value.id, editedName.value);
+    await loadSessionDetails();
+    closeEditNameModal();
+  } catch (err) {
+    error.value = err.message || 'Failed to update attempt name';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+function openDeleteModal(attempt) {
+  selectedAttempt.value = attempt;
+  deleteConfirmed.value = false;
+  showDeleteModal.value = true;
+}
+
+function closeDeleteModal() {
+  showDeleteModal.value = false;
+  selectedAttempt.value = null;
+  deleteConfirmed.value = false;
+}
+
+async function confirmDeleteAttempt() {
+  if (!selectedAttempt.value || !deleteConfirmed.value) return;
+  
+  try {
+    isLoading.value = true;
+    await sessionStore.deleteAttempt(selectedAttempt.value.id);
+    await loadSessionDetails();
+    closeDeleteModal();
+  } catch (err) {
+    error.value = err.message || 'Failed to delete attempt';
+  } finally {
+    isLoading.value = false;
+  }
+}
 
 async function delayExpiry(minutes) {
   try {

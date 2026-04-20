@@ -43,6 +43,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/kangourou-sessions', [KangourouSessionController::class, 'store'])->name('kangourou-sessions.store');
     Route::get('/api/my/kangourou-sessions', [KangourouSessionController::class, 'myIndex'])->name('kangourou-sessions.myIndex');
     Route::get('/api/my/attempts', [AttemptController::class, 'myIndex'])->name('attempts.myIndex');
+    Route::patch('/api/attempts/{attempt}', [AttemptController::class, 'update'])->name('attempts.update');
+    Route::delete('/api/attempts/{attempt}', [AttemptController::class, 'destroy'])->name('attempts.destroy');
+    Route::post('/api/attempts/claim', [AttemptController::class, 'claim'])->name('attempts.claim');
     Route::patch('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'update'])->name('kangourou-sessions.update');
     Route::delete('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'destroy'])->name('kangourou-sessions.destroy');
     Route::get('/api/kangourou-sessions/{kangourouSession}/details', [KangourouSessionController::class, 'details'])->name('kangourou-sessions.details');

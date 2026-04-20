@@ -154,6 +154,33 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     }
   }
 
+  async function updateAttemptName(attemptId, name) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await axios.patch(`/api/attempts/${attemptId}`, { name });
+      return response.data.attempt;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to update attempt name';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function deleteAttempt(attemptId) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      await axios.delete(`/api/attempts/${attemptId}`);
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to delete attempt';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   function clearError() {
     error.value = null;
   }
@@ -173,6 +200,8 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     updateSession,
     changeSessionCode,
     deleteSession,
+    updateAttemptName,
+    deleteAttempt,
     clearError,
   };
 });

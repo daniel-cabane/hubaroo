@@ -50,6 +50,7 @@ class DivisionController extends Controller
                 'teacher',
                 'students',
                 'invites',
+                'kangourouSessions' => fn ($q) => $q->withCount('attempts'),
                 'kangourouSessions.paper',
             ]);
         } else {

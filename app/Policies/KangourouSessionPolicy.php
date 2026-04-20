@@ -36,7 +36,7 @@ class KangourouSessionPolicy
      */
     public function update(User $user, KangourouSession $kangourouSession): bool
     {
-        return false;
+        return $kangourouSession->author_id === $user->id || $user->hasRole('Admin');
     }
 
     /**
@@ -44,7 +44,7 @@ class KangourouSessionPolicy
      */
     public function delete(User $user, KangourouSession $kangourouSession): bool
     {
-        return false;
+        return $kangourouSession->author_id === $user->id || $user->hasRole('Admin');
     }
 
     /**

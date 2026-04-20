@@ -3,10 +3,12 @@ import { ref, computed } from 'vue';
 import axios from 'axios';
 
 const STORAGE_KEY = 'hubaroo_active_attempt';
+const GUEST_ATTEMPTS_KEY = 'hubaroo_guest_attempts';
 
 export const useAttemptStore = defineStore('attempt', () => {
   const attempt = ref(null);
   const myAttempts = ref([]);
+  const guestAttempts = ref([]);
   const isLoading = ref(false);
   const error = ref(null);
   const activeRecovery = ref(null);
@@ -31,6 +33,59 @@ export const useAttemptStore = defineStore('attempt', () => {
     localStorage.removeItem(STORAGE_KEY);
   }
 
+  function getGuestAttemptIds() {
+    const stored = localStorage.getItem(GUEST_ATTEMPTS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  function addGuestAttemptId(attemptId) {
+    const ids = getGuestAttemptIds();
+    if (!ids.includes(attemptId)) {
+      ids.push(attemptId);
+      localStorage.setItem(GUEST_ATTEMPTS_KEY, JSON.stringify(ids));
+    }
+  }
+
+  function removeGuestAttemptIds(attemptIds) {
+    const ids = getGuestAttemptIds().filter(id => !attemptIds.includes(id));
+    if (ids.length === 0) {
+      localStorage.removeItem(GUEST_ATTEMPTS_KEY);
+    } else {
+      localStorage.setItem(GUEST_ATTEMPTS_KEY, JSON.stringify(ids));
+    }
+    guestAttempts.value = guestAttempts.value.filter(a => !attemptIds.includes(a.id));
+  }
+
+  async function fetchGuestAttempts() {
+    const ids = getGuestAttemptIds();
+    if (ids.length === 0) {
+      guestAttempts.value = [];
+      return;
+    }
+    try {
+      const results = await Promise.all(
+        ids.map(id => axios.get(`/api/attempts/${id}`).then(r => r.data.attempt).catch(() => null))
+      );
+      guestAttempts.value = results.filter(Boolean);
+      // Clean up any IDs that no longer exist
+      const validIds = guestAttempts.value.map(a => a.id);
+      localStorage.setItem(GUEST_ATTEMPTS_KEY, JSON.stringify(validIds));
+    } catch {
+      guestAttempts.value = [];
+    }
+  }
+
+  async function claimAttempts(attemptIds) {
+    try {
+      const response = await axios.post('/api/attempts/claim', { attempt_ids: attemptIds });
+      removeGuestAttemptIds(attemptIds);
+      return response.data;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to claim attempts';
+      throw err;
+    }
+  }
+
   async function createAttempt(sessionCode, name = null) {
     isLoading.value = true;
     error.value = null;
@@ -40,6 +95,10 @@ export const useAttemptStore = defineStore('attempt', () => {
       });
       attempt.value = response.data.attempt;
       saveToLocalStorage(response.data.attempt, sessionCode);
+      // Track guest attempts for later recovery
+      if (!response.data.attempt.user_id) {
+        addGuestAttemptId(response.data.attempt.id);
+      }
       return response.data.attempt;
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to create attempt';
@@ -158,6 +217,7 @@ export const useAttemptStore = defineStore('attempt', () => {
   return {
     attempt,
     myAttempts,
+    guestAttempts,
     isLoading,
     error,
     activeRecovery,
@@ -169,6 +229,10 @@ export const useAttemptStore = defineStore('attempt', () => {
     submitAttempt,
     recoverAttempt,
     fetchMyAttempts,
+    fetchGuestAttempts,
+    getGuestAttemptIds,
+    claimAttempts,
+    removeGuestAttemptIds,
     getFromLocalStorage,
     clearLocalStorage,
     clearError,
