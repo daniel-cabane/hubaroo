@@ -15,6 +15,7 @@ import MyAttemptsView from "./components/views/my-attempts-view.vue";
 import MyDivisionsView from "./components/views/my-divisions-view.vue";
 import DivisionDetailsView from "./components/views/division-details-view.vue";
 import PaperView from "./components/views/paper-view.vue";
+import AdminView from "./components/views/admin-view.vue";
 import { useAuthStore } from "./stores/authStore";
 
 const routes = [
@@ -109,6 +110,12 @@ const routes = [
         component: PaperView,
         meta: { requiresAuth: true }
     },
+    {
+        path: "/admin",
+        name: "Admin",
+        component: AdminView,
+        meta: { requiresAuth: true, requiresAdmin: true }
+    },
 ];
 
 const router = createRouter({
@@ -127,6 +134,8 @@ router.beforeEach(async (to, from) => {
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return '/login';
     } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
+        return '/';
+    } else if (to.meta.requiresAdmin && !authStore.user?.is_admin) {
         return '/';
     }
 });

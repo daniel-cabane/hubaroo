@@ -98,12 +98,12 @@ const selectedYear = ref('');
 const selectedLevel = ref('');
 
 const levelNames = {
-  e: 'Écoliers',
-  b: 'Benjamin',
-  c: 'Cadet',
-  p: 'Junior (P)',
-  j: 'Junior',
-  s: 'Student',
+  e: 'E - Écoliers (CE2-CM2)',
+  b: 'B - Benjamin (6e-5e)',
+  c: 'C - Cadet (4e-3e)',
+  p: 'P - Lycée Pro',
+  j: 'J - Junior (Lycée G.&T.)',
+  s: 'S - Spécialité (1re-Term)',
 };
 
 const availableYears = computed(() => {
@@ -113,7 +113,9 @@ const availableYears = computed(() => {
 
 const availableLevels = computed(() => {
   const levels = [...new Set(paperStore.papers.map(p => p.level))];
-  return levels.map(l => ({ value: l, label: levelNames[l] || l }));
+  const levelOrder = ['e', 'b', 'c', 'p', 'j', 's'];
+  const sortedLevels = levels.sort((a, b) => levelOrder.indexOf(a) - levelOrder.indexOf(b));
+  return sortedLevels.map(l => ({ value: l, label: levelNames[l] || l }));
 });
 
 const matchedPaper = computed(() => {

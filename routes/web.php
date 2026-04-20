@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -65,6 +66,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/my/invites', [DivisionController::class, 'myInvites'])->name('divisions.myInvites');
     Route::post('/api/invites/{invite}/accept', [DivisionController::class, 'acceptInvite'])->name('divisions.acceptInvite');
     Route::post('/api/invites/{invite}/decline', [DivisionController::class, 'declineInvite'])->name('divisions.declineInvite');
+
+    // Admin routes
+    Route::middleware(['can:admin'])->prefix('/api/admin')->group(function () {
+        Route::get('/papers', [AdminController::class, 'papers'])->name('admin.papers');
+        Route::patch('/papers/{paper}', [AdminController::class, 'updatePaper'])->name('admin.papers.update');
+        Route::get('/users', [AdminController::class, 'searchUsers'])->name('admin.users.search');
+        Route::patch('/users/{user}/role', [AdminController::class, 'updateUserRole'])->name('admin.users.updateRole');
+        Route::get('/roles', [AdminController::class, 'roles'])->name('admin.roles');
+    });
 });
 
 Route::fallback(function () {

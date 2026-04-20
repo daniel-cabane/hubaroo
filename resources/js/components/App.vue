@@ -90,6 +90,14 @@
                 >
                   Voir un sujet
                 </router-link>
+                <router-link
+                  v-if="authStore.user?.is_admin"
+                  to="/admin"
+                  @click="showAccountMenu = false"
+                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Administration
+                </router-link>
                 <div class="border-t border-border">
                   <button
                     @click="handleLogout"

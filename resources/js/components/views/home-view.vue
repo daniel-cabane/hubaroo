@@ -1,5 +1,34 @@
 <template>
   <div class="min-h-[calc(100vh-64px)] p-6">
+    <!-- Class Invites Section -->
+    <div v-if="authStore.isAuthenticated && !authStore.user?.is_teacher && divisionStore.invites.length > 0" class="mb-8">
+      <div class="bg-secondary/10 border-2 border-secondary/30 rounded-lg p-6">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface mb-4">Invitation<span v-if="divisionStore.invites.length>1">s</span></h3>
+        <div class="space-y-3">
+          <div v-for="invite in divisionStore.invites" :key="invite.id" class="flex items-center justify-between p-4 bg-surface dark:bg-gray-900 rounded-lg border border-secondary/20">
+            <div>
+              <p class="font-medium text-text-main dark:text-surface">{{ invite.division?.name }}</p>
+              <p class="text-sm text-text-muted">Invitation de l'enseignant à rejoindre la classe</p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                @click="handleAcceptInvite(invite.id)"
+                class="px-3 py-1.5 rounded-lg bg-success hover:bg-success/80 text-white text-sm font-medium transition-colors"
+              >
+                Accepter
+              </button>
+              <button
+                @click="divisionStore.declineInvite(invite.id)"
+                class="px-3 py-1.5 rounded-lg bg-error/20 hover:bg-error/30 text-error text-sm font-medium transition-colors"
+              >
+                Refuser
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Active Sessions Overlay -->
     <div v-if="authStore.isAuthenticated && showActiveSessions && activeSessions.length > 0" class="fixed top-20 left-0 right-0 z-40 max-h-[400px] overflow-y-auto bg-gradient-to-b from-primary/10 to-primary/5 border-b border-primary/20 p-4">
       <div class="container mx-auto">
@@ -111,10 +140,25 @@ const activeSessions = computed(() => {
   return sessions;
 });
 
+async function handleAcceptInvite(inviteId) {
+  try {
+    await divisionStore.acceptInvite(inviteId);
+    // Refresh divisions to include newly joined class and its active sessions
+    await divisionStore.fetchMyDivisions();
+  } catch {
+    // error handled by store
+  }
+}
+
 onMounted(async () => {
   if (authStore.isAuthenticated) {
     await divisionStore.fetchMyDivisions();
     await attemptStore.fetchMyAttempts();
+    
+    // Fetch invites if student
+    if (!authStore.user?.is_teacher) {
+      await divisionStore.fetchMyInvites();
+    }
   }
 });
 </script>

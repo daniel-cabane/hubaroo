@@ -3,20 +3,32 @@
     <h2 class="text-2xl font-bold mb-6 text-text-main dark:text-surface">Créer une session Kangourou</h2>
 
     <form v-if="!createdSession" @submit.prevent="handleCreate" class="space-y-6">
-      <!-- Paper Selection -->
-      <div class="space-y-2">
-        <label class="block text-sm font-medium text-text-main dark:text-surface/80">Sujet</label>
-        <select
-          v-model="form.paper_id"
-          class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
-          required
-        >
-          <option value="" disabled>Choisir un sujet</option>
-          <option v-for="paper in sessionStore.papers" :key="paper.id" :value="paper.id">
-            {{ paper.title }}
-          </option>
-        </select>
+      <!-- Paper Selection: Year and Level -->
+      <div class="flex flex-wrap gap-4">
+        <div class="flex-1 min-w-[140px]">
+          <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Année</label>
+          <select
+            v-model="selectedYear"
+            class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="" disabled>Choisir une année</option>
+            <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
+          </select>
+        </div>
+        <div class="flex-1 min-w-[140px]">
+          <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Niveau</label>
+          <select
+            v-model="selectedLevel"
+            class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="" disabled>Choisir un niveau</option>
+            <option v-for="level in availableLevels" :key="level.value" :value="level.value">{{ level.label }}</option>
+          </select>
+        </div>
       </div>
+      <p v-if="!matchedPaper && selectedYear && selectedLevel" class="text-sm text-text-muted">
+        Aucun sujet disponible pour cette combinaison.
+      </p>
 
       <!-- Status -->
       <div class="space-y-2">
@@ -37,7 +49,7 @@
 
       <button
         type="submit"
-        :disabled="sessionStore.isLoading"
+        :disabled="sessionStore.isLoading || !matchedPaper"
         class="w-full bg-primary hover:bg-primary-hover text-surface font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
       >
         {{ sessionStore.isLoading ? 'Création...' : 'Créer la session' }}
@@ -59,7 +71,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
@@ -70,15 +82,58 @@ const authStore = useAuthStore();
 const sessionStore = useKangourouSessionStore();
 const createdSession = ref(null);
 
+const selectedYear = ref('');
+const selectedLevel = ref('');
+
+const levelNames = {
+  e: 'E - Écoliers (CE2-CM2)',
+  b: 'B - Benjamin (6e-5e)',
+  c: 'C - Cadet (4e-3e)',
+  p: 'P - Lycée Pro',
+  j: 'J - Junior (Lycée G.&T.)',
+  s: 'S - Spécialité (1re-Term)',
+};
+
+const availableYears = computed(() => {
+  const years = [...new Set(sessionStore.papers.map(p => p.year))];
+  return years.sort((a, b) => b - a);
+});
+
+const availableLevels = computed(() => {
+  const levels = [...new Set(sessionStore.papers.map(p => p.level))];
+  const levelOrder = ['e', 'b', 'c', 'p', 'j', 's'];
+  const sortedLevels = levels.sort((a, b) => levelOrder.indexOf(a) - levelOrder.indexOf(b));
+  return sortedLevels.map(l => ({ value: l, label: levelNames[l] || l }));
+});
+
+const matchedPaper = computed(() => {
+  if (!selectedYear.value || !selectedLevel.value) {
+    return null;
+  }
+  return sessionStore.papers.find(
+    p => p.year === Number(selectedYear.value) && p.level === selectedLevel.value
+  );
+});
+
 const form = reactive({
   paper_id: '',
   status: 'draft',
 });
 
+watch(matchedPaper, (paper) => {
+  if (paper) {
+    form.paper_id = paper.id;
+  }
+});
+
 onMounted(() => {
   sessionStore.fetchPapers();
   if (route.query.paper_id) {
-    form.paper_id = Number(route.query.paper_id);
+    const paper = sessionStore.papers.find(p => p.id === Number(route.query.paper_id));
+    if (paper) {
+      selectedYear.value = paper.year;
+      selectedLevel.value = paper.level;
+    }
   }
 });
 

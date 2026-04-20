@@ -36,6 +36,7 @@ class User extends Authenticatable
      */
     protected $appends = [
         'is_teacher',
+        'is_admin',
     ];
 
     /**
@@ -98,6 +99,13 @@ class User extends Authenticatable
     {
         return Attribute::make(
             get: fn () => $this->hasRole('Teacher'),
+        );
+    }
+
+    protected function isAdmin(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->hasRole('Admin'),
         );
     }
 }

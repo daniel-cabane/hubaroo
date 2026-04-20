@@ -3,14 +3,15 @@
     <!-- Countdown Timer Bar -->
     <div
       v-if="isInProgress"
-      class="bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 flex items-center justify-center"
+      class="bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 flex items-center justify-between gap-4"
     >
-      <!-- <div class="text-sm text-text-muted">
-        Question {{ currentIndex + 1 }} / 26
-      </div> -->
+      <div class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-error bg-error/5">
+        <AlertTriangle class="w-5 h-5 text-error flex-shrink-0" />
+        <p class="text-md font-medium text-error">Session en cours - Ne pas quitter cette page</p>
+      </div>
       <button
         @click="toggleTimer"
-        class="text-xl font-mono px-3 py-1 rounded-lg transition-colors"
+        class="text-xl font-mono px-3 py-1 rounded-lg transition-colors cursor-pointer"
         :class="showTimer || isLastMinute ? 'bg-error/10 text-error font-bold' : 'bg-gray-100 dark:bg-gray-800 text-text-muted'"
       >
         <span v-if="showTimer || isLastMinute">{{ formattedTime }}</span>
@@ -174,7 +175,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 
@@ -435,8 +436,8 @@ onMounted(async () => {
     if (isInProgress.value) {
       const preferences = session.value.preferences || { time_limit: 50 };
       startCountdown(preferences.time_limit);
-    //   window.addEventListener('blur', handleBlur);
-    //   window.addEventListener('focus', handleFocus);
+      window.addEventListener('blur', handleBlur);
+      window.addEventListener('focus', handleFocus);
     }
   } catch (err) {
     // navigate away on error

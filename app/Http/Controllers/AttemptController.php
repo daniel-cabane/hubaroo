@@ -98,6 +98,11 @@ class AttemptController extends Controller
             return response()->json(['message' => 'This attempt has already been submitted.'], 403);
         }
 
+        $session = $attempt->kangourouSession;
+        if (! $session->isActive()) {
+            return response()->json(['message' => 'This session is no longer active.'], 403);
+        }
+
         $request->validate([
             'timer' => ['nullable', 'integer', 'min:0'],
             'termination' => ['nullable', 'in:submitted,blurred,timeout'],
