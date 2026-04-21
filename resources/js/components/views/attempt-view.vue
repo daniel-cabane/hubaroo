@@ -521,8 +521,8 @@ onMounted(async () => {
     if (isInProgress.value) {
       const preferences = session.value.preferences || { time_limit: 50 };
       startCountdown(preferences.time_limit);
-      // window.addEventListener('blur', handleBlur);
-      // window.addEventListener('focus', handleFocus);
+      window.addEventListener('blur', handleBlur);
+      window.addEventListener('focus', handleFocus);
     }
   } catch (err) {
     // navigate away on error
