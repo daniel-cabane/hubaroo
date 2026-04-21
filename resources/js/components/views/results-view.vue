@@ -1,15 +1,33 @@
 <template>
   <div class="container mx-auto p-6 max-w-2xl">
+    <div class="mb-4">
+      <router-link
+        :to="{ name: 'MyAttempts' }"
+        class="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors"
+      >
+        ← Mes tentatives
+      </router-link>
+    </div>
+
     <div v-if="isLoading" class="text-center text-text-muted">Chargement des résultats...</div>
 
     <div v-else-if="attempt">
       <!-- Score Summary -->
       <div v-if="correctionAvailable" class="text-center mb-8">
-        <h2 class="text-2xl font-bold text-text-main dark:text-surface mb-2">Résultats</h2>
+        <h2 class="text-2xl font-bold text-text-main dark:text-surface mb-2">Résultat</h2>
         <p class="text-sm text-text-muted mb-4">{{ session?.paper?.title }}</p>
         <div class="inline-block bg-surface dark:bg-gray-900 border border-border rounded-2xl px-8 py-6 shadow-md">
           <div class="text-5xl font-bold text-primary">{{ attempt.score }}</div>
           <div class="text-sm text-text-muted mt-1">points</div>
+        </div>
+        <div class="flex flex-wrap justify-center gap-1.5 mt-4">
+          <div
+            v-for="(answer, idx) in attempt.answers"
+            :key="idx"
+            class="w-4 h-4 rounded-full"
+            :class="answer.status === 'correct' ? 'bg-success' : answer.status === 'incorrect' ? 'bg-error' : 'bg-gray-300 dark:bg-gray-600'"
+            :title="`Q${idx + 1}`"
+          ></div>
         </div>
       </div>
 
@@ -23,24 +41,36 @@
         <div
           v-for="(answer, idx) in attempt.answers"
           :key="idx"
-          class="flex items-center gap-4 p-3 rounded-lg border"
+          class="rounded-lg border overflow-hidden"
           :class="reviewRowClass(answer)"
         >
-          <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-            :class="reviewBadgeClass(answer)"
-          >
-            {{ idx + 1 }}
+          <!-- Question image -->
+          <div v-if="session?.paper?.questions?.[idx]?.image" class="border-b border-inherit">
+            <img
+              :src="'/' + session.paper.questions[idx].image"
+              :alt="`Question ${idx + 1}`"
+              class="w-full object-contain max-h-64 bg-white"
+            />
           </div>
 
-          <div class="flex-1 text-sm">
-            <span class="text-text-main dark:text-surface">Votre réponse : </span>
-            <span class="font-bold" :class="answer.status === 'correct' ? 'text-success' : answer.status === 'incorrect' ? 'text-error' : 'text-text-muted'">
-              {{ answer.answer || '—' }}
-            </span>
-          </div>
+          <!-- Answer row -->
+          <div class="flex items-center gap-4 p-3">
+            <!-- <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+              :class="reviewBadgeClass(answer)"
+            >
+              {{ idx + 1 }}
+            </div> -->
 
-          <div class="text-sm text-text-muted">
-            Correct : <span class="font-bold text-success">{{ correctAnswers[idx] }}</span>
+            <div class="flex-1 text-sm">
+              <span class="text-text-main dark:text-surface">Votre réponse : </span>
+              <span class="font-bold" :class="answer.status === 'correct' ? 'text-success' : answer.status === 'incorrect' ? 'text-error' : 'text-text-muted'">
+                {{ answer.answer || '—' }}
+              </span>
+            </div>
+
+            <div class="text-sm text-text-muted">
+              Correct : <span class="font-bold text-success">{{ correctAnswers[idx] }}</span>
+            </div>
           </div>
         </div>
       </div>

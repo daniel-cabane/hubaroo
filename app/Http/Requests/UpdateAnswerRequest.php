@@ -22,9 +22,13 @@ class UpdateAnswerRequest extends FormRequest
      */
     public function rules(): array
     {
+        $isNumericQuestion = in_array((int) $this->input('question_index'), [24, 25]);
+
         return [
             'question_index' => ['required', 'integer', 'min:0', 'max:25'],
-            'answer' => ['nullable', 'in:A,B,C,D,E'],
+            'answer' => $isNumericQuestion
+                ? ['nullable', 'integer', 'min:0', 'max:100']
+                : ['nullable', 'in:A,B,C,D,E'],
             'timer' => ['nullable', 'integer', 'min:0'],
         ];
     }

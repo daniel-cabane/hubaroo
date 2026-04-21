@@ -66,8 +66,8 @@
               class="mx-auto max-w-full rounded-lg all-around-shadow mb-6"
             />
 
-            <!-- Answer Buttons -->
-            <div class="flex justify-center gap-3">
+            <!-- Answer Buttons (Q1-24) -->
+            <div v-if="!isNumericQuestion" class="flex justify-center gap-3">
               <button
                 v-for="letter in ['A', 'B', 'C', 'D', 'E']"
                 :key="letter"
@@ -78,6 +78,32 @@
               >
                 {{ letter }}
               </button>
+            </div>
+
+            <!-- Numeric Answer Display (Q25-26) -->
+            <div v-else class="flex flex-col items-center gap-4">
+              <label class="text-sm text-text-muted">Entrez votre réponse (0–100)</label>
+              <div
+                class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-900 text-text-main dark:text-surface select-none"
+                :class="numericInputClass"
+              >
+                {{ numericInputValue !== '' ? numericInputValue : '—' }}
+              </div>
+              <p v-if="!isInProgress" class="text-sm text-text-muted">
+                Correct : <span class="font-bold text-success">{{ currentQuestion?.correct_answer }}</span>
+              </p>
+              <!-- On-screen keypad -->
+              <div v-if="isInProgress" class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="key in ['1','2','3','4','5','6','7','8','9','⌫','0']"
+                  :key="key"
+                  @click="handleNumericKey(key)"
+                  class="w-14 h-14 rounded-xl text-xl font-bold transition-colors shadow"
+                  :class="key === '⌫' ? 'bg-gray-200 dark:bg-gray-700 text-error col-start-1' : 'bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700'"
+                >
+                  {{ key }}
+                </button>
+              </div>
             </div>
           </div>
         </Transition>
@@ -195,6 +221,7 @@ const showTimer = ref(false);
 const showBlurAlarm = ref(false);
 const blurCountdown = ref(10);
 const remainingSeconds = ref(0);
+const numericInputValue = ref('');
 
 let timerInterval = null;
 let blurInterval = null;
@@ -205,12 +232,24 @@ const isInProgress = computed(() => attemptStore.isInProgress);
 
 const questions = computed(() => session.value?.paper?.questions || []);
 const currentQuestion = computed(() => questions.value[currentIndex.value]);
+const isNumericQuestion = computed(() => currentQuestion.value?.tier === 4);
 
-watch(currentIndex, () => {
+const numericInputClass = computed(() => {
+  if (isInProgress.value) return 'border-border';
+  const answer = answers.value[currentIndex.value]?.answer;
+  const correct = currentQuestion.value?.correct_answer;
+  if (answer === null || answer === undefined || answer === '') return 'border-border';
+  return answer === correct ? 'border-success bg-success/5' : 'border-error bg-error/5';
+});
+
+watch(currentIndex, (newIdx) => {
+  if (newIdx >= 24) {
+    numericInputValue.value = answers.value[newIdx]?.answer ?? '';
+  }
   nextTick(() => {
     const container = navBar.value;
     if (!container) return;
-    const btn = container.querySelectorAll('button')[currentIndex.value];
+    const btn = container.querySelectorAll('button')[newIdx];
     if (btn) {
       btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
     }
@@ -255,12 +294,14 @@ function answerButtonClass(letter) {
 }
 
 function goToQuestion(idx) {
+  if (isNumericQuestion.value) saveNumericAnswer();
   slideDirection.value = idx > currentIndex.value ? 'slide-left' : 'slide-right';
   currentIndex.value = idx;
 }
 
 function prevQuestion() {
   if (currentIndex.value > 0) {
+    if (isNumericQuestion.value) saveNumericAnswer();
     slideDirection.value = 'slide-right';
     currentIndex.value--;
   }
@@ -268,9 +309,36 @@ function prevQuestion() {
 
 function nextQuestion() {
   if (currentIndex.value < 25) {
+    if (isNumericQuestion.value) saveNumericAnswer();
     slideDirection.value = 'slide-left';
     currentIndex.value++;
   }
+}
+
+function handleNumericKey(key) {
+  if (!isInProgress.value) return;
+  if (key === '⌫') {
+    numericInputValue.value = numericInputValue.value.slice(0, -1);
+  } else {
+    const newStr = numericInputValue.value + key;
+    const num = parseInt(newStr, 10);
+    if (!isNaN(num) && num <= 100) {
+      numericInputValue.value = String(num);
+    }
+  }
+  saveNumericAnswer();
+}
+
+async function saveNumericAnswer() {
+  if (!isInProgress.value) return;
+  const val = numericInputValue.value;
+  if (val === '' || val === null || val === undefined) {
+    await attemptStore.updateAnswer(attemptStore.attempt.id, currentIndex.value, null, remainingSeconds.value);
+    return;
+  }
+  const num = parseInt(val, 10);
+  if (isNaN(num) || num < 0 || num > 100) return;
+  await attemptStore.updateAnswer(attemptStore.attempt.id, currentIndex.value, String(num), remainingSeconds.value);
 }
 
 async function selectAnswer(letter) {
@@ -365,8 +433,21 @@ function handleKeydown(e) {
     return;
   }
 
+  if (isNumericQuestion.value && isInProgress.value) {
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      handleNumericKey('⌫');
+      return;
+    }
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      handleNumericKey(e.key);
+      return;
+    }
+  }
+
   const digit = parseInt(e.key, 10);
-  if (digit >= 1 && digit <= 5 && isInProgress.value) {
+  if (digit >= 1 && digit <= 5 && isInProgress.value && !isNumericQuestion.value) {
     e.preventDefault();
     selectAnswer(letterMap[digit]);
   }
@@ -404,7 +485,7 @@ async function autoSubmit(termination = 'timeout') {
 function handleBlur() {
   if (isInProgress.value) {
     showBlurAlarm.value = true;
-    blurCountdown.value = 10;
+    // blurCountdown.value = 10;
     blurInterval = setInterval(() => {
       blurCountdown.value--;
       if (blurCountdown.value <= 0) {
@@ -431,13 +512,17 @@ onMounted(async () => {
     await sessionStore.fetchSession(code);
     await attemptStore.fetchAttempt(attemptId);
 
+    if (currentIndex.value >= 24) {
+      numericInputValue.value = answers.value[currentIndex.value]?.answer ?? '';
+    }
+
     window.addEventListener('keydown', handleKeydown);
 
     if (isInProgress.value) {
       const preferences = session.value.preferences || { time_limit: 50 };
       startCountdown(preferences.time_limit);
-      window.addEventListener('blur', handleBlur);
-      window.addEventListener('focus', handleFocus);
+      // window.addEventListener('blur', handleBlur);
+      // window.addEventListener('focus', handleFocus);
     }
   } catch (err) {
     // navigate away on error
