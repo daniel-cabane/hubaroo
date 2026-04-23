@@ -7,7 +7,7 @@
     </div>
 
     <div v-else-if="session">
-      <h2 class="text-2xl font-bold mb-2 text-text-main dark:text-surface">{{ session.paper?.title }}</h2>
+      <h2 class="text-2xl font-bold mb-2 text-text-main dark:text-surface">Session Kangourou</h2>
       <p class="text-lg font-mono tracking-widest text-primary mb-4">{{ session.code }}</p>
 
       <div v-if="session.status === 'active' && !isExpired" class="space-y-4">

@@ -38,7 +38,7 @@
           v-for="(answer, idx) in answers"
           :key="idx"
           @click="goToQuestion(idx)"
-          class="w-12 h-12 mx-1 rounded-full text-lg font-bold flex-shrink-0 transition-colors"
+          class="w-12 h-12 mx-1 rounded-full text-lg font-bold flex-shrink-0 transition-colors cursor-pointer"
           :class="questionStatusClass(answer, idx)"
         >
           {{ idx + 1 }}
@@ -58,6 +58,9 @@
       </button>
 
       <div class="max-w-2xl mx-4 flex-1 relative overflow-visible">
+        <div v-if="isShuffled && isInProgress" class="text-center mb-3 text-xs text-text-muted bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-1 inline-block">
+          Questions mélangées — numéro original&nbsp;: <span class="font-semibold">{{ currentOriginalIndex + 1 }}</span>
+        </div>
         <Transition :name="slideDirection" mode="out-in">
           <div v-if="currentQuestion" :key="currentIndex" class="w-full">
             <img
@@ -82,27 +85,62 @@
 
             <!-- Numeric Answer Display (Q25-26) -->
             <div v-else class="flex flex-col items-center gap-4">
-              <label class="text-sm text-text-muted">Entrez votre réponse (0–100)</label>
-              <div
-                class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-900 text-text-main dark:text-surface select-none"
-                :class="numericInputClass"
-              >
-                {{ numericInputValue !== '' ? numericInputValue : '—' }}
-              </div>
-              <p v-if="!isInProgress" class="text-sm text-text-muted">
-                Correct : <span class="font-bold text-success">{{ currentQuestion?.correct_answer }}</span>
-              </p>
-              <!-- On-screen keypad -->
-              <div v-if="isInProgress" class="grid grid-cols-3 gap-2">
-                <button
-                  v-for="key in ['1','2','3','4','5','6','7','8','9','⌫','0']"
-                  :key="key"
-                  @click="handleNumericKey(key)"
-                  class="w-14 h-14 rounded-xl text-xl font-bold transition-colors shadow"
-                  :class="key === '⌫' ? 'bg-gray-200 dark:bg-gray-700 text-error col-start-1' : 'bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700'"
+              <label class="text-sm text-text-muted">Réponse numérique</label>
+              <div class="flex flex-col items-center gap-3">
+                <div
+                  class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-900 text-text-main dark:text-surface select-none"
+                  :class="numericInputClass"
                 >
-                  {{ key }}
+                  {{ numericInputValue !== '' ? numericInputValue : '—' }}
+                </div>
+                <p v-if="!isInProgress" class="text-sm text-text-muted">
+                  Correct : <span class="font-bold text-success">{{ currentQuestion?.correct_answer }}</span>
+                </p>
+                <!-- Keypad Toggle Button -->
+                <button
+                  v-if="isInProgress"
+                  @click="showKeypad = !showKeypad"
+                  class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                >
+                  {{ showKeypad ? 'Masquer le clavier' : 'Afficher le clavier' }}
                 </button>
+              </div>
+            </div>
+
+            <!-- Keypad Overlay -->
+            <div
+              v-if="isInProgress && showKeypad"
+              class="fixed inset-0 z-40 bg-black/30 flex items-center justify-center"
+              @click.self="showKeypad = false"
+            >
+              <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 shadow-xl flex flex-col items-center gap-4 relative">
+                <!-- Close Button -->
+                <button
+                  @click="showKeypad = false"
+                  class="absolute top-3 right-3 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X class="w-5 h-5 text-text-main dark:text-surface" />
+                </button>
+                <!-- Answer Display in Overlay -->
+                <div
+                  class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-800 text-text-main dark:text-surface select-none"
+                  :class="numericInputClass"
+                >
+                  {{ numericInputValue !== '' ? numericInputValue : '—' }}
+                </div>
+                <!-- Keypad Buttons -->
+                <div class="grid grid-cols-3 gap-2">
+                  <button
+                    v-for="key in ['1','2','3','4','5','6','7','8','9','delete','0']"
+                    :key="key"
+                    @click="handleNumericKey(key === 'delete' ? '⌫' : key)"
+                    class="w-16 h-16 rounded-xl text-2xl font-bold transition-colors cursor-pointer shadow flex items-center justify-center"
+                    :class="key === 'delete' ? 'bg-gray-200 dark:bg-gray-700 text-error col-start-1' : 'bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700'"
+                  >
+                    <Delete v-if="key === 'delete'" class="w-6 h-6" />
+                    <span v-else>{{ key }}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -123,9 +161,9 @@
     <div v-if="isInProgress" class="bg-surface dark:bg-gray-900 border-t border-border px-4 py-3 flex items-center justify-center">
       <button
         @click="showSubmitModal = true"
-        class="px-6 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors"
+        class="px-6 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface cursor-pointer font-medium transition-colors"
       >
-        Soumettre
+        Terminer la session
       </button>
     </div>
 
@@ -171,7 +209,7 @@
       class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
     >
       <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm mx-4 shadow-xl">
-        <h3 class="text-lg font-bold text-text-main dark:text-surface mb-2">Soumettre la tentative ?</h3>
+        <h3 class="text-lg font-bold text-text-main dark:text-surface mb-2">Terminer la session ?</h3>
         <p class="text-sm text-text-muted mb-1">
           Répondu : {{ answeredCount }} / 26
         </p>
@@ -181,16 +219,16 @@
         <div class="flex gap-3">
           <button
             @click="showSubmitModal = false"
-            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 cursor-pointer text-text-main dark:text-surface transition-colors"
           >
             Annuler
           </button>
           <button
             @click="handleSubmit"
             :disabled="attemptStore.isLoading"
-            class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
+            class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover cursor-pointer text-surface font-medium transition-colors disabled:opacity-50"
           >
-            {{ attemptStore.isLoading ? 'Soumission...' : 'Soumettre' }}
+            {{ attemptStore.isLoading ? 'Chargement...' : 'Terminer' }}
           </button>
         </div>
       </div>
@@ -201,7 +239,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 
@@ -222,6 +260,9 @@ const showBlurAlarm = ref(false);
 const blurCountdown = ref(10);
 const remainingSeconds = ref(0);
 const numericInputValue = ref('');
+const showKeypad = ref(false);
+const questionOrder = ref([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
+const isShuffled = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
@@ -231,20 +272,22 @@ const answers = computed(() => attemptStore.attempt?.answers || []);
 const isInProgress = computed(() => attemptStore.isInProgress);
 
 const questions = computed(() => session.value?.paper?.questions || []);
-const currentQuestion = computed(() => questions.value[currentIndex.value]);
+const currentOriginalIndex = computed(() => questionOrder.value[currentIndex.value]);
+const currentQuestion = computed(() => questions.value[currentOriginalIndex.value]);
 const isNumericQuestion = computed(() => currentQuestion.value?.tier === 4);
 
 const numericInputClass = computed(() => {
   if (isInProgress.value) return 'border-border';
-  const answer = answers.value[currentIndex.value]?.answer;
+  const answer = answers.value[currentOriginalIndex.value]?.answer;
   const correct = currentQuestion.value?.correct_answer;
   if (answer === null || answer === undefined || answer === '') return 'border-border';
   return answer === correct ? 'border-success bg-success/5' : 'border-error bg-error/5';
 });
 
 watch(currentIndex, (newIdx) => {
-  if (newIdx >= 24) {
-    numericInputValue.value = answers.value[newIdx]?.answer ?? '';
+  const origIdx = questionOrder.value[newIdx];
+  if (origIdx >= 24) {
+    numericInputValue.value = answers.value[origIdx]?.answer ?? '';
   }
   nextTick(() => {
     const container = navBar.value;
@@ -271,15 +314,16 @@ const answeredCount = computed(() =>
 function questionStatusClass(answer, idx) {
   const isCurrent = idx === currentIndex.value;
   const base = isCurrent ? 'ring-2 ring-primary ' : '';
+  const origAnswer = answers.value[questionOrder.value[idx]];
 
-  if (answer.status === 'correct') return base + 'bg-success text-white';
-  if (answer.status === 'incorrect') return base + 'bg-error text-white';
-  if (answer.answer !== null) return base + 'bg-primary/20 text-primary dark:text-primary-hover';
+  if (origAnswer?.status === 'correct') return base + 'bg-success text-white';
+  if (origAnswer?.status === 'incorrect') return base + 'bg-error text-white';
+  if (origAnswer?.answer !== null && origAnswer?.answer !== undefined) return base + 'bg-primary/20 text-primary dark:text-primary-hover';
   return base + 'bg-gray-100 dark:bg-gray-800 text-text-muted';
 }
 
 function answerButtonClass(letter) {
-  const currentAnswer = answers.value[currentIndex.value]?.answer;
+  const currentAnswer = answers.value[currentOriginalIndex.value]?.answer;
   const isSelected = currentAnswer === letter;
 
   if (!isInProgress.value) {
@@ -322,7 +366,7 @@ function handleNumericKey(key) {
   } else {
     const newStr = numericInputValue.value + key;
     const num = parseInt(newStr, 10);
-    if (!isNaN(num) && num <= 100) {
+    if (!isNaN(num) && num <= 1000000) {
       numericInputValue.value = String(num);
     }
   }
@@ -333,22 +377,22 @@ async function saveNumericAnswer() {
   if (!isInProgress.value) return;
   const val = numericInputValue.value;
   if (val === '' || val === null || val === undefined) {
-    await attemptStore.updateAnswer(attemptStore.attempt.id, currentIndex.value, null, remainingSeconds.value);
+    await attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, null, remainingSeconds.value);
     return;
   }
   const num = parseInt(val, 10);
-  if (isNaN(num) || num < 0 || num > 100) return;
-  await attemptStore.updateAnswer(attemptStore.attempt.id, currentIndex.value, String(num), remainingSeconds.value);
+  if (isNaN(num) || num < 0 || num > 1000000) return;
+  await attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, String(num), remainingSeconds.value);
 }
 
 async function selectAnswer(letter) {
   if (!isInProgress.value) return;
 
-  const currentAnswer = answers.value[currentIndex.value]?.answer;
+  const currentAnswer = answers.value[currentOriginalIndex.value]?.answer;
   const newAnswer = currentAnswer === letter ? null : letter;
 
   try {
-    await attemptStore.updateAnswer(attemptStore.attempt.id, currentIndex.value, newAnswer, remainingSeconds.value);
+    await attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, newAnswer, remainingSeconds.value);
   } catch {
     // error handled by store
   }
@@ -389,7 +433,8 @@ function confirmJump() {
 }
 
 function jumpToFirstUnanswered() {
-  const idx = answers.value.findIndex(a => a.answer === null);
+  // Find the first display index whose original answer is null
+  const idx = questionOrder.value.findIndex((origIdx) => answers.value[origIdx]?.answer === null);
   if (idx !== -1) {
     slideDirection.value = idx > currentIndex.value ? 'slide-left' : 'slide-right';
     currentIndex.value = idx;
@@ -451,6 +496,44 @@ function handleKeydown(e) {
     e.preventDefault();
     selectAnswer(letterMap[digit]);
   }
+}
+
+function shuffleArray(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildQuestionOrder(qs, shuffleMode) {
+  if (!shuffleMode || shuffleMode === 'none') {
+    return qs.map((_, i) => i);
+  }
+
+  if (shuffleMode === 'by_tier') {
+    const byTier = {};
+    qs.forEach((q, i) => {
+      const t = q.tier ?? 1;
+      if (!byTier[t]) byTier[t] = [];
+      byTier[t].push(i);
+    });
+    const tiers = Object.keys(byTier).map(Number).sort((a, b) => a - b);
+    return tiers.flatMap(t => shuffleArray(byTier[t]));
+  }
+
+  if (shuffleMode === 'tiers_1_3') {
+    const tier1to3 = qs.map((q, i) => ({ q, i })).filter(({ q }) => (q.tier ?? 1) !== 4).map(({ i }) => i);
+    const tier4 = qs.map((q, i) => ({ q, i })).filter(({ q }) => (q.tier ?? 1) === 4).map(({ i }) => i);
+    return [...shuffleArray(tier1to3), ...tier4];
+  }
+
+  if (shuffleMode === 'complete') {
+    return shuffleArray(qs.map((_, i) => i));
+  }
+
+  return qs.map((_, i) => i);
 }
 
 function startCountdown(timeLimitMinutes) {
@@ -519,10 +602,30 @@ onMounted(async () => {
     window.addEventListener('keydown', handleKeydown);
 
     if (isInProgress.value) {
-      const preferences = session.value.preferences || { time_limit: 50 };
-      startCountdown(preferences.time_limit);
-      window.addEventListener('blur', handleBlur);
-      window.addEventListener('focus', handleFocus);
+      const preferences = session.value?.preferences || {};
+      const shuffleMode = preferences.shuffle ?? 'none';
+      if (shuffleMode !== 'none') {
+        questionOrder.value = buildQuestionOrder(questions.value, shuffleMode);
+        isShuffled.value = true;
+      }
+
+      const timeLimitMinutes = preferences.time_limit ?? 50;
+      startCountdown(timeLimitMinutes);
+
+      const blurSecurity = preferences.blur_security ?? true;
+      if (blurSecurity) {
+        window.addEventListener('blur', handleBlur);
+        window.addEventListener('focus', handleFocus);
+      }
+
+      if (session.value?.id) {
+        window.Echo.channel(`session.${session.value.id}`)
+          .listen('.SessionExpired', () => {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            autoSubmit('timeout');
+          });
+      }
     }
   } catch (err) {
     // navigate away on error
@@ -535,6 +638,9 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('blur', handleBlur);
   window.removeEventListener('focus', handleFocus);
+  if (session.value?.id) {
+    window.Echo.leave(`session.${session.value.id}`);
+  }
 });
 </script>
 

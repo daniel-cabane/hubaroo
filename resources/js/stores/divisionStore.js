@@ -58,7 +58,11 @@ export const useDivisionStore = defineStore('division', () => {
     error.value = null;
     try {
       const response = await axios.patch(`/api/divisions/${id}`, data);
-      division.value = response.data.division;
+      if (division.value?.id === id) {
+        division.value = { ...division.value, ...response.data.division };
+      } else {
+        division.value = response.data.division;
+      }
       const idx = divisions.value.findIndex(d => d.id === id);
       if (idx !== -1) {
         divisions.value[idx] = response.data.division;

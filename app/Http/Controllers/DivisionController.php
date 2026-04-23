@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SessionClosedForDivision;
+use App\Events\SessionOpenedForDivision;
+use App\Events\StudentJoinedDivision;
 use App\Http\Requests\CreateDivisionRequest;
 use App\Http\Requests\UpdateDivisionRequest;
 use App\Models\Division;
@@ -155,6 +158,8 @@ class DivisionController extends Controller
         $invite->delete();
         $division->students()->syncWithoutDetaching([$user->id]);
 
+        broadcast(new StudentJoinedDivision($division, $user));
+
         return response()->json(['message' => 'Invite accepted.']);
     }
 
@@ -200,6 +205,8 @@ class DivisionController extends Controller
             ->where('status', 'pending')
             ->update(['status' => 'accepted', 'user_id' => $user->id]);
 
+        broadcast(new StudentJoinedDivision($division, $user));
+
         return response()->json([
             'message' => 'Joined class successfully.',
             'division' => $division->load('teacher'),
@@ -223,6 +230,8 @@ class DivisionController extends Controller
 
         $session->divisions()->syncWithoutDetaching([$division->id]);
 
+        broadcast(new SessionOpenedForDivision($division, $session->load('paper')));
+
         return response()->json(['message' => 'Session opened for division.']);
     }
 
@@ -233,6 +242,8 @@ class DivisionController extends Controller
         }
 
         $session->divisions()->detach($division->id);
+
+        broadcast(new SessionClosedForDivision($division, $session));
 
         return response()->json(['message' => 'Session closed for division.']);
     }

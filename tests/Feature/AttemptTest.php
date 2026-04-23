@@ -109,6 +109,17 @@ test('cannot submit already finished attempt', function () {
     $response->assertForbidden();
 });
 
+test('can submit an attempt when session is expired', function () {
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit");
+
+    $response->assertOk();
+    expect($response->json('attempt.status'))->toBe('finished');
+    expect($response->json('attempt.score'))->not->toBeNull();
+});
+
 test('can recover attempt by code', function () {
     $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
 

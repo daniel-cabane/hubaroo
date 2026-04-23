@@ -272,7 +272,7 @@
           class="block p-5 rounded-xl border border-border bg-surface dark:bg-gray-900 hover:border-primary hover:shadow-md transition-all"
         >
           <p class="font-semibold text-text-main dark:text-surface">{{ session.paper?.title }}</p>
-          <p class="text-sm text-primary font-mono mt-1">{{ session.code }}</p>
+          <p class="text-sm text-text-muted mt-1">{{ formatTimeUntilExpiration(session.expires_at) }}</p>
         </router-link>
       </div>
     </template>
@@ -423,7 +423,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ChevronLeft, RefreshCw, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
@@ -492,6 +492,44 @@ onMounted(async () => {
   if (isTeacher.value) {
     await sessionStore.fetchMySessions();
   }
+
+  window.Echo.private(`division.${divisionId.value}`)
+    .listen('.StudentJoinedDivision', (e) => {
+      console.log(e);
+      if (!divisionStore.division) {
+        return;
+      }
+
+      const student = e.student;
+      const alreadyExists = (divisionStore.division.students ?? []).some(s => s.id === student.id);
+
+      if (!alreadyExists) {
+        if (!divisionStore.division.students) {
+          divisionStore.division.students = [];
+        }
+        divisionStore.division.students.push(student);
+        divisionStore.division.students_count = (divisionStore.division.students_count ?? 0) + 1;
+      }
+    })
+    .listen('.SessionOpenedForDivision', (e) => {
+      if (!divisionStore.division) {
+        return;
+      }
+
+      const session = e.session;
+      const alreadyExists = (divisionStore.division.kangourou_sessions ?? []).some(s => s.id === session.id);
+
+      if (!alreadyExists) {
+        if (!divisionStore.division.kangourou_sessions) {
+          divisionStore.division.kangourou_sessions = [];
+        }
+        divisionStore.division.kangourou_sessions.push(session);
+      }
+    });
+});
+
+onUnmounted(() => {
+  window.Echo.leave(`division.${divisionId.value}`);
 });
 
 async function handleRename() {
@@ -592,5 +630,25 @@ function formatExpiredTime(expiresAt) {
   if (diffDays < 7) return `il y a ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
   if (diffWeeks < 4) return `il y a ${diffWeeks} semaine${diffWeeks > 1 ? 's' : ''}`;
   return `il y a ${diffMonths} mois`;
+}
+
+function formatTimeUntilExpiration(expiresAt) {
+  if (!expiresAt) return 'Expirée';
+
+  const expiryDate = new Date(expiresAt);
+  const now = new Date();
+  const diffMs = expiryDate - now;
+
+  if (diffMs <= 0) return 'Expirée';
+
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) return 'Expiration immédiate';
+  if (diffMins < 60) return `expires dans ${diffMins} minute${diffMins > 1 ? 's' : ''}`;
+  if (diffHours < 24) return `expires dans ${diffHours} heure${diffHours > 1 ? 's' : ''}`;
+  return `expires dans ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
 }
 </script>

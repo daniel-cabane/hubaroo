@@ -26,6 +26,7 @@ class GradingService
 
         $score = 0.0;
         $allFirstTwentyFourCorrect = true;
+        $onlyCountTier4IfAllCorrect = $preferences['only_count_tier4_if_all_before_correct'] ?? true;
 
         foreach ($questions as $index => $question) {
             $userAnswer = $answers[$index]['answer'] ?? null;
@@ -59,8 +60,8 @@ class GradingService
             }
         }
 
-        // Tier 4 bonus: award points for Q25-26 only if all Q1-24 are correct
-        if ($allFirstTwentyFourCorrect) {
+        // Tier 4 bonus: conditionally require all Q1-24 to be correct
+        if (! $onlyCountTier4IfAllCorrect || $allFirstTwentyFourCorrect) {
             $tier4Count = $questions->count() - 24;
             $score += $grading['tier4_bonus'] * $tier4Count;
         }

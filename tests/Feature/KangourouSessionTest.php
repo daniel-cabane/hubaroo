@@ -142,9 +142,10 @@ test('delayed correction shows answers when session is expired', function () {
 });
 
 test('can activate a session', function () {
-    $session = KangourouSession::factory()->draft()->create(['paper_id' => $this->paper->id]);
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->draft()->create(['paper_id' => $this->paper->id]);
 
-    $response = $this->patchJson("/api/kangourou-sessions/{$session->id}/activate");
+    $response = $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}/activate");
 
     $response->assertOk();
     expect($response->json('session.status'))->toBe('active');
@@ -218,7 +219,7 @@ test('author can update session correction mode and grading', function () {
     expect($prefs['grading']['tier2'])->toBe(6);
 });
 
-test('update session preserves time_limit even if sent', function () {
+test('author can update session time_limit', function () {
     $user = User::factory()->create();
     $session = KangourouSession::factory()->withAuthor($user)->create([
         'paper_id' => $this->paper->id,
@@ -226,12 +227,68 @@ test('update session preserves time_limit even if sent', function () {
     ]);
 
     $response = $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}", [
-        'preferences' => ['time_limit' => 999, 'correction' => 'immediate'],
+        'preferences' => ['time_limit' => 90, 'correction' => 'immediate'],
     ]);
 
     $response->assertOk();
-    expect($response->json('session.preferences.time_limit'))->toBe(50);
+    expect($response->json('session.preferences.time_limit'))->toBe(90);
     expect($response->json('session.preferences.correction'))->toBe('immediate');
+});
+
+test('author can update blur_security preference', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    $response = $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}", [
+        'preferences' => ['blur_security' => false],
+    ]);
+
+    $response->assertOk();
+    expect($response->json('session.preferences.blur_security'))->toBeFalse();
+});
+
+test('author can update shuffle preference', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    $response = $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}", [
+        'preferences' => ['shuffle' => 'by_tier'],
+    ]);
+
+    $response->assertOk();
+    expect($response->json('session.preferences.shuffle'))->toBe('by_tier');
+});
+
+test('shuffle preference validates allowed values', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    $response = $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}", [
+        'preferences' => ['shuffle' => 'invalid'],
+    ]);
+
+    $response->assertUnprocessable();
+    $response->assertJsonValidationErrors(['preferences.shuffle']);
+});
+
+test('author can update only_count_tier4_if_all_before_correct preference', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+
+    $response = $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}", [
+        'preferences' => ['only_count_tier4_if_all_before_correct' => false],
+    ]);
+
+    $response->assertOk();
+    expect($response->json('session.preferences.only_count_tier4_if_all_before_correct'))->toBeFalse();
 });
 
 test('non-author cannot update session', function () {

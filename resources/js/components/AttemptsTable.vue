@@ -60,12 +60,12 @@
                 <span v-if="sortBy === 'termination'" class="ml-1">{{ sortOrder === 'asc' ? '▲' : '▼' }}</span>
               </th>
               <th
-                @click="toggleSort('date')"
+                @click="toggleSort('updated')"
                 class="px-4 py-3 font-semibold text-text-main text-center dark:text-surface/80 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                :title="sortBy === 'date' ? (sortOrder === 'asc' ? 'Ordre croissant' : 'Ordre décroissant') : 'Cliquer pour trier'"
+                :title="sortBy === 'updated' ? (sortOrder === 'asc' ? 'Ordre croissant' : 'Ordre décroissant') : 'Cliquer pour trier'"
               >
-                Date
-                <span v-if="sortBy === 'date'" class="ml-1">{{ sortOrder === 'asc' ? '▲' : '▼' }}</span>
+                Mis à jour
+                <span v-if="sortBy === 'updated'" class="ml-1">{{ sortOrder === 'asc' ? '▲' : '▼' }}</span>
               </th>
             </tr>
           </thead>
@@ -79,14 +79,14 @@
                       <button
                         @click="$emit('edit', attempt)"
                         title="Éditer le nom"
-                        class="text-text-muted hover:text-info transition-colors"
+                        class="text-text-muted hover:text-info transition-colors cursor-pointer"
                       >
                         <Edit class="w-4 h-4" />
                       </button>
                       <button
                         @click="$emit('delete', attempt)"
                         title="Supprimer la tentative"
-                        class="text-text-muted hover:text-error transition-colors"
+                        class="text-text-muted hover:text-error transition-colors cursor-pointer"
                       >
                         <Trash2 class="w-4 h-4" />
                       </button>
@@ -111,9 +111,8 @@
                   {{ attempt.timer !== null ? `${Math.floor(attempt.timer / 60)}:${String(attempt.timer % 60).padStart(2, '0')}` : '—' }}
                 </td>
                 <td class="px-4 py-3 text-text-muted text-center">{{ terminationLabel(attempt.termination) }}</td>
-                <td class="px-4 py-3 text-text-muted text-xs text-center">
-                  <div>{{ new Date(attempt.created_at).toLocaleDateString('fr-FR') }}</div>
-                  <div>{{ new Date(attempt.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }}</div>
+                <td class="px-4 py-3 text-text-muted text-xs text-center" :title="new Date(attempt.updated_at).toLocaleString('fr-FR')">
+                  {{ timeAgo(attempt.updated_at) }}
                 </td>
               </tr>
               <tr>
@@ -181,6 +180,15 @@ function getAnswerColorClass(status) {
   return 'bg-gray-300 text-text-muted dark:bg-gray-600';
 }
 
+function timeAgo(dateStr) {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return 'À l\'instant';
+  if (diff < 3600) return `Il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `Il y a ${Math.floor(diff / 3600)} h`;
+  if (diff < 2592000) return `Il y a ${Math.floor(diff / 86400)} j`;
+  return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
 function toggleSort(column) {
   if (sortBy.value === column) {
     sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
@@ -220,9 +228,9 @@ const filteredAndSortedAttempts = computed(() => {
         aVal = a.termination || '';
         bVal = b.termination || '';
         return sortOrder.value === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      case 'date':
-        aVal = new Date(a.created_at).getTime();
-        bVal = new Date(b.created_at).getTime();
+      case 'updated':
+        aVal = new Date(a.updated_at).getTime();
+        bVal = new Date(b.updated_at).getTime();
         return sortOrder.value === 'asc' ? aVal - bVal : bVal - aVal;
       default:
         return 0;

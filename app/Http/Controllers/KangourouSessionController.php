@@ -94,9 +94,6 @@ class KangourouSessionController extends Controller
             $current = $kangourouSession->preferences ?? [];
             $incoming = $request->validated('preferences');
 
-            // Preserve time_limit — not editable
-            unset($incoming['time_limit']);
-
             $data['preferences'] = array_replace_recursive($current, $incoming);
         }
 
@@ -123,7 +120,7 @@ class KangourouSessionController extends Controller
     {
         $this->authorize('view', $kangourouSession);
 
-        $kangourouSession->load(['paper', 'attempts' => function ($query) {
+        $kangourouSession->load(['paper', 'divisions', 'attempts' => function ($query) {
             $query->latest()->select('id', 'kangourou_session_id', 'user_id', 'name', 'code', 'status', 'score', 'timer', 'termination', 'answers', 'created_at', 'updated_at');
         }]);
 

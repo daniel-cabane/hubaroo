@@ -132,3 +132,46 @@ test('gradeAndSave marks answers and saves score', function () {
     expect($attempt->answers[0]['status'])->toBe('correct');
     expect($attempt->answers[10]['status'])->toBe('unanswered');
 });
+
+test('tier 4 bonus always awarded when only_count_tier4_if_all_before_correct is false', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'preferences' => ['only_count_tier4_if_all_before_correct' => false],
+    ]);
+
+    $questions = $this->paper->questions()->orderByPivot('order')->get();
+    $answers = [];
+    foreach ($questions as $index => $question) {
+        if ($index === 0) {
+            // Q1 is wrong — tier 4 bonus should still apply
+            $wrongAnswer = $question->correct_answer === 'A' ? 'B' : 'A';
+            $answers[] = ['answer' => $wrongAnswer, 'status' => 'answered'];
+        } else {
+            $answers[] = ['answer' => $question->correct_answer, 'status' => 'answered'];
+        }
+    }
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $session->id,
+        'answers' => $answers,
+    ]);
+
+    $score = $this->gradingService->grade($attempt);
+
+    // Q1 wrong: 7*3 - 0.75 = 20.25 → 20 (floor), tier2: 32, tier3: 40, tier4 bonus: 2 (always awarded)
+    // Total: 7*3 + 8*4 + 8*5 + 2*1 - 0.25*3 = 21 + 32 + 40 + 2 - 0.75 = 94.25 → 94
+    expect($score)->toBe(94);
+});
+
+test('default preferences include all new fields', function () {
+    $defaults = KangourouSession::DEFAULT_PREFERENCES;
+
+    expect($defaults)->toHaveKey('time_limit');
+    expect($defaults)->toHaveKey('blur_security');
+    expect($defaults)->toHaveKey('only_count_tier4_if_all_before_correct');
+    expect($defaults)->toHaveKey('shuffle');
+    expect($defaults['time_limit'])->toBe(50);
+    expect($defaults['blur_security'])->toBeTrue();
+    expect($defaults['only_count_tier4_if_all_before_correct'])->toBeTrue();
+    expect($defaults['shuffle'])->toBe('none');
+});

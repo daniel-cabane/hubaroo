@@ -34,13 +34,13 @@
       <div class="container mx-auto">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-text-main dark:text-surface">Sessions en cours</h3>
-          <button
+          <!-- <button
             @click="showActiveSessions = false"
             class="text-text-muted hover:text-text-main transition-colors"
             title="Fermer"
           >
             <X class="w-5 h-5" />
-          </button>
+          </button> -->
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <router-link
@@ -143,7 +143,7 @@
           </div>
           <div class="flex items-center justify-between text-xs text-text-muted">
             <span class="truncate">{{ ga.name || 'Anonyme' }}</span>
-            <span v-if="ga.score !== null" class="flex-shrink-0 ml-2">{{ ga.score }}</span>
+            <span v-if="ga.score !== null && ga.kangourou_session?.status === 'expired'" class="flex-shrink-0 ml-2">{{ ga.score }}</span>
           </div>
         </router-link>
       </div>
@@ -205,7 +205,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { PlusCircle, LogIn, X, ChevronUp } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
@@ -293,7 +293,26 @@ onMounted(async () => {
   if (authStore.isAuthenticated) {
     await divisionStore.fetchMyDivisions();
     await attemptStore.fetchMyAttempts();
-    
+
+    // Subscribe to division channels for real-time session updates
+    divisionStore.divisions.forEach(division => {
+      window.Echo.private(`division.${division.id}`)
+        .listen('.SessionOpenedForDivision', (e) => {
+          const div = divisionStore.divisions.find(d => d.id === division.id);
+          if (!div) { return; }
+          if (!div.kangourou_sessions) { div.kangourou_sessions = []; }
+          const alreadyExists = div.kangourou_sessions.some(s => s.id === e.session.id);
+          if (!alreadyExists) {
+            div.kangourou_sessions.push(e.session);
+          }
+        })
+        .listen('.SessionClosedForDivision', (e) => {
+          const div = divisionStore.divisions.find(d => d.id === division.id);
+          if (!div) { return; }
+          div.kangourou_sessions = (div.kangourou_sessions ?? []).filter(s => s.id !== e.session.id);
+        });
+    });
+
     // Fetch invites if student
     if (!authStore.user?.is_teacher) {
       await divisionStore.fetchMyInvites();
@@ -311,5 +330,11 @@ onMounted(async () => {
     // Load guest attempts for display
     await attemptStore.fetchGuestAttempts();
   }
+});
+
+onUnmounted(() => {
+  divisionStore.divisions.forEach(division => {
+    window.Echo.leave(`division.${division.id}`);
+  });
 });
 </script>

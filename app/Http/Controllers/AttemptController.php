@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AttemptUpdated;
 use App\Http\Requests\UpdateAnswerRequest;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
@@ -86,9 +87,12 @@ class AttemptController extends Controller
             'timer' => $request->validated('timer'),
         ]);
 
+        $fresh = $attempt->fresh();
+        broadcast(new AttemptUpdated($fresh));
+
         return response()->json([
             'message' => 'Answer saved.',
-            'attempt' => $attempt->fresh(),
+            'attempt' => $fresh,
         ]);
     }
 
@@ -96,11 +100,6 @@ class AttemptController extends Controller
     {
         if ($attempt->status === 'finished') {
             return response()->json(['message' => 'This attempt has already been submitted.'], 403);
-        }
-
-        $session = $attempt->kangourouSession;
-        if (! $session->isActive()) {
-            return response()->json(['message' => 'This session is no longer active.'], 403);
         }
 
         $request->validate([
@@ -115,10 +114,13 @@ class AttemptController extends Controller
 
         $score = $this->gradingService->gradeAndSave($attempt);
 
+        $fresh = $this->maskCorrectionIfNeeded($attempt->fresh());
+        broadcast(new AttemptUpdated($fresh));
+
         return response()->json([
             'message' => 'Attempt submitted and graded.',
             'score' => $score,
-            'attempt' => $this->maskCorrectionIfNeeded($attempt->fresh()),
+            'attempt' => $fresh,
         ]);
     }
 

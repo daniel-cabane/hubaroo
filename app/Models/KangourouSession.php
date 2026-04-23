@@ -17,6 +17,9 @@ class KangourouSession extends Model
 
     public const DEFAULT_PREFERENCES = [
         'time_limit' => 50,
+        'blur_security' => true,
+        'only_count_tier4_if_all_before_correct' => true,
+        'shuffle' => 'none',
         'correction' => 'delayed',
         'grading' => [
             'tier1' => 3,

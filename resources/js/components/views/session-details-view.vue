@@ -115,6 +115,48 @@
             </select>
           </div>
 
+          <!-- Class Access (private sessions only) -->
+          <div v-if="editForm.privacy === 'private'" class="rounded-lg border border-border p-4 space-y-3">
+            <p class="text-sm font-medium text-text-main dark:text-surface/80">Accès par classe</p>
+            <p v-if="session.privacy !== 'private'" class="text-xs text-warning">Enregistrez d'abord les paramètres pour activer les accès aux classes.</p>
+            <div v-if="divisionStore.divisions.length === 0" class="text-sm text-text-muted italic py-1">
+              Aucune classe disponible.
+            </div>
+            <div
+              v-for="division in divisionStore.divisions"
+              :key="division.id"
+              class="flex items-center justify-between"
+            >
+              <span class="text-sm text-text-main dark:text-surface">{{ division.name }}</span>
+              <button
+                type="button"
+                @click="toggleDivision(division)"
+                :disabled="isTogglingDivision === division.id || session.privacy !== 'private'"
+                class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                :class="linkedDivisionIds.includes(division.id) ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'"
+              >
+                <span
+                  class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                  :class="linkedDivisionIds.includes(division.id) ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+          </div>
+
+          <!-- Time Limit -->
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Durée limite (minutes)</label>
+            <input
+              v-model.number="editForm.preferences.time_limit"
+              type="number"
+              min="1"
+              max="300"
+              step="1"
+              :disabled="session.status !== 'draft'"
+              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+
           <!-- Correction -->
           <div class="space-y-1">
             <label class="block text-sm font-medium text-text-main dark:text-surface/80">Correction</label>
@@ -126,6 +168,47 @@
               <option value="delayed">Différée (après expiration)</option>
               <option value="immediate">Immédiate</option>
             </select>
+          </div>
+
+          <!-- Shuffle -->
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Ordre des questions</label>
+            <select
+              v-model="editForm.preferences.shuffle"
+              :disabled="session.status !== 'draft'"
+              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="none">Ordre normal</option>
+              <option value="by_tier">Mélange par palier</option>
+              <option value="tiers_1_3">Mélange paliers 1–3</option>
+              <option value="complete">Mélange complet</option>
+            </select>
+          </div>
+
+          <!-- Blur Security -->
+          <div class="space-y-1">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                v-model="editForm.preferences.blur_security"
+                type="checkbox"
+                :disabled="session.status !== 'draft'"
+                class="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <span class="text-sm font-medium text-text-main dark:text-surface/80">Sécurité anti-zapping (surveillance de l'onglet actif)</span>
+            </label>
+          </div>
+
+          <!-- Only count tier 4 if all before correct -->
+          <div class="space-y-1">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input
+                v-model="editForm.preferences.only_count_tier4_if_all_before_correct"
+                type="checkbox"
+                :disabled="session.status !== 'draft'"
+                class="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <span class="text-sm font-medium text-text-main dark:text-surface/80">Compter le palier 4 uniquement si toutes les questions précédentes sont correctes</span>
+            </label>
           </div>
 
           <!-- Grading -->
@@ -204,10 +287,10 @@
             </button>
             <button
               @click="saveChanges"
-              :disabled="isLoading"
+              :disabled="isSaving"
               class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
             >
-              {{ isLoading ? 'Enregistrement...' : 'Enregistrer' }}
+              {{ isSaving ? 'Enregistrement...' : 'Enregistrer' }}
             </button>
           </div>
         </div>
@@ -383,16 +466,16 @@
         <div class="flex gap-3">
           <button
             @click="closeEditNameModal"
-            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors cursor-pointer"
           >
             Annuler
           </button>
           <button
             @click="saveEditedName"
-            :disabled="isLoading || !editedName.trim()"
-            class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
+            :disabled="isOperationLoading || !editedName.trim()"
+            class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {{ isLoading ? 'Enregistrement...' : 'Enregistrer' }}
+            {{ isOperationLoading ? 'Enregistrement...' : 'Enregistrer' }}
           </button>
         </div>
       </div>
@@ -417,22 +500,22 @@
             type="checkbox"
             class="w-4 h-4"
           />
-          <span class="text-sm text-error font-medium">Je confirme la suppression</span>
+          <span class="text-sm text-error font-medium cursor-pointer">Je confirme la suppression</span>
         </label>
 
         <div class="flex gap-3">
           <button
             @click="closeDeleteModal"
-            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors cursor-pointer"
           >
             Annuler
           </button>
           <button
             @click="confirmDeleteAttempt"
-            :disabled="isLoading || !deleteConfirmed"
-            class="flex-1 px-4 py-2 rounded-lg bg-error hover:bg-error-hover text-surface font-medium transition-colors disabled:opacity-50"
+            :disabled="isOperationLoading || !deleteConfirmed"
+            class="flex-1 px-4 py-2 rounded-lg bg-error hover:bg-error-hover text-surface font-medium transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {{ isLoading ? 'Suppression...' : 'Supprimer' }}
+            {{ isOperationLoading ? 'Suppression...' : 'Supprimer' }}
           </button>
         </div>
       </div>
@@ -441,16 +524,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
 import { ChevronLeft, RefreshCw, Clock, Play } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
+import { useDivisionStore } from '@/stores/divisionStore';
 import AttemptsTable from '@/components/AttemptsTable.vue';
 
 const route = useRoute();
 const sessionStore = useKangourouSessionStore();
+const divisionStore = useDivisionStore();
 
 const isLoading = ref(false);
+const isOperationLoading = ref(false);
 const error = ref(null);
 const session = ref(null);
 const showChangeCodeModal = ref(false);
@@ -464,10 +550,17 @@ const showDeleteModal = ref(false);
 const selectedAttempt = ref(null);
 const editedName = ref('');
 const deleteConfirmed = ref(false);
+const linkedDivisionIds = ref([]);
+const isTogglingDivision = ref(null);
+const isSaving = ref(false);
 
 const editForm = reactive({
   privacy: 'public',
   preferences: {
+    time_limit: 50,
+    blur_security: true,
+    only_count_tier4_if_all_before_correct: true,
+    shuffle: 'none',
     correction: 'delayed',
     grading: { tier1: 3, tier2: 4, tier3: 5, tier4_bonus: 1, penalty_fraction: 0.25 },
   },
@@ -484,7 +577,12 @@ function initializeForm() {
     const prefs = session.value.preferences || {};
     const grading = prefs.grading || {};
     editForm.privacy = session.value.privacy;
-    editForm.preferences.correction = prefs.correction || 'delayed';
+    editForm.preferences.time_limit = prefs.time_limit ?? 50;
+    editForm.preferences.blur_security = prefs.blur_security ?? true;
+    editForm.preferences.only_count_tier4_if_all_before_correct = prefs.only_count_tier4_if_all_before_correct ?? true;
+    editForm.preferences.shuffle = prefs.shuffle ?? 'none';
+    editForm.preferences.correction = prefs.correction ?? 'delayed';
+    linkedDivisionIds.value = (session.value?.divisions ?? []).map(d => d.id);
     editForm.preferences.grading.tier1 = grading.tier1 ?? 3;
     editForm.preferences.grading.tier2 = grading.tier2 ?? 4;
     editForm.preferences.grading.tier3 = grading.tier3 ?? 5;
@@ -513,7 +611,7 @@ async function reloadSessionDetails() {
 
 async function saveChanges() {
   try {
-    isLoading.value = true;
+    isSaving.value = true;
     error.value = null;
     await sessionStore.updateSession(session.value.id, {
       privacy: editForm.privacy,
@@ -523,7 +621,7 @@ async function saveChanges() {
   } catch (err) {
     error.value = err.message || 'Failed to save changes';
   } finally {
-    isLoading.value = false;
+    isSaving.value = false;
   }
 }
 
@@ -608,14 +706,22 @@ async function saveEditedName() {
   if (!selectedAttempt.value || !editedName.value.trim()) return;
   
   try {
-    isLoading.value = true;
+    isOperationLoading.value = true;
+    error.value = null;
     await sessionStore.updateAttemptName(selectedAttempt.value.id, editedName.value);
-    await loadSessionDetails();
+    
+    // Update local state with proper Vue reactivity
+    if (session.value?.attempts) {
+      const attempt = session.value.attempts.find(a => a.id === selectedAttempt.value.id);
+      if (attempt) {
+        attempt.name = editedName.value;
+      }
+    }
     closeEditNameModal();
   } catch (err) {
     error.value = err.message || 'Failed to update attempt name';
   } finally {
-    isLoading.value = false;
+    isOperationLoading.value = false;
   }
 }
 
@@ -635,14 +741,22 @@ async function confirmDeleteAttempt() {
   if (!selectedAttempt.value || !deleteConfirmed.value) return;
   
   try {
-    isLoading.value = true;
+    isOperationLoading.value = true;
+    error.value = null;
     await sessionStore.deleteAttempt(selectedAttempt.value.id);
-    await loadSessionDetails();
+    
+    // Update local state with proper Vue reactivity
+    if (session.value?.attempts) {
+      const index = session.value.attempts.findIndex(a => a.id === selectedAttempt.value.id);
+      if (index !== -1) {
+        session.value.attempts.splice(index, 1);
+      }
+    }
     closeDeleteModal();
   } catch (err) {
     error.value = err.message || 'Failed to delete attempt';
   } finally {
-    isLoading.value = false;
+    isOperationLoading.value = false;
   }
 }
 
@@ -683,7 +797,50 @@ async function expireNow() {
   }
 }
 
+async function toggleDivision(division) {
+  if (isTogglingDivision.value) return;
+  isTogglingDivision.value = division.id;
+  try {
+    if (linkedDivisionIds.value.includes(division.id)) {
+      await divisionStore.closeSessionForDivision(session.value.id, division.id);
+      linkedDivisionIds.value = linkedDivisionIds.value.filter(id => id !== division.id);
+    } else {
+      await divisionStore.openSessionForDivision(session.value.id, division.id);
+      linkedDivisionIds.value = [...linkedDivisionIds.value, division.id];
+    }
+  } catch {
+    // error handled by store
+  } finally {
+    isTogglingDivision.value = null;
+  }
+}
+
 onMounted(() => {
-  loadSessionDetails();
+  loadSessionDetails().then(() => {
+    if (session.value?.id) {
+      window.Echo.private(`session.${session.value.id}`)
+        .listen('.AttemptUpdated', (e) => {
+          if (!session.value?.attempts) {
+            return;
+          }
+
+          const updated = e.attempt;
+          const index = session.value.attempts.findIndex(a => a.id === updated.id);
+
+          if (index !== -1) {
+            session.value.attempts[index] = updated;
+          } else {
+            session.value.attempts.push(updated);
+          }
+        });
+    }
+  });
+  divisionStore.fetchMyDivisions();
+});
+
+onUnmounted(() => {
+  if (session.value?.id) {
+    window.Echo.leave(`session.${session.value.id}`);
+  }
 });
 </script>

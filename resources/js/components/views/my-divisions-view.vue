@@ -73,7 +73,8 @@
             <span v-if="!d.accepting_students" class="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded-full">Fermée</span>
           </div>
           <p class="text-sm text-text-muted">
-            Code : <span class="font-mono font-bold">{{ d.code }}</span>
+            <span v-if="isTeacher">Code : <span class="font-mono font-bold">{{ d.code }}</span></span>
+            <span v-else>{{ d.teacher?.name }}</span>
           </p>
           <p class="text-sm text-text-muted mt-1">
             {{ d.students_count }} élève{{ d.students_count !== 1 ? 's' : '' }}
