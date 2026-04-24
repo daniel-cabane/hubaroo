@@ -617,7 +617,8 @@ async function saveChanges() {
       privacy: editForm.privacy,
       preferences: editForm.preferences,
     });
-    await loadSessionDetails();
+    const sessionId = route.params.id;
+    session.value = await sessionStore.fetchSessionDetails(sessionId);
   } catch (err) {
     error.value = err.message || 'Failed to save changes';
   } finally {

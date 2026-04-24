@@ -105,8 +105,8 @@
     </div>
   </div>
 
-  <!-- Guest Attempts Overlay (Bottom) -->
-  <div v-if="!authStore.isAuthenticated && attemptStore.guestAttempts.length > 0" class="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-surface/95 to-surface/85 border-t border-border shadow-lg transition-all duration-300" :class="showGuestAttempts ? 'translate-y-0' : 'translate-y-[calc(100%-52px)]'">
+  <!-- Recent Attempts Overlay (Bottom) -->
+  <div v-if="displayAttempts.length > 0" class="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-surface/95 to-surface/85 border-t border-border shadow-lg transition-all duration-300" :class="showGuestAttempts ? 'translate-y-0' : 'translate-y-[calc(100%-52px)]'">
     <div class="max-w-3xl mx-auto p-4">
       <!-- Header with Toggle -->
       <div class="flex items-center justify-between pb-3 border-b border-border">
@@ -123,7 +123,7 @@
       <!-- Attempts Grid (always rendered) -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto mt-4">
         <router-link
-          v-for="ga in attemptStore.guestAttempts"
+          v-for="ga in displayAttempts"
           :key="ga.id"
           :to="ga.status === 'inProgress' && ga.kangourou_session?.status === 'active'
             ? { name: 'Attempt', params: { code: ga.kangourou_session.code, attemptId: ga.id } }
@@ -223,6 +223,13 @@ const isClaiming = ref(false);
 
 const claimableAttempts = computed(() => {
   return attemptStore.guestAttempts.filter(a => !a.user_id);
+});
+
+const displayAttempts = computed(() => {
+  if (authStore.isAuthenticated) {
+    return attemptStore.myAttempts.slice(0, 3);
+  }
+  return attemptStore.guestAttempts;
 });
 
 const activeSessions = computed(() => {

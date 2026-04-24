@@ -44,9 +44,11 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAttemptStore } from '@/stores/attemptStore';
+import { useAuthStore } from '@/stores/authStore';
 
 const router = useRouter();
 const attemptStore = useAttemptStore();
+const authStore = useAuthStore();
 const code = ref('');
 const error = ref(null);
 const storedAttempt = ref(null);
@@ -55,12 +57,29 @@ onMounted(() => {
   storedAttempt.value = attemptStore.getFromLocalStorage();
 });
 
-function handleJoin() {
+async function handleJoin() {
   if (code.value.length !== 6) {
     error.value = 'Veuillez entrer un code à 6 caractères.';
     return;
   }
-  router.push({ name: 'Session', params: { code: code.value.toUpperCase() } });
+
+  const upperCode = code.value.toUpperCase();
+
+  // For guests, check if they already have an attempt for this session
+  if (!authStore.isAuthenticated) {
+    if (attemptStore.guestAttempts.length === 0) {
+      await attemptStore.fetchGuestAttempts();
+    }
+    const existing = attemptStore.guestAttempts.find(
+      a => a.kangourou_session?.code === upperCode
+    );
+    if (existing) {
+      router.push({ name: 'Results', params: { code: upperCode, attemptId: existing.id } });
+      return;
+    }
+  }
+
+  router.push({ name: 'Session', params: { code: upperCode } });
 }
 
 function resumeAttempt() {

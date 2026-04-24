@@ -2,6 +2,7 @@
   <div class="container mx-auto p-6 max-w-2xl">
     <div class="mb-4">
       <router-link
+        v-if="authStore.isAuthenticated"
         :to="{ name: 'MyAttempts' }"
         class="inline-flex items-center gap-1 text-sm text-text-muted hover:text-primary transition-colors"
       >
@@ -32,8 +33,19 @@
       </div>
 
       <!-- Delayed correction notice -->
-      <div v-if="!correctionAvailable" class="mb-8 p-4 bg-info/10 border border-info/30 rounded-lg text-center">
+      <div v-if="!correctionAvailable" class="mb-8 p-4 bg-info/10 border border-info/30 rounded-lg text-center space-y-3">
         <p class="text-sm text-text-main dark:text-surface">La correction sera disponible à la fin de la session.</p>
+        <div v-if="rejoinApproved" class="text-sm text-success font-medium">Demande acceptée ! Consultez le centre d'alertes pour rejoindre.</div>
+        <div v-else-if="rejoinDenied" class="text-sm text-error font-medium">Votre demande de reprise a été refusée.</div>
+        <div v-else-if="pendingDemandId" class="text-sm text-text-muted italic">Demande de reprise envoyée, en attente de validation...</div>
+        <button
+          v-else
+          @click="requestRejoin"
+          :disabled="isRequestingRejoin"
+          class="px-4 py-2 rounded-lg bg-info hover:bg-info/80 text-white text-sm font-medium transition-colors disabled:opacity-50"
+        >
+          {{ isRequestingRejoin ? 'Envoi...' : 'Demander à reprendre' }}
+        </button>
       </div>
 
       <!-- Question Review -->
@@ -93,14 +105,27 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
+import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';
+import { useAuthStore } from '@/stores/authStore';
 
 const route = useRoute();
 const sessionStore = useKangourouSessionStore();
 const attemptStore = useAttemptStore();
+const rejoinDemandStore = useRejoinDemandStore();
+const authStore = useAuthStore();
 
 const isLoading = ref(true);
 const session = ref(null);
 const attempt = ref(null);
+const isRequestingRejoin = ref(false);
+
+// Derived from store so AlertCenter and this view stay in sync
+const currentDemand = computed(() =>
+  rejoinDemandStore.studentDemands.find(d => d.attemptId === attempt.value?.id)
+);
+const pendingDemandId = computed(() => currentDemand.value?.status === 'pending' ? currentDemand.value.id : null);
+const rejoinApproved = computed(() => currentDemand.value?.status === 'approved');
+const rejoinDenied = computed(() => currentDemand.value?.status === 'denied');
 
 const correctAnswers = computed(() => {
   if (!session.value?.paper?.questions) return [];
@@ -121,6 +146,24 @@ function reviewBadgeClass(answer) {
   if (answer.status === 'correct') return 'bg-success text-white';
   if (answer.status === 'incorrect') return 'bg-error text-white';
   return 'bg-gray-200 dark:bg-gray-700 text-text-muted';
+}
+
+async function requestRejoin() {
+  if (!attempt.value) return;
+  isRequestingRejoin.value = true;
+  try {
+    const demand = await rejoinDemandStore.createDemand(attempt.value.id);
+    rejoinDemandStore.addStudentDemand({
+      id: demand.id,
+      attemptId: attempt.value.id,
+      sessionCode: route.params.code,
+      sessionTitle: session.value?.paper?.title ?? null,
+    });
+  } catch {
+    // error handled by store
+  } finally {
+    isRequestingRejoin.value = false;
+  }
 }
 
 onMounted(async () => {

@@ -6,6 +6,7 @@ use Database\Factories\AttemptFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Attempt extends Model
@@ -25,6 +26,7 @@ class Attempt extends Model
         'status',
         'score',
         'timer',
+        'extra_time',
         'termination',
     ];
 
@@ -37,6 +39,7 @@ class Attempt extends Model
             'answers' => 'array',
             'score' => 'integer',
             'timer' => 'integer',
+            'extra_time' => 'integer',
         ];
     }
 
@@ -48,6 +51,11 @@ class Attempt extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function rejoinDemand(): HasOne
+    {
+        return $this->hasOne(RejoinDemand::class);
     }
 
     /**

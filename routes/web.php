@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\KangourouSessionController;
 use App\Http\Controllers\PaperController;
+use App\Http\Controllers\RejoinDemandController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -38,6 +39,9 @@ Route::patch('/api/attempts/{attempt}/answer', [AttemptController::class, 'updat
 Route::post('/api/attempts/{attempt}/submit', [AttemptController::class, 'submit'])->name('attempts.submit');
 Route::get('/api/attempts/recover/{code}', [AttemptController::class, 'recover'])->name('attempts.recover');
 
+// Rejoin demand (guests allowed to create)
+Route::post('/api/attempts/{attempt}/rejoin-demand', [RejoinDemandController::class, 'store'])->name('rejoin-demands.store');
+
 // Auth-only routes
 Route::middleware(['auth'])->group(function () {
     Route::post('/api/kangourou-sessions', [KangourouSessionController::class, 'store'])->name('kangourou-sessions.store');
@@ -47,6 +51,11 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/api/attempts/{attempt}', [AttemptController::class, 'destroy'])->name('attempts.destroy');
     Route::post('/api/attempts/claim', [AttemptController::class, 'claim'])->name('attempts.claim');
     Route::patch('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'update'])->name('kangourou-sessions.update');
+
+    // Rejoin demands (auth required for teacher actions)
+    Route::get('/api/my/rejoin-demands', [RejoinDemandController::class, 'myIndex'])->name('rejoin-demands.myIndex');
+    Route::post('/api/rejoin-demands/{rejoinDemand}/approve', [RejoinDemandController::class, 'approve'])->name('rejoin-demands.approve');
+    Route::delete('/api/rejoin-demands/{rejoinDemand}', [RejoinDemandController::class, 'reject'])->name('rejoin-demands.reject');
     Route::delete('/api/kangourou-sessions/{kangourouSession}', [KangourouSessionController::class, 'destroy'])->name('kangourou-sessions.destroy');
     Route::get('/api/kangourou-sessions/{kangourouSession}/details', [KangourouSessionController::class, 'details'])->name('kangourou-sessions.details');
     Route::patch('/api/kangourou-sessions/{kangourouSession}/change-code', [KangourouSessionController::class, 'changeCode'])->name('kangourou-sessions.changeCode');

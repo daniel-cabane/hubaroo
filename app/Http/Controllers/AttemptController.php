@@ -36,6 +36,7 @@ class AttemptController extends Controller
             if ($existingAttempt) {
                 return response()->json([
                     'message' => 'You already have an attempt for this session.',
+                    'requires_rejoin' => true,
                     'attempt' => $existingAttempt,
                 ], 409);
             }

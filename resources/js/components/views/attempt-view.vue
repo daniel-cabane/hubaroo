@@ -59,7 +59,7 @@
 
       <div class="max-w-2xl mx-4 flex-1 relative overflow-visible">
         <div v-if="isShuffled && isInProgress" class="text-center mb-3 text-xs text-text-muted bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-1 inline-block">
-          Questions mélangées — numéro original&nbsp;: <span class="font-semibold">{{ currentOriginalIndex + 1 }}</span>
+          Questions mélangées
         </div>
         <Transition :name="slideDirection" mode="out-in">
           <div v-if="currentQuestion" :key="currentIndex" class="w-full">
@@ -316,8 +316,10 @@ function questionStatusClass(answer, idx) {
   const base = isCurrent ? 'ring-2 ring-primary ' : '';
   const origAnswer = answers.value[questionOrder.value[idx]];
 
-  if (origAnswer?.status === 'correct') return base + 'bg-success text-white';
-  if (origAnswer?.status === 'incorrect') return base + 'bg-error text-white';
+  if (!isInProgress.value) {
+    if (origAnswer?.status === 'correct') return base + 'bg-success text-white';
+    if (origAnswer?.status === 'incorrect') return base + 'bg-error text-white';
+  }
   if (origAnswer?.answer !== null && origAnswer?.answer !== undefined) return base + 'bg-primary/20 text-primary dark:text-primary-hover';
   return base + 'bg-gray-100 dark:bg-gray-800 text-text-muted';
 }
@@ -538,7 +540,8 @@ function buildQuestionOrder(qs, shuffleMode) {
 
 function startCountdown(timeLimitMinutes) {
   const attemptCreatedAt = new Date(attemptStore.attempt.created_at);
-  const deadline = new Date(attemptCreatedAt.getTime() + timeLimitMinutes * 60 * 1000);
+  const extraTimeSeconds = attemptStore.attempt.extra_time ?? 0;
+  const deadline = new Date(attemptCreatedAt.getTime() + timeLimitMinutes * 60 * 1000 + extraTimeSeconds * 1000);
 
   timerInterval = setInterval(() => {
     const now = new Date();

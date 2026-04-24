@@ -40,7 +40,7 @@
           <span :class="session.status === 'active' ? 'text-success font-medium' : ''">{{ statusLabel(session.status) }}</span>
         </div>
         <button
-          @click.stop="() => { sessionIdToDelete = session.id; showDeleteConfirm = true; }"
+          @click.stop.prevent="() => { sessionIdToDelete = session.id; showDeleteConfirm = true; }"
           :disabled="session.status === 'active'"
           class="w-10 h-10 rounded-full flex items-center justify-center bg-error/10 hover:bg-error/20 text-error transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 ml-4"
           title="Supprimer"

@@ -42,6 +42,9 @@
             </div>
           </div>
 
+          <!-- Alert Center (for session authors) -->
+          <AlertCenter v-if="!isAttemptView && authStore.isAuthenticated" />
+
           <!-- Account menu -->
           <div v-if="!isAttemptView" class="relative" ref="menuContainer">
             <button
@@ -141,6 +144,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { CircleUserRound, ChevronDown, User } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useAttemptStore } from '@/stores/attemptStore';
+import AlertCenter from '@/components/AlertCenter.vue';
 
 const router = useRouter();
 const route = useRoute();
