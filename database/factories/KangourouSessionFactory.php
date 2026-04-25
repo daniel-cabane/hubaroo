@@ -49,4 +49,9 @@ class KangourouSessionFactory extends Factory
             'author_id' => $user?->id ?? User::factory(),
         ]);
     }
+
+    public function private(): static
+    {
+        return $this->state(fn () => ['privacy' => 'private']);
+    }
 }

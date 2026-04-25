@@ -17,6 +17,7 @@ class StudentJoinedDivision implements ShouldBroadcast
     public function __construct(
         public Division $division,
         public User $student,
+        public ?string $className = null,
     ) {}
 
     public function broadcastAs(): string
@@ -38,6 +39,7 @@ class StudentJoinedDivision implements ShouldBroadcast
                 'id' => $this->student->id,
                 'name' => $this->student->name,
                 'email' => $this->student->email,
+                'pivot' => ['class_name' => $this->className],
             ],
         ];
     }

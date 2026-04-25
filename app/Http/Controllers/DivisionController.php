@@ -11,6 +11,7 @@ use App\Models\Division;
 use App\Models\DivisionInvite;
 use App\Models\KangourouSession;
 use App\Models\User;
+use App\Services\ClassNameFormatter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -154,11 +155,18 @@ class DivisionController extends Controller
             return response()->json(['message' => 'This invite has already been responded to.'], 409);
         }
 
+        $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+        ]);
+
+        $className = ClassNameFormatter::format($request->input('first_name'), $request->input('last_name'));
+
         $division = $invite->division;
         $invite->delete();
-        $division->students()->syncWithoutDetaching([$user->id]);
+        $division->students()->syncWithoutDetaching([$user->id => ['class_name' => $className]]);
 
-        broadcast(new StudentJoinedDivision($division, $user));
+        broadcast(new StudentJoinedDivision($division, $user, $className));
 
         return response()->json(['message' => 'Invite accepted.']);
     }
@@ -180,6 +188,8 @@ class DivisionController extends Controller
     {
         $request->validate([
             'code' => ['required', 'string', 'size:6'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
         ]);
 
         $division = Division::where('code', strtoupper($request->input('code')))->firstOrFail();
@@ -198,14 +208,16 @@ class DivisionController extends Controller
             return response()->json(['message' => 'You are already in this class.'], 409);
         }
 
-        $division->students()->attach($user->id);
+        $className = ClassNameFormatter::format($request->input('first_name'), $request->input('last_name'));
+
+        $division->students()->attach($user->id, ['class_name' => $className]);
 
         DivisionInvite::where('division_id', $division->id)
             ->where('email', $user->email)
             ->where('status', 'pending')
             ->update(['status' => 'accepted', 'user_id' => $user->id]);
 
-        broadcast(new StudentJoinedDivision($division, $user));
+        broadcast(new StudentJoinedDivision($division, $user, $className));
 
         return response()->json([
             'message' => 'Joined class successfully.',
@@ -220,6 +232,22 @@ class DivisionController extends Controller
         $division->students()->detach($student->id);
 
         return response()->json(['message' => 'Student removed.']);
+    }
+
+    public function updateStudentClassName(Division $division, User $student, Request $request): JsonResponse
+    {
+        $this->authorize('manageStudents', $division);
+
+        $request->validate([
+            'first_name' => ['required', 'string', 'max:100'],
+            'last_name' => ['required', 'string', 'max:100'],
+        ]);
+
+        $className = ClassNameFormatter::format($request->input('first_name'), $request->input('last_name'));
+
+        $division->students()->updateExistingPivot($student->id, ['class_name' => $className]);
+
+        return response()->json(['message' => 'Class name updated.', 'class_name' => $className]);
     }
 
     public function openForDivision(KangourouSession $session, Division $division, Request $request): JsonResponse

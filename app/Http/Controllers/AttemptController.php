@@ -6,6 +6,7 @@ use App\Events\AttemptUpdated;
 use App\Http\Requests\UpdateAnswerRequest;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
+use App\Models\User;
 use App\Services\GradingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,8 +19,28 @@ class AttemptController extends Controller
     {
         $session = KangourouSession::where('code', $code)->firstOrFail();
 
+        if ($session->status === 'draft') {
+            return response()->json(['message' => "Cette session n'est pas encore disponible."], 403);
+        }
+
         if (! $session->isActive()) {
-            return response()->json(['message' => 'This session is no longer active.'], 403);
+            return response()->json(['message' => 'Cette session est terminée.'], 403);
+        }
+
+        if ($session->privacy === 'private') {
+            $user = $request->user();
+
+            if (! $user) {
+                return response()->json(['message' => 'Vous devez être connecté pour rejoindre cette session.'], 401);
+            }
+
+            $isMember = $session->divisions()
+                ->whereHas('students', fn ($q) => $q->where('users.id', $user->id))
+                ->exists();
+
+            if (! $isMember) {
+                return response()->json(['message' => "Vous n'êtes pas membre d'une classe pour laquelle cette session est ouverte."], 403);
+            }
         }
 
         $request->validate([
@@ -42,10 +63,12 @@ class AttemptController extends Controller
             }
         }
 
+        $attemptName = $this->resolveAttemptName($request->user(), $session, $request->input('name'));
+
         $attempt = Attempt::create([
             'kangourou_session_id' => $session->id,
             'user_id' => $userId,
-            'name' => $userId ? $request->user()->name : $request->input('name'),
+            'name' => $attemptName,
             'code' => Attempt::generateCode(),
             'answers' => Attempt::defaultAnswers(),
             'status' => 'inProgress',
@@ -56,6 +79,31 @@ class AttemptController extends Controller
             'message' => 'Attempt created.',
             'attempt' => $attempt,
         ], 201);
+    }
+
+    private function resolveAttemptName(?User $user, KangourouSession $session, ?string $guestName): ?string
+    {
+        if (! $user) {
+            return $guestName;
+        }
+
+        $division = $session->divisions()
+            ->whereHas('students', fn ($q) => $q->where('users.id', $user->id))
+            ->first();
+
+        if ($division) {
+            $pivotClassName = $division->students()
+                ->where('users.id', $user->id)
+                ->first()
+                ?->pivot
+                ?->class_name;
+
+            if ($pivotClassName) {
+                return $pivotClassName;
+            }
+        }
+
+        return $user->name;
     }
 
     public function show(Attempt $attempt): JsonResponse

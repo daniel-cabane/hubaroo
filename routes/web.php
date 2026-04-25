@@ -70,6 +70,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/divisions/{division}/invite', [DivisionController::class, 'invite'])->name('divisions.invite');
     Route::post('/api/divisions/join', [DivisionController::class, 'join'])->name('divisions.join');
     Route::delete('/api/divisions/{division}/students/{student}', [DivisionController::class, 'removeStudent'])->name('divisions.removeStudent');
+    Route::patch('/api/divisions/{division}/students/{student}', [DivisionController::class, 'updateStudentClassName'])->name('divisions.updateStudentClassName');
 
     // Session ↔ Division management
     Route::post('/api/kangourou-sessions/{session}/divisions/{division}', [DivisionController::class, 'openForDivision'])->name('sessions.openForDivision');

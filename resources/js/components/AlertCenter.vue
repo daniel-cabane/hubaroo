@@ -210,7 +210,6 @@ async function reject(demand) {
 function listenForStudentDemand(demand) {
   window.Echo.channel(`rejoin.${demand.id}`)
     .listen('.RejoinDemandResolved', (event) => {
-      console.log(213);
       demandStore.resolveStudentDemand(demand.id, event.resolution, event.extra_time);
       if (event.resolution === 'approved') {
         isOpen.value = true;
@@ -226,7 +225,6 @@ onMounted(async () => {
 
     window.Echo.private(`App.Models.User.${authStore.user.id}`)
       .listen('.RejoinDemandCreated', (event) => {
-        console.log(229)
         demandStore.addDemand(event.demand);
       });
   }

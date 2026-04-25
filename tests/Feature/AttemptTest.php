@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Attempt;
+use App\Models\Division;
 use App\Models\KangourouSession;
 use App\Models\Paper;
 use App\Models\User;
@@ -25,6 +26,15 @@ test('cannot create an attempt for an expired session', function () {
     $response = $this->postJson("/api/kangourou-sessions/{$session->code}/attempts");
 
     $response->assertForbidden();
+});
+
+test('cannot create an attempt for a draft session', function () {
+    $session = KangourouSession::factory()->draft()->create(['paper_id' => $this->paper->id]);
+
+    $response = $this->postJson("/api/kangourou-sessions/{$session->code}/attempts");
+
+    $response->assertForbidden();
+    expect($response->json('message'))->toBe("Cette session n'est pas encore disponible.");
 });
 
 test('attempt has a unique 6-char recovery code', function () {
@@ -362,19 +372,44 @@ test('authenticated user cannot create multiple attempts for the same session', 
     ]);
 });
 
-test('guest users can create multiple attempts for the same session', function () {
-    // Create first guest attempt
-    $response1 = $this->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
-        'name' => 'Guest 1',
-    ]);
+test('guest cannot join a private session', function () {
+    $session = KangourouSession::factory()->private()->create(['paper_id' => $this->paper->id]);
 
-    $response1->assertCreated();
+    $response = $this->postJson("/api/kangourou-sessions/{$session->code}/attempts");
 
-    // Create second guest attempt
-    $response2 = $this->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
-        'name' => 'Guest 2',
-    ]);
+    $response->assertUnauthorized();
+});
 
-    $response2->assertCreated();
-    expect($response2->json('attempt.name'))->toBe('Guest 2');
+test('authenticated user not in any division cannot join a private session', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->private()->create(['paper_id' => $this->paper->id]);
+
+    $response = $this->actingAs($user)->postJson("/api/kangourou-sessions/{$session->code}/attempts");
+
+    $response->assertForbidden();
+});
+
+test('student in the session division can join a private session', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->private()->create(['paper_id' => $this->paper->id]);
+    $division = Division::factory()->create();
+    $division->students()->attach($user->id);
+    $session->divisions()->attach($division->id);
+
+    $response = $this->actingAs($user)->postJson("/api/kangourou-sessions/{$session->code}/attempts");
+
+    $response->assertCreated();
+});
+
+test('student in a different division cannot join a private session', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->private()->create(['paper_id' => $this->paper->id]);
+
+    // User belongs to a division, but it's not linked to the session
+    $otherDivision = Division::factory()->create();
+    $otherDivision->students()->attach($user->id);
+
+    $response = $this->actingAs($user)->postJson("/api/kangourou-sessions/{$session->code}/attempts");
+
+    $response->assertForbidden();
 });

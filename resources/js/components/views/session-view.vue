@@ -92,7 +92,8 @@
       </div>
 
       <div v-else class="space-y-4">
-        <p class="text-text-muted">Cette session a expiré.</p>
+        <p v-if="session.status === 'draft'" class="text-text-muted">Cette session n'est pas encore disponible.</p>
+        <p v-else class="text-text-muted">Cette session a expiré.</p>
       </div>
     </div>
   </div>

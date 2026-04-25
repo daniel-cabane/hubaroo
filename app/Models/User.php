@@ -87,7 +87,7 @@ class User extends Authenticatable
 
     public function divisions(): BelongsToMany
     {
-        return $this->belongsToMany(Division::class);
+        return $this->belongsToMany(Division::class)->withPivot('class_name');
     }
 
     public function divisionInvites(): HasMany

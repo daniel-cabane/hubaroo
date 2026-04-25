@@ -32,14 +32,14 @@
         </div>
         <div class="flex gap-2">
           <button
-            @click="handleAcceptInvite(invite.id)"
-            class="px-3 py-1.5 text-sm bg-success/10 text-success border border-success/30 rounded-lg hover:bg-success/20 transition-colors"
+            @click="openInviteNameModal(invite.id)"
+            class="px-3 py-1.5 text-sm bg-success/10 text-success border border-success/30 rounded-lg hover:bg-success/20 transition-colors cursor-pointer"
           >
             Accepter
           </button>
           <button
             @click="handleDeclineInvite(invite.id)"
-            class="px-3 py-1.5 text-sm bg-error/10 text-error border border-error/30 rounded-lg hover:bg-error/20 transition-colors"
+            class="px-3 py-1.5 text-sm bg-error/10 text-error border border-error/30 rounded-lg hover:bg-error/20 transition-colors cursor-pointer"
           >
             Refuser
           </button>
@@ -163,6 +163,26 @@
               class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface font-mono uppercase focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Prénom</label>
+              <input
+                v-model="joinFirstName"
+                type="text"
+                required
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Nom</label>
+              <input
+                v-model="joinLastName"
+                type="text"
+                required
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          </div>
           <div v-if="divisionStore.error" class="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg text-sm">
             {{ divisionStore.error }}
           </div>
@@ -172,6 +192,50 @@
             </button>
             <button type="submit" :disabled="divisionStore.isLoading" class="px-4 py-2 bg-primary hover:bg-primary-hover cursor-pointer text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
               Rejoindre
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Accept Invite Name Modal -->
+    <div
+      v-if="showInviteNameModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="showInviteNameModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Accepter l'invitation</h3>
+        <form @submit.prevent="handleAcceptInviteWithName" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Prénom</label>
+              <input
+                v-model="inviteFirstName"
+                type="text"
+                required
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Nom</label>
+              <input
+                v-model="inviteLastName"
+                type="text"
+                required
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          </div>
+          <div v-if="divisionStore.error" class="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg text-sm">
+            {{ divisionStore.error }}
+          </div>
+          <div class="flex justify-end gap-2">
+            <button type="button" @click="showInviteNameModal = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+              Annuler
+            </button>
+            <button type="submit" :disabled="divisionStore.isLoading" class="px-4 py-2 bg-primary hover:bg-primary-hover cursor-pointer text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+              Accepter
             </button>
           </div>
         </form>
@@ -195,6 +259,12 @@ const showJoinModal = ref(false);
 const showArchivedMenu = ref(false);
 const newDivisionName = ref('');
 const joinCode = ref('');
+const joinFirstName = ref('');
+const joinLastName = ref('');
+const showInviteNameModal = ref(false);
+const pendingInviteId = ref(null);
+const inviteFirstName = ref('');
+const inviteLastName = ref('');
 
 const activeDivisions = computed(() =>
   divisionStore.divisions.filter(d => !d.archived)
@@ -220,10 +290,28 @@ async function handleCreate() {
 }
 
 async function handleJoin() {
-  await divisionStore.joinDivision(joinCode.value);
+  await divisionStore.joinDivision(joinCode.value, joinFirstName.value, joinLastName.value);
   if (!divisionStore.error) {
     showJoinModal.value = false;
     joinCode.value = '';
+    joinFirstName.value = '';
+    joinLastName.value = '';
+  }
+}
+
+function openInviteNameModal(id) {
+  pendingInviteId.value = id;
+  inviteFirstName.value = '';
+  inviteLastName.value = '';
+  divisionStore.clearError();
+  showInviteNameModal.value = true;
+}
+
+async function handleAcceptInviteWithName() {
+  await divisionStore.acceptInvite(pendingInviteId.value, inviteFirstName.value, inviteLastName.value);
+  if (!divisionStore.error) {
+    showInviteNameModal.value = false;
+    await divisionStore.fetchMyDivisions();
   }
 }
 

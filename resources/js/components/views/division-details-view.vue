@@ -30,20 +30,20 @@
           <button
             v-if="!divisionStore.division.archived"
             @click="showArchiveConfirm = true"
-            class="px-3 py-1.5 text-sm border border-border text-text-muted rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            class="px-3 py-1.5 text-sm border border-border text-text-muted rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
           >
             Archiver
           </button>
           <button
             v-else
             @click="showUnarchiveConfirm = true"
-            class="px-3 py-1.5 text-sm border border-success text-success rounded-lg hover:bg-success/10 transition-colors"
+            class="px-3 py-1.5 text-sm border border-success text-success rounded-lg hover:bg-success/10 transition-colors cursor-pointer"
           >
             Activer
           </button>
           <button
             @click="showDeleteConfirm = true"
-            class="px-3 py-1.5 text-sm bg-error/10 text-error border border-error/30 rounded-lg hover:bg-error/20 transition-colors"
+            class="px-3 py-1.5 text-sm bg-error/10 text-error border border-error/30 rounded-lg hover:bg-error/20 transition-colors cursor-pointer"
           >
             Supprimer
           </button>
@@ -74,7 +74,7 @@
                 <button
                   @click="handleRename"
                   :disabled="editName === divisionStore.division.name || divisionStore.division.archived"
-                  class="px-3 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm disabled:opacity-40 transition-colors"
+                  class="px-3 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm disabled:opacity-40 transition-colors cursor-pointer"
                 >
                   OK
                 </button>
@@ -95,7 +95,7 @@
                   @click="showChangeCodeConfirm = true"
                   :disabled="divisionStore.division.archived"
                   title="Générer un nouveau code"
-                  class="text-text-muted hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  class="text-text-muted hover:text-primary cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <RefreshCw class="w-5 h-5" />
                 </button>
@@ -109,7 +109,7 @@
                 @click="handleToggleAccepting"
                 :disabled="divisionStore.division.archived"
                 :class="[
-                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
                   divisionStore.division.accepting_students ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600'
                 ]"
               >
@@ -137,7 +137,7 @@
               <button
                 type="submit"
                 :disabled="divisionStore.isLoading || divisionStore.division.archived"
-                class="px-3 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm disabled:opacity-50 transition-colors"
+                class="px-3 py-2 bg-primary cursor-pointer hover:bg-primary-hover text-surface rounded-lg text-sm disabled:opacity-50 transition-colors"
               >
                 Inviter
               </button>
@@ -172,17 +172,27 @@
                 class="flex items-center justify-between py-1"
               >
                 <div>
-                  <p class="text-sm font-medium text-text-main dark:text-surface">{{ student.name }}</p>
+                  <p class="text-sm font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name ?? student.name }}</p>
                   <p class="text-xs text-text-muted">{{ student.email }}</p>
                 </div>
-                <button
-                  @click="() => { studentIdToRemove = student.id; showRemoveStudentConfirm = true; }"
-                  :disabled="divisionStore.division.archived"
-                  class="text-text-muted hover:text-error transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Retirer l'élève"
-                >
-                  <X class="w-4 h-4" />
-                </button>
+                <div class="flex items-center gap-1">
+                  <button
+                    @click="openEditClassNameModal(student)"
+                    :disabled="divisionStore.division.archived"
+                    class="text-text-muted hover:text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Modifier le nom de classe"
+                  >
+                    <Pencil class="w-4 h-4" />
+                  </button>
+                  <button
+                    @click="() => { studentIdToRemove = student.id; showRemoveStudentConfirm = true; }"
+                    :disabled="divisionStore.division.archived"
+                    class="text-text-muted hover:text-error transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Retirer l'élève"
+                  >
+                    <X class="w-4 h-4" />
+                  </button>
+                </div>
               </li>
             </ul>
             <p v-else class="text-sm text-text-muted">Aucun élève.</p>
@@ -209,20 +219,29 @@
                 <p class="text-sm font-medium text-text-main dark:text-surface">{{ session.paper?.title }}</p>
                 <p class="text-xs text-text-muted">{{ session.code }}</p>
               </div>
-              <button
-                @click="handleToggleSession(session)"
-                :class="[
-                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-                  isSessionOpen(session.id) ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600'
-                ]"
-              >
-                <span
+              <div class="flex items-center gap-2">
+                <button
+                  @click="openActiveSessionModal(session)"
+                  class="text-text-muted hover:text-primary transition-colors cursor-pointer"
+                  title="Voir les tentatives"
+                >
+                  <Eye class="w-6 h-6" />
+                </button>
+                <button
+                  @click="handleToggleSession(session)"
                   :class="[
-                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow',
-                    isSessionOpen(session.id) ? 'translate-x-6' : 'translate-x-1'
+                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
+                    isSessionOpen(session.id) ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600'
                   ]"
-                />
-              </button>
+                >
+                  <span
+                    :class="[
+                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow',
+                      isSessionOpen(session.id) ? 'translate-x-6' : 'translate-x-1'
+                    ]"
+                  />
+                </button>
+              </div>
             </li>
           </ul>
         </div>
@@ -281,20 +300,43 @@
     <div
       v-if="showExpiredSessionModal"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
-      @click.self="showExpiredSessionModal = false"
+      @click.self="closeExpiredSessionModal"
     >
       <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between p-4 border-b border-border">
           <h3 class="text-lg font-semibold text-text-main dark:text-surface">{{ expiredSessionDetail?.paper?.title }}</h3>
-          <button @click="showExpiredSessionModal = false" class="text-text-muted hover:text-text-main transition-colors">
+          <button @click="closeExpiredSessionModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
             <X class="w-5 h-5" />
           </button>
         </div>
         <div class="p-4 overflow-y-auto flex-1">
-          <div v-if="isLoadingExpiredSession" class="text-text-muted text-center py-8">Chargement...</div>
-          <AttemptsTable
-            v-else
-            :attempts="divisionAttempts"
+          <DivisionAttemptsTable
+            :students="divisionStore.division?.students ?? []"
+            :attempts="expiredSessionDetail?.attempts ?? []"
+            :loading="isLoadingExpiredSession"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Session Attempts Modal -->
+    <div
+      v-if="showActiveSessionModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      @click.self="closeActiveSessionModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-border">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface">{{ activeSessionDetail?.paper?.title }}</h3>
+          <button @click="closeActiveSessionModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1">
+          <DivisionAttemptsTable
+            :students="divisionStore.division?.students ?? []"
+            :attempts="activeSessionDetail?.attempts ?? []"
+            :loading="isLoadingActiveSession"
           />
         </div>
       </div>
@@ -310,13 +352,13 @@
         <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-2">Archiver la classe ?</h3>
         <p class="text-sm text-text-muted mb-4">Une fois archivée, cette classe ne sera plus accessible et toutes les sessions et invitations seront masquées.</p>
         <div class="flex justify-end gap-2">
-          <button @click="showArchiveConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+          <button @click="showArchiveConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors cursor-pointer">
             Annuler
           </button>
           <button
             @click="handleArchive"
             :disabled="divisionStore.isLoading"
-            class="px-4 py-2 bg-warning text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            class="px-4 py-2 bg-warning text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors cursor-pointer"
           >
             Archiver
           </button>
@@ -334,13 +376,13 @@
         <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-2">Activer la classe ?</h3>
         <p class="text-sm text-text-muted mb-4">Cette classe deviendra à nouveau active et toutes les sessions et invitations seront visibles.</p>
         <div class="flex justify-end gap-2">
-          <button @click="showUnarchiveConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+          <button @click="showUnarchiveConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors cursor-pointer">
             Annuler
           </button>
           <button
             @click="handleUnarchive"
             :disabled="divisionStore.isLoading"
-            class="px-4 py-2 bg-success text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            class="px-4 py-2 bg-success text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors cursor-pointer"
           >
             Activer
           </button>
@@ -358,17 +400,65 @@
         <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-2">Changer le code d'invitation ?</h3>
         <p class="text-sm text-text-muted mb-4">Un nouveau code sera généré. L'ancien code ne fonctionnera plus.</p>
         <div class="flex justify-end gap-2">
-          <button @click="showChangeCodeConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+          <button @click="showChangeCodeConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors cursor-pointer">
             Annuler
           </button>
           <button
             @click="handleChangeCode"
             :disabled="divisionStore.isLoading"
-            class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors cursor-pointer"
           >
             Changer
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Edit Class Name Modal -->
+    <div
+      v-if="showEditClassNameModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="showEditClassNameModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-sm">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Modifier le nom de classe</h3>
+        <form @submit.prevent="handleEditClassName" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Prénom</label>
+              <input
+                v-model="editClassFirstName"
+                type="text"
+                required
+                class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Nom</label>
+              <input
+                v-model="editClassLastName"
+                type="text"
+                required
+                class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              />
+            </div>
+          </div>
+          <div v-if="divisionStore.error" class="bg-error/10 border border-error/30 text-error px-3 py-2 rounded-lg text-sm">
+            {{ divisionStore.error }}
+          </div>
+          <div class="flex justify-end gap-2">
+            <button type="button" @click="showEditClassNameModal = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors cursor-pointer">
+              Annuler
+            </button>
+            <button
+              type="submit"
+              :disabled="divisionStore.isLoading"
+              class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              Enregistrer
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -382,13 +472,13 @@
         <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-2">Retirer l'élève ?</h3>
         <p class="text-sm text-text-muted mb-4">L'élève sera retiré de la classe. Il pourra la rejoindre en utilisant le code.</p>
         <div class="flex justify-end gap-2">
-          <button @click="showRemoveStudentConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+          <button @click="showRemoveStudentConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors cursor-pointer">
             Annuler
           </button>
           <button
             @click="() => { handleRemoveStudent(studentIdToRemove); }"
             :disabled="divisionStore.isLoading"
-            class="px-4 py-2 bg-error text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            class="px-4 py-2 bg-error text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors cursor-pointer"
           >
             Retirer
           </button>
@@ -406,13 +496,13 @@
         <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-2">Supprimer la classe ?</h3>
         <p class="text-sm text-text-muted mb-4">Cette action est irréversible. Tous les élèves seront retirés.</p>
         <div class="flex justify-end gap-2">
-          <button @click="showDeleteConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+          <button @click="showDeleteConfirm = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors cursor-pointer">
             Annuler
           </button>
           <button
             @click="handleDelete"
             :disabled="divisionStore.isLoading"
-            class="px-4 py-2 bg-error text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            class="px-4 py-2 bg-error text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors cursor-pointer"
           >
             Supprimer
           </button>
@@ -425,11 +515,11 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, RefreshCw, X } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, X, Eye, Pencil } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
-import AttemptsTable from '@/components/AttemptsTable.vue';
+import DivisionAttemptsTable from '@/components/DivisionAttemptsTable.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -452,9 +542,18 @@ const showUnarchiveConfirm = ref(false);
 const showChangeCodeConfirm = ref(false);
 const showRemoveStudentConfirm = ref(false);
 const studentIdToRemove = ref(null);
+const showEditClassNameModal = ref(false);
+const editClassStudentId = ref(null);
+const editClassFirstName = ref('');
+const editClassLastName = ref('');
 const showExpiredSessionModal = ref(false);
 const expiredSessionDetail = ref(null);
 const isLoadingExpiredSession = ref(false);
+const expiredSessionChannelId = ref(null);
+const showActiveSessionModal = ref(false);
+const activeSessionDetail = ref(null);
+const isLoadingActiveSession = ref(false);
+const activeSessionChannelId = ref(null);
 
 const pendingInvites = computed(() =>
   (divisionStore.division?.invites ?? []).filter(i => i.status === 'pending')
@@ -472,14 +571,6 @@ const openSessionIds = computed(() =>
   (divisionStore.division?.kangourou_sessions ?? []).map(s => s.id)
 );
 
-const divisionStudentIds = computed(() =>
-  new Set((divisionStore.division?.students ?? []).map(s => s.id))
-);
-
-const divisionAttempts = computed(() =>
-  (expiredSessionDetail.value?.attempts ?? []).filter(a => divisionStudentIds.value.has(a.user_id))
-);
-
 function isSessionOpen(sessionId) {
   return openSessionIds.value.includes(sessionId);
 }
@@ -495,7 +586,6 @@ onMounted(async () => {
 
   window.Echo.private(`division.${divisionId.value}`)
     .listen('.StudentJoinedDivision', (e) => {
-      console.log(e);
       if (!divisionStore.division) {
         return;
       }
@@ -530,6 +620,12 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.Echo.leave(`division.${divisionId.value}`);
+  if (expiredSessionChannelId.value !== null) {
+    window.Echo.leave(`session.${expiredSessionChannelId.value}`);
+  }
+  if (activeSessionChannelId.value !== null) {
+    window.Echo.leave(`session.${activeSessionChannelId.value}`);
+  }
 });
 
 async function handleRename() {
@@ -578,6 +674,21 @@ async function handleRemoveStudent(studentId) {
   }
 }
 
+function openEditClassNameModal(student) {
+  editClassStudentId.value = student.id;
+  editClassFirstName.value = '';
+  editClassLastName.value = '';
+  divisionStore.clearError();
+  showEditClassNameModal.value = true;
+}
+
+async function handleEditClassName() {
+  await divisionStore.updateStudentClassName(divisionId.value, editClassStudentId.value, editClassFirstName.value, editClassLastName.value);
+  if (!divisionStore.error) {
+    showEditClassNameModal.value = false;
+  }
+}
+
 async function handleInvite() {
   inviteSuccess.value = false;
   await divisionStore.inviteStudent(divisionId.value, inviteEmail.value);
@@ -595,11 +706,75 @@ async function openExpiredSessionModal(session) {
   try {
     const data = await sessionStore.fetchSessionDetails(session.id);
     expiredSessionDetail.value = data;
+    expiredSessionChannelId.value = session.id;
+    window.Echo.private(`session.${session.id}`)
+      .listen('.AttemptUpdated', (e) => {
+        if (!expiredSessionDetail.value) {
+          return;
+        }
+        const updated = e.attempt;
+        const attempts = expiredSessionDetail.value.attempts ?? [];
+        const idx = attempts.findIndex(a => a.id === updated.id);
+        if (idx !== -1) {
+          attempts[idx] = updated;
+        } else {
+          attempts.push(updated);
+        }
+        expiredSessionDetail.value = { ...expiredSessionDetail.value, attempts };
+      });
   } catch (err) {
     // error handled by store
   } finally {
     isLoadingExpiredSession.value = false;
   }
+}
+
+function closeExpiredSessionModal() {
+  showExpiredSessionModal.value = false;
+  if (expiredSessionChannelId.value !== null) {
+    window.Echo.leave(`session.${expiredSessionChannelId.value}`);
+    expiredSessionChannelId.value = null;
+  }
+  expiredSessionDetail.value = null;
+}
+
+async function openActiveSessionModal(session) {
+  showActiveSessionModal.value = true;
+  isLoadingActiveSession.value = true;
+  activeSessionDetail.value = null;
+  try {
+    const data = await sessionStore.fetchSessionDetails(session.id);
+    activeSessionDetail.value = data;
+    activeSessionChannelId.value = session.id;
+    window.Echo.private(`session.${session.id}`)
+      .listen('.AttemptUpdated', (e) => {
+        if (!activeSessionDetail.value) {
+          return;
+        }
+        const updated = e.attempt;
+        const attempts = activeSessionDetail.value.attempts ?? [];
+        const idx = attempts.findIndex(a => a.id === updated.id);
+        if (idx !== -1) {
+          attempts[idx] = updated;
+        } else {
+          attempts.push(updated);
+        }
+        activeSessionDetail.value = { ...activeSessionDetail.value, attempts };
+      });
+  } catch (err) {
+    // error handled by store
+  } finally {
+    isLoadingActiveSession.value = false;
+  }
+}
+
+function closeActiveSessionModal() {
+  showActiveSessionModal.value = false;
+  if (activeSessionChannelId.value !== null) {
+    window.Echo.leave(`session.${activeSessionChannelId.value}`);
+    activeSessionChannelId.value = null;
+  }
+  activeSessionDetail.value = null;
 }
 
 async function handleToggleSession(session) {

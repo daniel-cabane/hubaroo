@@ -135,11 +135,11 @@ export const useDivisionStore = defineStore('division', () => {
     }
   }
 
-  async function joinDivision(code) {
+  async function joinDivision(code, firstName, lastName) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await axios.post('/api/divisions/join', { code });
+      const response = await axios.post('/api/divisions/join', { code, first_name: firstName, last_name: lastName });
       divisions.value.unshift(response.data.division);
       return response.data.division;
     } catch (err) {
@@ -164,14 +164,34 @@ export const useDivisionStore = defineStore('division', () => {
     }
   }
 
-  async function acceptInvite(inviteId) {
+  async function acceptInvite(inviteId, firstName, lastName) {
     isLoading.value = true;
     error.value = null;
     try {
-      await axios.post(`/api/invites/${inviteId}/accept`);
+      await axios.post(`/api/invites/${inviteId}/accept`, { first_name: firstName, last_name: lastName });
       invites.value = invites.value.filter(i => i.id !== inviteId);
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to accept invite';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function updateStudentClassName(divisionId, studentId, firstName, lastName) {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await axios.patch(`/api/divisions/${divisionId}/students/${studentId}`, { first_name: firstName, last_name: lastName });
+      if (division.value) {
+        const student = division.value.students.find(s => s.id === studentId);
+        if (student) {
+          student.pivot.class_name = response.data.class_name;
+        }
+      }
+      return response.data.class_name;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to update class name';
       throw err;
     } finally {
       isLoading.value = false;
@@ -240,6 +260,7 @@ export const useDivisionStore = defineStore('division', () => {
     fetchMyInvites,
     acceptInvite,
     declineInvite,
+    updateStudentClassName,
     openSessionForDivision,
     closeSessionForDivision,
     clearError,
