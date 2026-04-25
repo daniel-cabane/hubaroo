@@ -1,12 +1,59 @@
 <template>
   <div class="container mx-auto p-6">
     <!-- Header -->
-    <div class="flex items-center gap-4 mb-6">
+    <div>
       <router-link to="/my/sessions" class="text-primary hover:underline flex items-center gap-2">
         <ChevronLeft class="w-4 h-4" />
         Retour
       </router-link>
-      <h1 class="text-3xl font-bold text-text-main dark:text-surface">{{ session?.paper?.title }}</h1>
+      <div class="flex justify-between align-center mb-2 px-2">
+        <h1 class="text-3xl font-bold text-text-main dark:text-surface">{{ session?.paper?.title }}</h1>
+        <span class="text-3xl font-bold flex align-center gap-1">
+          {{ session?.code }}
+          <button
+                @click="showChangeCodeModal = true"
+                class="text-text-main dark:text-surface hover:text-primary cursor-pointer transition-colors"
+                title="Changer le code"
+              >
+                <RefreshCw class="w-5 h-5" />
+              </button>
+        </span>
+      </div>
+      <div class="flex justify-between items-center mb-6 px-2">
+        <!-- Status badge -->
+        <span
+          class="text-lg font-bold px-4 py-1.5 rounded-full"
+          :class="{
+            'bg-warning/15 text-warning': session?.status === 'draft',
+            'bg-success/15 text-success': session?.status === 'active',
+            'bg-error/15 text-error': session?.status === 'expired',
+          }"
+        >
+          {{ statusLabel(session?.status) }}
+        </span>
+
+        <!-- Action button -->
+        <div class="flex items-center gap-3">
+          <template v-if="session?.status === 'active'">
+            <span class="text-sm text-text-muted">{{ timeUntilExpiry }}</span>
+            <button
+              @click="showExpiryModal = true"
+              class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium transition-colors cursor-pointer"
+            >
+              <Clock class="w-4 h-4" />
+              Éditer l'expiration
+            </button>
+          </template>
+          <button
+            v-else-if="session?.status === 'draft'"
+            @click="showActivateModal = true"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-success/10 hover:bg-success/20 text-success text-sm font-medium transition-colors cursor-pointer"
+          >
+            <Play class="w-4 h-4" />
+            Activer la session
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -18,291 +65,234 @@
     </div>
 
     <!-- Content -->
-    <div v-else-if="session" class="space-y-8">
-      <!-- Session Details Section -->
-      <div class="bg-surface dark:bg-gray-900 rounded-lg border border-border p-6 space-y-4">
-        <h2 class="text-xl font-bold text-text-main dark:text-surface">Détails de la session</h2>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Code -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Code</label>
-            <div class="flex gap-2">
-              <input
-                :value="session.code"
-                disabled
-                class="flex-1 px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface/50 bg-gray-50 cursor-not-allowed font-mono font-bold"
-              />
-              <button
-                @click="showChangeCodeModal = true"
-                class="text-text-main dark:text-surface hover:text-primary cursor-pointer transition-colors"
-                title="Changer le code"
-              >
-                <RefreshCw class="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <!-- Status -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Statut</label>
-            <div class="flex gap-2">
-              <input
-                :value="statusLabel(session.status)"
-                disabled
-                :class="`flex-1 px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface/50 bg-gray-50 cursor-not-allowed font-medium ${
-                  session.status === 'active' ? 'text-success' : ''
-                }`"
-              />
-              <button
-                v-if="session.status === 'draft'"
-                @click="showActivateModal = true"
-                title="Activer la session"
-                class="flex items-center justify-center text-text-main dark:text-surface hover:text-success cursor-pointer transition-colors"
-              >
-                <Play class="w-5 h-5" />
-              </button>
-              <div v-else class="flex items-center justify-center text-text-muted/30">
-                <Play class="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Created At -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Créée le</label>
-            <input
-              :value="new Date(session.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })"
-              disabled
-              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface/50 bg-gray-50 cursor-not-allowed"
-            />
-          </div>
-
-          <!-- Expires At -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Expire le</label>
-            <div class="flex gap-2">
-              <input
-                :value="session.expires_at ? new Date(session.expires_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'"
-                disabled
-                class="flex-1 px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface/50 bg-gray-50 cursor-not-allowed"
-              />
-              <button
-                @click="showExpiryModal = true"
-                class="text-text-main dark:text-surface hover:text-primary cursor-pointer transition-colors"
-                title="Gérer l'expiration"
-              >
-                <Clock class="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Editable Settings -->
-        <div class="border-t border-border pt-4 space-y-4 mt-6">
-          <h3 class="text-lg font-semibold text-text-main dark:text-surface">Paramètres</h3>
-
-          <!-- Privacy -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Confidentialité</label>
-            <select
-              v-model="editForm.privacy"
-              :disabled="session.status !== 'draft'"
-              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="public">Public</option>
-              <option value="private">Privé</option>
-            </select>
-          </div>
-
-          <!-- Class Access (private sessions only) -->
-          <div v-if="editForm.privacy === 'private'" class="rounded-lg border border-border p-4 space-y-3">
-            <p class="text-sm font-medium text-text-main dark:text-surface/80">Accès par classe</p>
-            <p v-if="session.privacy !== 'private'" class="text-xs text-warning">Enregistrez d'abord les paramètres pour activer les accès aux classes.</p>
-            <div v-if="divisionStore.divisions.length === 0" class="text-sm text-text-muted italic py-1">
-              Aucune classe disponible.
-            </div>
-            <div
-              v-for="division in divisionStore.divisions"
-              :key="division.id"
-              class="flex items-center justify-between"
-            >
-              <span class="text-sm text-text-main dark:text-surface">{{ division.name }}</span>
-              <button
-                type="button"
-                @click="toggleDivision(division)"
-                :disabled="isTogglingDivision === division.id || session.privacy !== 'private'"
-                class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                :class="linkedDivisionIds.includes(division.id) ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'"
-              >
-                <span
-                  class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
-                  :class="linkedDivisionIds.includes(division.id) ? 'translate-x-6' : 'translate-x-1'"
-                />
-              </button>
-            </div>
-          </div>
-
-          <!-- Time Limit -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Durée limite (minutes)</label>
-            <input
-              v-model.number="editForm.preferences.time_limit"
-              type="number"
-              min="1"
-              max="300"
-              step="1"
-              :disabled="session.status !== 'draft'"
-              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          <!-- Correction -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Correction</label>
-            <select
-              v-model="editForm.preferences.correction"
-              :disabled="session.status !== 'draft'"
-              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="delayed">Différée (après expiration)</option>
-              <option value="immediate">Immédiate</option>
-            </select>
-          </div>
-
-          <!-- Shuffle -->
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Ordre des questions</label>
-            <select
-              v-model="editForm.preferences.shuffle"
-              :disabled="session.status !== 'draft'"
-              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="none">Ordre normal</option>
-              <option value="by_tier">Mélange par palier</option>
-              <option value="tiers_1_3">Mélange paliers 1–3</option>
-              <option value="complete">Mélange complet</option>
-            </select>
-          </div>
-
-          <!-- Blur Security -->
-          <div class="space-y-1">
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input
-                v-model="editForm.preferences.blur_security"
-                type="checkbox"
-                :disabled="session.status !== 'draft'"
-                class="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <span class="text-sm font-medium text-text-main dark:text-surface/80">Sécurité anti-zapping (surveillance de l'onglet actif)</span>
-            </label>
-          </div>
-
-          <!-- Only count tier 4 if all before correct -->
-          <div class="space-y-1">
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input
-                v-model="editForm.preferences.only_count_tier4_if_all_before_correct"
-                type="checkbox"
-                :disabled="session.status !== 'draft'"
-                class="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <span class="text-sm font-medium text-text-main dark:text-surface/80">Compter le palier 4 uniquement si toutes les questions précédentes sont correctes</span>
-            </label>
-          </div>
-
-          <!-- Grading -->
-          <fieldset class="space-y-3 border border-border rounded-lg p-4">
-            <legend class="text-sm font-medium text-text-main dark:text-surface/80 px-1">Barème</legend>
-            <div class="grid grid-cols-3 gap-3">
-              <div class="space-y-1">
-                <label class="block text-xs text-text-muted">Palier 1 (Q1–8)</label>
-                <input
-                  v-model.number="editForm.preferences.grading.tier1"
-                  type="number"
-                  min="0"
-                  step="1"
-                  :disabled="session.status !== 'draft'"
-                  class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-              <div class="space-y-1">
-                <label class="block text-xs text-text-muted">Palier 2 (Q9–16)</label>
-                <input
-                  v-model.number="editForm.preferences.grading.tier2"
-                  type="number"
-                  min="0"
-                  step="1"
-                  :disabled="session.status !== 'draft'"
-                  class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-              <div class="space-y-1">
-                <label class="block text-xs text-text-muted">Palier 3 (Q17–24)</label>
-                <input
-                  v-model.number="editForm.preferences.grading.tier3"
-                  type="number"
-                  min="0"
-                  step="1"
-                  :disabled="session.status !== 'draft'"
-                  class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="space-y-1">
-                <label class="block text-xs text-text-muted">Fraction de pénalité</label>
-                <input
-                  v-model.number="editForm.preferences.grading.penalty_fraction"
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  :disabled="session.status !== 'draft'"
-                  class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <p class="text-xs text-text-muted">ex. 0,25 = 1/4 des points déduits</p>
-              </div>
-              <div class="space-y-1">
-                <label class="block text-xs text-text-muted">Bonus palier 4 (Q25–26)</label>
-                <input
-                  v-model.number="editForm.preferences.grading.tier4_bonus"
-                  type="number"
-                  min="0"
-                  step="1"
-                  :disabled="session.status !== 'draft'"
-                  class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-          </fieldset>
-
-          <!-- Save Button -->
-          <div v-if="session.status === 'draft'" class="flex gap-3 pt-4">
-            <button
-              @click="reloadSessionDetails"
-              class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
-            >
-              Annuler
-            </button>
-            <button
-              @click="saveChanges"
-              :disabled="isSaving"
-              class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
-            >
-              {{ isSaving ? 'Enregistrement...' : 'Enregistrer' }}
-            </button>
-          </div>
-        </div>
+    <div v-else-if="session">
+      <!-- Tab Navigation -->
+      <div class="flex border-b border-border mb-6">
+        <button
+          @click="setTab('tentatives')"
+          class="px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px cursor-pointer"
+          :class="activeTab === 'tentatives' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-main'"
+        >
+          Tentatives ({{ session.attempts.length }})
+        </button>
+        <button
+          @click="setTab('parametres')"
+          class="px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px cursor-pointer"
+          :class="activeTab === 'parametres' ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-main'"
+        >
+          Paramètres
+        </button>
       </div>
 
-      <!-- Attempts Section -->
-      <AttemptsTable
-        :attempts="session.attempts || []"
-        :editable="true"
-        @edit="openEditNameModal"
-        @delete="openDeleteModal"
-      />
+      <!-- Tab Panels -->
+      <Transition :name="'slide-' + slideDirection" mode="out-in">
+        <!-- Tab 1: Tentatives -->
+        <div v-if="activeTab === 'tentatives'" key="tentatives">
+          <AttemptsTable
+            :attempts="session.attempts || []"
+            :editable="true"
+            @edit="openEditNameModal"
+            @delete="openDeleteModal"
+          />
+        </div>
+
+        <!-- Tab 2: Paramètres -->
+        <div v-else key="parametres">
+        <div class="bg-surface dark:bg-gray-900 rounded-lg border border-border p-6 space-y-4">
+            <!-- Privacy -->
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80">Confidentialité</label>
+              <select
+                v-model="editForm.privacy"
+                :disabled="session.status !== 'draft'"
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="public">Public</option>
+                <option value="private">Privé</option>
+              </select>
+            </div>
+
+            <!-- Class Access (private sessions only) -->
+            <div v-if="editForm.privacy === 'private'" class="rounded-lg border border-border p-4 space-y-3">
+              <p class="text-sm font-medium text-text-main dark:text-surface/80">Accès par classe</p>
+              <p v-if="session.privacy !== 'private'" class="text-xs text-warning">Enregistrez d'abord les paramètres pour activer les accès aux classes.</p>
+              <div v-if="divisionStore.divisions.length === 0" class="text-sm text-text-muted italic py-1">
+                Aucune classe disponible.
+              </div>
+              <div
+                v-for="division in divisionStore.divisions"
+                :key="division.id"
+                class="flex items-center justify-between"
+              >
+                <span class="text-sm text-text-main dark:text-surface">{{ division.name }}</span>
+                <button
+                  type="button"
+                  @click="toggleDivision(division)"
+                  :disabled="isTogglingDivision === division.id || session.privacy !== 'private'"
+                  class="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  :class="linkedDivisionIds.includes(division.id) ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'"
+                >
+                  <span
+                    class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                    :class="linkedDivisionIds.includes(division.id) ? 'translate-x-6' : 'translate-x-1'"
+                  />
+                </button>
+              </div>
+            </div>
+
+            <!-- Time Limit -->
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80">Durée limite (minutes)</label>
+              <input
+                v-model.number="editForm.preferences.time_limit"
+                type="number"
+                min="1"
+                max="300"
+                step="1"
+                :disabled="session.status !== 'draft'"
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+
+            <!-- Correction -->
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80">Correction</label>
+              <select
+                v-model="editForm.preferences.correction"
+                :disabled="session.status !== 'draft'"
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="delayed">Différée (après expiration)</option>
+                <option value="immediate">Immédiate</option>
+              </select>
+            </div>
+
+            <!-- Shuffle -->
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-text-main dark:text-surface/80">Ordre des questions</label>
+              <select
+                v-model="editForm.preferences.shuffle"
+                :disabled="session.status !== 'draft'"
+                class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="none">Ordre normal</option>
+                <option value="by_tier">Mélange par palier</option>
+                <option value="tiers_1_3">Mélange paliers 1–3</option>
+                <option value="complete">Mélange complet</option>
+              </select>
+            </div>
+
+            <!-- Blur Security -->
+            <div class="space-y-1">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  v-model="editForm.preferences.blur_security"
+                  type="checkbox"
+                  :disabled="session.status !== 'draft'"
+                  class="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span class="text-sm font-medium text-text-main dark:text-surface/80">Sécurité anti-zapping (surveillance de l'onglet actif)</span>
+              </label>
+            </div>
+
+            <!-- Only count tier 4 if all before correct -->
+            <div class="space-y-1">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  v-model="editForm.preferences.only_count_tier4_if_all_before_correct"
+                  type="checkbox"
+                  :disabled="session.status !== 'draft'"
+                  class="w-4 h-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <span class="text-sm font-medium text-text-main dark:text-surface/80">Compter le palier 4 uniquement si toutes les questions précédentes sont correctes</span>
+              </label>
+            </div>
+
+            <!-- Grading -->
+            <fieldset class="space-y-3 border border-border rounded-lg p-4">
+              <legend class="text-sm font-medium text-text-main dark:text-surface/80 px-1">Barème</legend>
+              <div class="grid grid-cols-3 gap-3">
+                <div class="space-y-1">
+                  <label class="block text-xs text-text-muted">Palier 1 (Q1–8)</label>
+                  <input
+                    v-model.number="editForm.preferences.grading.tier1"
+                    type="number"
+                    min="0"
+                    step="1"
+                    :disabled="session.status !== 'draft'"
+                    class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div class="space-y-1">
+                  <label class="block text-xs text-text-muted">Palier 2 (Q9–16)</label>
+                  <input
+                    v-model.number="editForm.preferences.grading.tier2"
+                    type="number"
+                    min="0"
+                    step="1"
+                    :disabled="session.status !== 'draft'"
+                    class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div class="space-y-1">
+                  <label class="block text-xs text-text-muted">Palier 3 (Q17–24)</label>
+                  <input
+                    v-model.number="editForm.preferences.grading.tier3"
+                    type="number"
+                    min="0"
+                    step="1"
+                    :disabled="session.status !== 'draft'"
+                    class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                  <label class="block text-xs text-text-muted">Fraction de pénalité</label>
+                  <input
+                    v-model.number="editForm.preferences.grading.penalty_fraction"
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    :disabled="session.status !== 'draft'"
+                    class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <p class="text-xs text-text-muted">ex. 0,25 = 1/4 des points déduits</p>
+                </div>
+                <div class="space-y-1">
+                  <label class="block text-xs text-text-muted">Palier 4 (Q25–26)</label>
+                  <input
+                    v-model.number="editForm.preferences.grading.tier4_bonus"
+                    type="number"
+                    min="0"
+                    step="1"
+                    :disabled="session.status !== 'draft'"
+                    class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface text-center focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- Save Button -->
+            <div v-if="session.status === 'draft'" class="flex gap-3 pt-4">
+              <button
+                @click="reloadSessionDetails"
+                class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                @click="saveChanges"
+                :disabled="isSaving"
+                class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
+              >
+                {{ isSaving ? 'Enregistrement...' : 'Enregistrer' }}
+              </button>
+            </div>
+        </div>
+      </div>
+      </Transition>
     </div>
 
     <!-- Activate Session Modal -->
@@ -539,6 +529,16 @@ const isLoading = ref(false);
 const isOperationLoading = ref(false);
 const error = ref(null);
 const session = ref(null);
+const activeTab = ref('tentatives');
+const slideDirection = ref('right');
+const tabOrder = ['tentatives', 'parametres'];
+
+function setTab(tab) {
+  const currentIndex = tabOrder.indexOf(activeTab.value);
+  const nextIndex = tabOrder.indexOf(tab);
+  slideDirection.value = nextIndex > currentIndex ? 'left' : 'right';
+  activeTab.value = tab;
+}
 const showChangeCodeModal = ref(false);
 const isLoadingCodeChange = ref(false);
 const showExpiryModal = ref(false);
@@ -572,6 +572,17 @@ function statusLabel(status) {
   return statusLabels[status] || status;
 }
 
+const timeUntilExpiry = computed(() => {
+  if (!session.value?.expires_at) return '';
+  const diff = Math.floor((new Date(session.value.expires_at) - Date.now()) / 1000);
+  if (diff <= 0) return 'Expirée';
+  if (diff < 60) return `Expire dans ${diff} sec`;
+  if (diff < 3600) return `Expire dans ${Math.floor(diff / 60)} min`;
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  return m > 0 ? `Expire dans ${h}h ${m}min` : `Expire dans ${h}h`;
+});
+
 function initializeForm() {
   if (session.value) {
     const prefs = session.value.preferences || {};
@@ -597,6 +608,7 @@ async function loadSessionDetails() {
     error.value = null;
     const sessionId = route.params.id;
     session.value = await sessionStore.fetchSessionDetails(sessionId);
+    activeTab.value = session.value?.status === 'draft' ? 'parametres' : 'tentatives';
     initializeForm();
   } catch (err) {
     error.value = err.message || 'Failed to load session details';
@@ -607,6 +619,12 @@ async function loadSessionDetails() {
 
 async function reloadSessionDetails() {
   await loadSessionDetails();
+}
+
+async function refreshSession() {
+  const sessionId = route.params.id;
+  session.value = await sessionStore.fetchSessionDetails(sessionId);
+  initializeForm();
 }
 
 async function saveChanges() {
@@ -626,26 +644,12 @@ async function saveChanges() {
   }
 }
 
-async function activateSession() {
-  try {
-    isActivating.value = true;
-    error.value = null;
-    await sessionStore.activateSession(session.value.id);
-    await loadSessionDetails();
-    showActivateModal.value = false;
-  } catch (err) {
-    error.value = err.message || 'Failed to activate session';
-  } finally {
-    isActivating.value = false;
-  }
-}
-
 async function activateSessionHandler() {
   try {
     isActivating.value = true;
     error.value = null;
     await sessionStore.activateSession(session.value.id);
-    await loadSessionDetails();
+    await refreshSession();
     showActivateModal.value = false;
   } catch (err) {
     error.value = err.message || 'Failed to activate session';
@@ -659,7 +663,7 @@ async function changeSessionCode() {
     isLoadingCodeChange.value = true;
     error.value = null;
     await sessionStore.changeSessionCode(session.value.id);
-    await loadSessionDetails();
+    await refreshSession();
     showChangeCodeModal.value = false;
   } catch (err) {
     error.value = err.message || 'Failed to change session code';
@@ -772,7 +776,7 @@ async function delayExpiry(minutes) {
     await sessionStore.updateSession(session.value.id, {
       expires_at: newExpiresAt.toISOString(),
     });
-    await loadSessionDetails();
+    await refreshSession();
     showExpiryModal.value = false;
   } catch (err) {
     error.value = err.message || 'Failed to delay expiry';
@@ -789,7 +793,7 @@ async function expireNow() {
     await sessionStore.updateSession(session.value.id, {
       expires_at: new Date().toISOString(),
     });
-    await loadSessionDetails();
+    await refreshSession();
     showExpiryModal.value = false;
   } catch (err) {
     error.value = err.message || 'Failed to expire session';
@@ -845,3 +849,29 @@ onUnmounted(() => {
   }
 });
 </script>
+
+<style scoped>
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.slide-left-enter-from {
+  transform: translateX(40px);
+  opacity: 0;
+}
+.slide-left-leave-to {
+  transform: translateX(-40px);
+  opacity: 0;
+}
+.slide-right-enter-from {
+  transform: translateX(-40px);
+  opacity: 0;
+}
+.slide-right-leave-to {
+  transform: translateX(40px);
+  opacity: 0;
+}
+</style>

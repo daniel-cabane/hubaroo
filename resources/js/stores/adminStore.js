@@ -6,6 +6,7 @@ export const useAdminStore = defineStore('admin', () => {
   const papers = ref([]);
   const users = ref([]);
   const roles = ref([]);
+  const bugReports = ref([]);
   const isLoading = ref(false);
   const error = ref(null);
 
@@ -74,10 +75,50 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
+  async function fetchBugReports() {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const response = await axios.get('/api/admin/bug-reports');
+      bugReports.value = response.data.bug_reports;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to fetch bug reports';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function updateBugReport(bugReportId, status) {
+    error.value = null;
+    try {
+      const response = await axios.patch(`/api/admin/bug-reports/${bugReportId}`, { status });
+      const index = bugReports.value.findIndex(b => b.id === bugReportId);
+      if (index !== -1) {
+        bugReports.value[index] = response.data.bug_report;
+      }
+      return response.data.bug_report;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to update bug report';
+      throw err;
+    }
+  }
+
+  async function destroyBugReport(bugReportId) {
+    error.value = null;
+    try {
+      await axios.delete(`/api/admin/bug-reports/${bugReportId}`);
+      bugReports.value = bugReports.value.filter(b => b.id !== bugReportId);
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to delete bug report';
+      throw err;
+    }
+  }
+
   return {
     papers,
     users,
     roles,
+    bugReports,
     isLoading,
     error,
     fetchPapers,
@@ -85,5 +126,8 @@ export const useAdminStore = defineStore('admin', () => {
     searchUsers,
     updateUserRole,
     fetchRoles,
+    fetchBugReports,
+    updateBugReport,
+    destroyBugReport,
   };
 });

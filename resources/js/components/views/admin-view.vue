@@ -18,6 +18,14 @@
       >
         Utilisateurs
       </button>
+      <button
+        @click="switchToBugReports"
+        class="px-4 py-2 text-sm font-medium transition-colors"
+        :class="activeTab === 'bug-reports' ? 'border-b-2 border-primary text-primary' : 'text-text-muted hover:text-text-main'"
+      >
+        Bugs
+        <span v-if="openBugReportsCount > 0" class="ml-1 bg-error text-white text-xs rounded-full px-1.5 py-0.5">{{ openBugReportsCount }}</span>
+      </button>
     </div>
 
     <!-- Error -->
@@ -122,11 +130,50 @@
         </div>
       </div>
     </div>
+
+    <!-- Bug Reports Tab -->
+    <div v-if="activeTab === 'bug-reports'">
+      <div v-if="adminStore.isLoading && !adminStore.bugReports.length" class="text-text-muted text-sm">Chargement...</div>
+      <div v-else-if="!adminStore.bugReports.length" class="text-text-muted text-sm">Aucun rapport de bug.</div>
+      <div v-else class="space-y-3">
+        <div
+          v-for="report in adminStore.bugReports"
+          :key="report.id"
+          class="p-4 rounded-lg border border-border/50 hover:bg-gray-50 dark:hover:bg-gray-800/50 space-y-2"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="text-xs text-text-muted">{{ report.user?.name }} &bull; {{ report.user?.email }}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <select
+                :value="report.status"
+                @change="changeBugReportStatus(report, $event.target.value)"
+                class="px-2 py-1 border border-border rounded dark:bg-gray-800 dark:text-surface text-xs"
+              >
+                <option value="new">Nouveau</option>
+                <option value="important">Important</option>
+                <option value="tbd">À voir</option>
+                <option value="fixed">Corrigé</option>
+                <option value="irrelevant">Non pertinent</option>
+              </select>
+              <button
+                @click="deleteBugReport(report.id)"
+                class="text-xs text-error hover:underline"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+          <p class="text-sm text-text-main dark:text-surface whitespace-pre-wrap">{{ report.comment }}</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useAdminStore } from '@/stores/adminStore';
 
 const adminStore = useAdminStore();
@@ -134,6 +181,11 @@ const activeTab = ref('papers');
 const editingPaper = ref(null);
 const userSearch = ref('');
 const levels = ['e', 'b', 'c', 'p', 'j', 's'];
+const unsolvedStatuses = ['new', 'important', 'tbd'];
+
+const openBugReportsCount = computed(() =>
+  adminStore.bugReports.filter(b => unsolvedStatuses.includes(b.status)).length,
+);
 
 onMounted(() => {
   adminStore.fetchPapers();
@@ -168,5 +220,20 @@ function searchUsers() {
 
 async function changeRole(user, role) {
   await adminStore.updateUserRole(user.id, role);
+}
+
+function switchToBugReports() {
+  activeTab.value = 'bug-reports';
+  if (!adminStore.bugReports.length) {
+    adminStore.fetchBugReports();
+  }
+}
+
+async function changeBugReportStatus(report, status) {
+  await adminStore.updateBugReport(report.id, status);
+}
+
+async function deleteBugReport(id) {
+  await adminStore.destroyBugReport(id);
 }
 </script>

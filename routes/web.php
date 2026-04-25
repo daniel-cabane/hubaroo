@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\BugReportController;
 use App\Http\Controllers\DivisionController;
 use App\Http\Controllers\KangourouSessionController;
 use App\Http\Controllers\PaperController;
@@ -79,6 +80,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/invites/{invite}/accept', [DivisionController::class, 'acceptInvite'])->name('divisions.acceptInvite');
     Route::post('/api/invites/{invite}/decline', [DivisionController::class, 'declineInvite'])->name('divisions.declineInvite');
 
+    Route::post('/api/bug-reports', [BugReportController::class, 'store'])->name('bug-reports.store');
+    Route::get('/api/my/bug-reports/unsolved-count', [BugReportController::class, 'unsolvedCount'])->name('bug-reports.unsolvedCount');
+
     // Admin routes
     Route::middleware(['can:admin'])->prefix('/api/admin')->group(function () {
         Route::get('/papers', [AdminController::class, 'papers'])->name('admin.papers');
@@ -86,6 +90,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/users', [AdminController::class, 'searchUsers'])->name('admin.users.search');
         Route::patch('/users/{user}/role', [AdminController::class, 'updateUserRole'])->name('admin.users.updateRole');
         Route::get('/roles', [AdminController::class, 'roles'])->name('admin.roles');
+        Route::get('/bug-reports', [AdminController::class, 'bugReports'])->name('admin.bug-reports.index');
+        Route::patch('/bug-reports/{bugReport}', [AdminController::class, 'updateBugReport'])->name('admin.bug-reports.update');
+        Route::delete('/bug-reports/{bugReport}', [AdminController::class, 'destroyBugReport'])->name('admin.bug-reports.destroy');
     });
 });
 

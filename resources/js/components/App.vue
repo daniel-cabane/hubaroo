@@ -68,44 +68,58 @@
                 <router-link
                   to="/my/sessions"
                   @click="showAccountMenu = false"
-                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
+                  <Layers class="w-4 h-4 shrink-0 text-text-muted" />
                   Mes sessions
                 </router-link>
                 <router-link
                   to="/my/attempts"
                   @click="showAccountMenu = false"
-                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
+                  <ClipboardList class="w-4 h-4 shrink-0 text-text-muted" />
                   Mes tentatives
                 </router-link>
                 <router-link
                   to="/my/divisions"
                   @click="showAccountMenu = false"
-                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
+                  <GraduationCap class="w-4 h-4 shrink-0 text-text-muted" />
                   Mes classes
                 </router-link>
                 <router-link
                   to="/papers"
                   @click="showAccountMenu = false"
-                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
+                  <BookOpen class="w-4 h-4 shrink-0 text-text-muted" />
                   Voir un sujet
                 </router-link>
                 <router-link
                   v-if="authStore.user?.is_admin"
                   to="/admin"
                   @click="showAccountMenu = false"
-                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
+                  <ShieldCheck class="w-4 h-4 shrink-0 text-text-muted" />
                   Administration
                 </router-link>
+                <button
+                  v-if="bugReportStore.canSubmit()"
+                  @click="openBugReportModal"
+                  class="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <Bug class="w-4 h-4 shrink-0 text-text-muted" />
+                  Signaler un bug
+                </button>
                 <div class="border-t border-border">
                   <button
-                    @click="handleLogout"
-                    class="w-full text-left px-4 py-2 text-sm text-error hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    @click="openLogoutModal"
+                    class="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-error hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
+                    <LogOut class="w-4 h-4 shrink-0" />
                     Déconnexion
                   </button>
                 </div>
@@ -114,15 +128,17 @@
                 <router-link
                   to="/login"
                   @click="showAccountMenu = false"
-                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
+                  <LogIn class="w-4 h-4 shrink-0 text-text-muted" />
                   Connexion
                 </router-link>
                 <router-link
                   to="/register"
                   @click="showAccountMenu = false"
-                  class="block px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
+                  <UserPlus class="w-4 h-4 shrink-0 text-text-muted" />
                   Inscription
                 </router-link>
               </template>
@@ -135,23 +151,91 @@
     <main class="flex-1">
       <router-view />
     </main>
+
+    <!-- Logout Confirmation Modal -->
+    <div
+      v-if="showLogoutModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+      @click.self="showLogoutModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-4">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface">Se déconnecter ?</h3>
+        <p class="text-sm text-text-muted">Vous serez redirigé vers la page de connexion.</p>
+        <div class="flex gap-3">
+          <button
+            @click="showLogoutModal = false"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            @click="handleLogout"
+            class="flex-1 px-4 py-2 rounded-lg bg-error hover:bg-error/80 text-white font-medium transition-colors"
+          >
+            Déconnexion
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bug Report Modal -->
+    <div
+      v-if="showBugReportModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+      @click.self="closeBugReportModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl space-y-4">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface">Signaler un bug</h3>
+        <p class="text-sm text-text-muted">Décrivez le problème rencontré. Nous ferons de notre mieux pour le corriger.</p>
+
+        <textarea
+          v-model="bugReportComment"
+          placeholder="Décrivez le bug..."
+          rows="5"
+          class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+        ></textarea>
+
+        <div v-if="bugReportStore.error" class="text-xs text-error">{{ bugReportStore.error }}</div>
+
+        <div class="flex gap-3">
+          <button
+            @click="closeBugReportModal"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            @click="submitBugReport"
+            :disabled="!bugReportComment.trim() || bugReportStore.isSubmitting"
+            class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
+          >
+            {{ bugReportStore.isSubmitting ? 'Envoi...' : 'Envoyer' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { CircleUserRound, ChevronDown, User } from 'lucide-vue-next';
+import { CircleUserRound, ChevronDown, User, Layers, ClipboardList, GraduationCap, BookOpen, ShieldCheck, Bug, LogOut, LogIn, UserPlus } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useAttemptStore } from '@/stores/attemptStore';
+import { useBugReportStore } from '@/stores/bugReportStore';
 import AlertCenter from '@/components/AlertCenter.vue';
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 const attemptStore = useAttemptStore();
+const bugReportStore = useBugReportStore();
 const showAccountMenu = ref(false);
 const showBannerMenu = ref(false);
+const showBugReportModal = ref(false);
+const showLogoutModal = ref(false);
+const bugReportComment = ref('');
 const menuContainer = ref(null);
 const bannerMenuContainer = ref(null);
 
@@ -170,11 +254,43 @@ function handleClickOutside(e) {
 onMounted(() => {
   attemptStore.checkRecovery();
   document.addEventListener('click', handleClickOutside);
+  if (authStore.isAuthenticated) {
+    bugReportStore.fetchUnsolvedCount();
+  }
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
 });
+
+watch(() => authStore.isAuthenticated, (isAuthenticated) => {
+  if (isAuthenticated) {
+    bugReportStore.fetchUnsolvedCount();
+  }
+});
+
+function openBugReportModal() {
+  showAccountMenu.value = false;
+  bugReportComment.value = '';
+  bugReportStore.error = null;
+  showBugReportModal.value = true;
+}
+
+function closeBugReportModal() {
+  showBugReportModal.value = false;
+}
+
+async function submitBugReport() {
+  if (!bugReportComment.value.trim()) {
+    return;
+  }
+  try {
+    await bugReportStore.submitBugReport(bugReportComment.value.trim());
+    showBugReportModal.value = false;
+  } catch {
+    // error shown in modal
+  }
+}
 
 function resumeStoredAttempt() {
   const stored = attemptStore.activeRecovery;
@@ -190,10 +306,16 @@ function dismissAttempt() {
   attemptStore.dismissRecovery();
 }
 
+function openLogoutModal() {
+  showAccountMenu.value = false;
+  showLogoutModal.value = true;
+}
+
 async function handleLogout() {
+  showLogoutModal.value = false;
   try {
     await authStore.logout();
-    router.push('/login');
+    router.push('/');
   } catch (error) {
     console.error('Logout failed:', error);
   }

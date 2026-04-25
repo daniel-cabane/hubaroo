@@ -1,7 +1,7 @@
 <template>
   <div class="bg-surface dark:bg-gray-900 rounded-lg border border-border p-6 space-y-4">
-    <div class="flex items-center justify-between gap-4">
-      <h2 class="text-xl font-bold text-text-main dark:text-surface">Tentatives ({{ attempts.length }})</h2>
+    <div class="flex items-center justify-between gap-4" v-if="attempts.length">
+      <span></span>
       <input
         v-model="filterName"
         type="text"

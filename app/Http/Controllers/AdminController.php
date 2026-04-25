@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateBugReportRequest;
+use App\Models\BugReport;
 use App\Models\Paper;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -73,5 +75,28 @@ class AdminController extends Controller
         $roles = Role::pluck('name');
 
         return response()->json(['roles' => $roles]);
+    }
+
+    public function bugReports(): JsonResponse
+    {
+        $bugReports = BugReport::with('user:id,name,email')
+            ->latest()
+            ->get();
+
+        return response()->json(['bug_reports' => $bugReports]);
+    }
+
+    public function updateBugReport(UpdateBugReportRequest $request, BugReport $bugReport): JsonResponse
+    {
+        $bugReport->update($request->validated());
+
+        return response()->json(['bug_report' => $bugReport->fresh('user')]);
+    }
+
+    public function destroyBugReport(BugReport $bugReport): JsonResponse
+    {
+        $bugReport->delete();
+
+        return response()->json(['message' => 'Bug report deleted.']);
     }
 }
