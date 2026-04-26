@@ -17,8 +17,18 @@
           <template v-if="attemptMap[student.id]">
             <tr>
               <td rowspan="2" class="px-4 py-3">
-                <div class="font-medium text-text-main dark:text-surface">{{ student.name }}</div>
+                <div class="font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name || student.name }}</div>
                 <div class="text-xs text-text-muted">{{ student.email }}</div>
+                <div class="flex justify-center mt-1">
+                <button
+                  @click="$emit('delete', attemptMap[student.id])"
+                  title="Supprimer la tentative"
+                  :disabled="attemptMap[student.id].status !== 'finished'"
+                  class="text-text-muted hover:text-error transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-text-muted"
+                >
+                  <Trash2 class="w-5 h-5" />
+                </button>
+                </div>
               </td>
               <td class="px-4 py-3 text-center">
                 <span :class="`px-2 py-1 rounded text-xs font-semibold ${ attemptMap[student.id].status === 'finished' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }`">
@@ -53,7 +63,7 @@
           </template>
           <tr v-else>
             <td class="px-4 py-3">
-              <div class="font-medium text-text-main dark:text-surface">{{ student.name }}</div>
+              <div class="font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name || student.name }}</div>
               <div class="text-xs text-text-muted">{{ student.email }}</div>
             </td>
             <td colspan="5" class="px-4 py-3 text-center text-text-muted italic">
@@ -68,6 +78,9 @@
 
 <script setup>
 import { computed } from 'vue';
+import { Trash2 } from 'lucide-vue-next';
+
+defineEmits(['delete']);
 
 const props = defineProps({
   students: {
@@ -85,7 +98,7 @@ const props = defineProps({
 });
 
 const sortedStudents = computed(() =>
-  [...props.students].sort((a, b) => a.name.localeCompare(b.name))
+  [...props.students].sort((a, b) => (a.pivot?.class_name || a.name).localeCompare(b.pivot?.class_name || b.name))
 );
 
 const attemptMap = computed(() =>

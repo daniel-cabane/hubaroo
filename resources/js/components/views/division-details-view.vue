@@ -314,6 +314,7 @@
             :students="divisionStore.division?.students ?? []"
             :attempts="expiredSessionDetail?.attempts ?? []"
             :loading="isLoadingExpiredSession"
+            @delete="openDeleteAttemptModal($event, 'expired')"
           />
         </div>
       </div>
@@ -337,6 +338,7 @@
             :students="divisionStore.division?.students ?? []"
             :attempts="activeSessionDetail?.attempts ?? []"
             :loading="isLoadingActiveSession"
+            @delete="openDeleteAttemptModal($event, 'active')"
           />
         </div>
       </div>
@@ -487,6 +489,39 @@
     </div>
 
     <!-- Delete Modal -->
+    <!-- Delete Attempt Modal -->
+    <div
+      v-if="showDeleteAttemptModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="closeDeleteAttemptModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-5">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface">Supprimer la tentative ?</h3>
+        <p class="text-sm text-text-muted">
+          Êtes-vous sûr de vouloir supprimer la tentative de <span class="font-semibold">{{ selectedAttempt?.name || `Utilisateur #${selectedAttempt?.user_id}` }}</span> ?
+        </p>
+        <label class="flex items-center gap-3 p-3 bg-error/10 border border-error/30 rounded-lg">
+          <input v-model="deleteAttemptConfirmed" type="checkbox" class="w-4 h-4" />
+          <span class="text-sm text-error font-medium cursor-pointer">Je confirme la suppression</span>
+        </label>
+        <div class="flex gap-3">
+          <button
+            @click="closeDeleteAttemptModal"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors cursor-pointer"
+          >
+            Annuler
+          </button>
+          <button
+            @click="confirmDeleteAttempt"
+            :disabled="isDeletingAttempt || !deleteAttemptConfirmed"
+            class="flex-1 px-4 py-2 rounded-lg bg-error hover:bg-error-hover text-surface font-medium transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {{ isDeletingAttempt ? 'Suppression...' : 'Supprimer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div
       v-if="showDeleteConfirm"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -554,6 +589,15 @@ const showActiveSessionModal = ref(false);
 const activeSessionDetail = ref(null);
 const isLoadingActiveSession = ref(false);
 const activeSessionChannelId = ref(null);
+const showDeleteAttemptModal = ref(false);
+const selectedAttempt = ref(null);
+const selectedAttemptContext = ref(null);
+const deleteAttemptConfirmed = ref(false);
+const isDeletingAttempt = ref(false);
+
+const selectedAttemptSessionDetail = computed(() =>
+  selectedAttemptContext.value === 'active' ? activeSessionDetail.value : expiredSessionDetail.value
+);
 
 const pendingInvites = computed(() =>
   (divisionStore.division?.invites ?? []).filter(i => i.status === 'pending')
@@ -765,6 +809,38 @@ async function openActiveSessionModal(session) {
     // error handled by store
   } finally {
     isLoadingActiveSession.value = false;
+  }
+}
+
+function openDeleteAttemptModal(attempt, context) {
+  selectedAttempt.value = attempt;
+  selectedAttemptContext.value = context;
+  deleteAttemptConfirmed.value = false;
+  showDeleteAttemptModal.value = true;
+}
+
+function closeDeleteAttemptModal() {
+  showDeleteAttemptModal.value = false;
+  selectedAttempt.value = null;
+  selectedAttemptContext.value = null;
+  deleteAttemptConfirmed.value = false;
+}
+
+async function confirmDeleteAttempt() {
+  if (!selectedAttempt.value || !deleteAttemptConfirmed.value) { return; }
+  isDeletingAttempt.value = true;
+  try {
+    await sessionStore.deleteAttempt(selectedAttempt.value.id);
+    const detail = selectedAttemptContext.value === 'active' ? activeSessionDetail : expiredSessionDetail;
+    if (detail.value?.attempts) {
+      const index = detail.value.attempts.findIndex(a => a.id === selectedAttempt.value.id);
+      if (index !== -1) {
+        detail.value.attempts.splice(index, 1);
+      }
+    }
+    closeDeleteAttemptModal();
+  } finally {
+    isDeletingAttempt.value = false;
   }
 }
 

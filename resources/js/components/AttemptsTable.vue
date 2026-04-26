@@ -86,7 +86,8 @@
                       <button
                         @click="$emit('delete', attempt)"
                         title="Supprimer la tentative"
-                        class="text-text-muted hover:text-error transition-colors cursor-pointer"
+                        :disabled="attempt.status !== 'finished'"
+                        class="text-text-muted hover:text-error transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-text-muted"
                       >
                         <Trash2 class="w-4 h-4" />
                       </button>

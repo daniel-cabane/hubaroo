@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AttemptNameUpdated;
 use App\Events\AttemptUpdated;
 use App\Http\Requests\UpdateAnswerRequest;
 use App\Models\Attempt;
@@ -206,6 +207,8 @@ class AttemptController extends Controller
         $attempt->update([
             'name' => $request->input('name'),
         ]);
+
+        broadcast(new AttemptNameUpdated($attempt->fresh()));
 
         return response()->json([
             'message' => 'Attempt updated successfully.',

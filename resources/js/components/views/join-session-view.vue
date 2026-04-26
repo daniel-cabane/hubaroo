@@ -2,7 +2,11 @@
   <div class="container mx-auto p-6 max-w-lg">
     <h2 class="text-2xl font-bold mb-6 text-text-main dark:text-surface">Rejoindre une session Kangourou</h2>
 
-    <!-- Recovery banner -->
+      <div v-if="deletionMessage" class="mb-6 p-4 bg-warning/10 border border-warning/30 text-warning rounded-lg text-sm font-medium">
+        {{ deletionMessage }}
+      </div>
+
+      <!-- Recovery banner -->
     <div v-if="storedAttempt" class="mb-6 p-4 bg-info/10 border border-info/30 rounded-lg">
       <p class="text-sm text-text-main dark:text-surface">Vous avez une tentative en cours.</p>
       <button
@@ -41,16 +45,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useAuthStore } from '@/stores/authStore';
 
+const route = useRoute();
 const router = useRouter();
 const attemptStore = useAttemptStore();
 const authStore = useAuthStore();
 const code = ref('');
 const error = ref(null);
+const deletionMessage = computed(() => route.query.message || null);
+
 const storedAttempt = ref(null);
 
 onMounted(() => {

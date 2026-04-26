@@ -3,11 +3,14 @@
     <!-- Countdown Timer Bar -->
     <div
       v-if="isInProgress"
-      class="bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 flex items-center justify-between gap-4"
+      class="relative bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 flex items-center justify-between gap-4"
     >
       <div class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-error bg-error/5">
         <AlertTriangle class="w-5 h-5 text-error flex-shrink-0" />
         <p class="text-md font-medium text-error">Session en cours - Ne pas quitter cette page</p>
+      </div>
+      <div class="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-text-muted truncate max-w-xs text-center">
+        {{ attemptStore.attempt?.name }}
       </div>
       <button
         @click="toggleTimer"
@@ -66,7 +69,9 @@
             <img
               :src="'/' + currentQuestion.image"
               :alt="'Question ' + (currentIndex + 1)"
-              class="mx-auto max-w-full rounded-lg all-around-shadow mb-6"
+              class="mx-auto max-w-full rounded-lg all-around-shadow mb-6 select-none pointer-events-none"
+              draggable="false"
+              oncontextmenu="return false;"
             />
 
             <!-- Answer Buttons (Q1-24) -->
@@ -629,6 +634,13 @@ onMounted(async () => {
             autoSubmit('timeout');
           });
       }
+
+      if (attemptStore.attempt?.id) {
+        window.Echo.channel(`attempt.${attemptStore.attempt.id}`)
+          .listen('.AttemptNameUpdated', (event) => {
+            attemptStore.attempt.name = event.name;
+          });
+      }
     }
   } catch (err) {
     // navigate away on error
@@ -643,6 +655,9 @@ onUnmounted(() => {
   window.removeEventListener('focus', handleFocus);
   if (session.value?.id) {
     window.Echo.leave(`session.${session.value.id}`);
+  }
+  if (attemptStore.attempt?.id) {
+    window.Echo.leave(`attempt.${attemptStore.attempt.id}`);
   }
 });
 </script>
@@ -675,5 +690,13 @@ onUnmounted(() => {
 .all-around-shadow {
     /* 0 offset x, 0 offset y, 15px blur, 5px spread */
     box-shadow: 0 0 15px 5px rgba(0, 0, 0, 0.1);
+}
+img {
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none;      /* IE 10 and 11 */
+  user-select: none;         /* Standard syntax */
+  
+  /* Also prevents the image from being "dragged" */
+  -webkit-user-drag: none;
 }
 </style>

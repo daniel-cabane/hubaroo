@@ -113,9 +113,12 @@
             </div>
 
             <!-- Class Access (private sessions only) -->
-            <div v-if="editForm.privacy === 'private'" class="rounded-lg border border-border p-4 space-y-3">
+            <div v-if="editForm.privacy === 'private'" class="relative rounded-lg border border-border p-4 space-y-3">
+              <!-- Overlay when session not yet saved as private -->
+              <div v-if="session.privacy !== 'private'" class="absolute inset-0 bg-white/70 dark:bg-gray-900/70 rounded-lg flex items-center justify-center z-10">
+                <p class="text-sm font-semibold text-text-muted dark:text-surface/80">Enregistrer les modifications</p>
+              </div>
               <p class="text-sm font-medium text-text-main dark:text-surface/80">Accès par classe</p>
-              <p v-if="session.privacy !== 'private'" class="text-xs text-warning">Enregistrez d'abord les paramètres pour activer les accès aux classes.</p>
               <div v-if="divisionStore.divisions.length === 0" class="text-sm text-text-muted italic py-1">
                 Aucune classe disponible.
               </div>
@@ -549,6 +552,7 @@ const showEditNameModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedAttempt = ref(null);
 const editedName = ref('');
+
 const deleteConfirmed = ref(false);
 const linkedDivisionIds = ref([]);
 const isTogglingDivision = ref(null);
@@ -648,6 +652,10 @@ async function activateSessionHandler() {
   try {
     isActivating.value = true;
     error.value = null;
+    await sessionStore.updateSession(session.value.id, {
+      privacy: editForm.privacy,
+      preferences: editForm.preferences,
+    });
     await sessionStore.activateSession(session.value.id);
     await refreshSession();
     showActivateModal.value = false;
