@@ -15,6 +15,14 @@ import path from 'path';
 const RENDER_SCALE = 3;
 const PADDING_ABOVE = 20; // PDF units above question number baseline to show full square box
 const BOTTOM_GAP = 10;    // Extra PDF units gap above next question (clears illustrations extending above number)
+const EDGE_SCAN_BAND = 4;
+const EDGE_ROW_RATIO_THRESHOLD = 0.0015;
+const EDGE_BAND_RATIO_THRESHOLD = 0.01;
+const EDGE_RUN_RATIO_THRESHOLD = 0.01;
+const TOP_EXPANSION_STEP = 12;
+const BOTTOM_EXPANSION_STEP = 12;
+const MAX_TOP_EXPANSION = 48;
+const MAX_ADJUSTMENT_PASSES = 6;
 
 async function main() {
     const [pdfPath, outputDir, year, level] = process.argv.slice(2);
@@ -63,12 +71,14 @@ async function main() {
         const q = questionPositions[i];
         const dims = pageDimensions.get(q.page);
         const pdfPageHeight = dims.height / RENDER_SCALE;
+        const pageBuffer = Buffer.from(pageBuffers.get(q.page));
 
         // Top of crop: above the question number square box
-        const topPx = Math.max(0, Math.floor((pdfPageHeight - q.pdfY - PADDING_ABOVE) * RENDER_SCALE));
+        let topPx = Math.max(0, Math.floor((pdfPageHeight - q.pdfY - PADDING_ABOVE) * RENDER_SCALE));
 
         // Bottom of crop: just above next question's square, or section header, or footer, or page bottom
         let bottomPx;
+        let maxBottomPx;
         const next = questionPositions[i + 1];
         if (next && next.page === q.page) {
             // Check if there's a section header between this question and the next
@@ -76,18 +86,33 @@ async function main() {
             if (sectionY !== undefined && sectionY < q.pdfY && sectionY > next.pdfY) {
                 // Section header is between these two questions — crop above it
                 bottomPx = Math.floor((pdfPageHeight - sectionY) * RENDER_SCALE);
+                maxBottomPx = bottomPx;
             } else {
                 // Crop above the next question's square with a small gap
                 bottomPx = Math.floor((pdfPageHeight - next.pdfY - PADDING_ABOVE - BOTTOM_GAP) * RENDER_SCALE);
+                maxBottomPx = Math.floor((pdfPageHeight - next.pdfY - PADDING_ABOVE) * RENDER_SCALE);
             }
         } else if (footerPositions[q.page] !== undefined) {
             // Last question on a page with footer — crop above the footer
             bottomPx = Math.floor((pdfPageHeight - footerPositions[q.page]) * RENDER_SCALE);
+            maxBottomPx = bottomPx;
         } else {
             bottomPx = dims.height;
+            maxBottomPx = dims.height;
         }
 
         bottomPx = Math.min(bottomPx, dims.height);
+        maxBottomPx = Math.min(maxBottomPx, dims.height);
+
+        ({ topPx, bottomPx } = await expandCropBounds({
+            pageBuffer,
+            width: dims.width,
+            topPx,
+            bottomPx,
+            minTopPx: Math.max(0, topPx - MAX_TOP_EXPANSION),
+            maxBottomPx,
+        }));
+
         const height = bottomPx - topPx;
 
         if (height <= 0) {
@@ -97,7 +122,7 @@ async function main() {
         const filename = `${year}_${level}_q${q.num}.png`;
         const outputPath = path.join(outputDir, filename);
 
-        await sharp(Buffer.from(pageBuffers.get(q.page)))
+        await sharp(pageBuffer)
             .extract({ left: 0, top: topPx, width: dims.width, height })
             .png()
             .toFile(outputPath);
@@ -113,6 +138,89 @@ async function main() {
         count: results.length,
         questions: results,
     }));
+}
+
+async function expandCropBounds({ pageBuffer, width, topPx, bottomPx, minTopPx, maxBottomPx }) {
+    let currentTopPx = topPx;
+    let currentBottomPx = bottomPx;
+
+    for (let pass = 0; pass < MAX_ADJUSTMENT_PASSES; pass++) {
+        const height = currentBottomPx - currentTopPx;
+
+        if (height <= 0) {
+            break;
+        }
+
+        const { data, info } = await sharp(pageBuffer)
+            .extract({ left: 0, top: currentTopPx, width, height })
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        const touchesTop = edgeHasContent(data, info.width, info.height, 'top');
+        const touchesBottom = edgeHasContent(data, info.width, info.height, 'bottom');
+        let changed = false;
+
+        if (touchesTop && currentTopPx > minTopPx) {
+            currentTopPx = Math.max(minTopPx, currentTopPx - TOP_EXPANSION_STEP);
+            changed = true;
+        }
+
+        if (touchesBottom && currentBottomPx < maxBottomPx) {
+            currentBottomPx = Math.min(maxBottomPx, currentBottomPx + BOTTOM_EXPANSION_STEP);
+            changed = true;
+        }
+
+        if (!changed) {
+            break;
+        }
+    }
+
+    return {
+        topPx: currentTopPx,
+        bottomPx: currentBottomPx,
+    };
+}
+
+function edgeHasContent(data, width, height, side) {
+    const scanRows = Math.min(EDGE_SCAN_BAND, height);
+    const startY = side === 'top' ? 0 : height - scanRows;
+    const edgeY = side === 'top' ? 0 : height - 1;
+    let edgeDarkPixels = 0;
+    let bandDarkPixels = 0;
+    let longestRun = 0;
+    let run = 0;
+
+    for (let x = 0; x < width; x++) {
+        const edgeIndex = (edgeY * width + x) * 3;
+        if (isDarkPixel(data, edgeIndex)) {
+            edgeDarkPixels++;
+            run++;
+            longestRun = Math.max(longestRun, run);
+        } else {
+            run = 0;
+        }
+    }
+
+    for (let y = startY; y < startY + scanRows; y++) {
+        for (let x = 0; x < width; x++) {
+            const index = (y * width + x) * 3;
+            if (isDarkPixel(data, index)) {
+                bandDarkPixels++;
+            }
+        }
+    }
+
+    const edgeRatio = edgeDarkPixels / width;
+    const bandRatio = bandDarkPixels / (width * scanRows);
+    const runRatio = longestRun / width;
+
+    return edgeRatio >= EDGE_ROW_RATIO_THRESHOLD
+        || bandRatio >= EDGE_BAND_RATIO_THRESHOLD
+        || runRatio >= EDGE_RUN_RATIO_THRESHOLD;
+}
+
+function isDarkPixel(data, index) {
+    return (data[index] + data[index + 1] + data[index + 2]) / 3 < 245;
 }
 
 /**
