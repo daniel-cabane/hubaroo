@@ -4,6 +4,8 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
+        <meta name="google-site-verification" content="Sas11eU7Kyn0in20dCFel06JZKem9H4BW6pRw-R-NtI" />
+
         <title>{{ config('app.name', 'Hubaroo') }}</title>
 
         <!-- Favicon -->
