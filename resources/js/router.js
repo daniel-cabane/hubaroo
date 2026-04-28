@@ -16,6 +16,8 @@ import MyDivisionsView from "./components/views/my-divisions-view.vue";
 import DivisionDetailsView from "./components/views/division-details-view.vue";
 import PaperView from "./components/views/paper-view.vue";
 import AdminView from "./components/views/admin-view.vue";
+import PrivacyPolicyView from "./components/views/privacy-policy-view.vue";
+import TermsOfServiceView from "./components/views/terms-of-service-view.vue";
 import { useAuthStore } from "./stores/authStore";
 
 const routes = [
@@ -115,6 +117,16 @@ const routes = [
         name: "Admin",
         component: AdminView,
         meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+        path: "/terms/privacy",
+        name: "PrivacyPolicy",
+        component: PrivacyPolicyView,
+    },
+    {
+        path: "/terms/service",
+        name: "TermsOfService",
+        component: TermsOfServiceView,
     },
 ];
 

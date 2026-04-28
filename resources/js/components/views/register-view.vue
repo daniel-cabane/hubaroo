@@ -8,6 +8,24 @@
         </div>
 
         <form @submit.prevent="handleRegister" class="space-y-6">
+          <!-- Google Sign In -->
+          <a
+            href="/auth/google/redirect"
+            class="flex justify-center"
+          >
+            <img :src="'/google-signin.png'" alt="Sign in with Google" class="h-16" />
+          </a>
+
+          <!-- Divider -->
+          <div class="relative">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-border"></div>
+            </div>
+            <div class="relative flex justify-center text-sm">
+              <span class="px-2 bg-surface dark:bg-gray-900 text-text-muted">ou</span>
+            </div>
+          </div>
+
           <!-- First Name -->
           <div class="space-y-2">
             <label class="block text-sm font-medium text-text-main dark:text-surface/80">Prénom</label>
@@ -109,6 +127,14 @@
             {{ error }}
           </div>
 
+          <!-- Legal consent notice -->
+          <p class="text-xs text-text-muted dark:text-text-muted/70 text-center leading-relaxed">
+            En créant un compte, vous acceptez nos
+            <router-link to="/terms/service" class="text-primary hover:underline font-medium">Conditions d'utilisation</router-link>
+            et notre
+            <router-link to="/terms/privacy" class="text-primary hover:underline font-medium">Politique de confidentialité</router-link>.
+          </p>
+
           <button
             type="submit"
             :disabled="isLoading || !isFormValid"
@@ -116,6 +142,7 @@
           >
             {{ isLoading ? 'Inscription...' : 'Créer un compte' }}
           </button>
+
         </form>
 
         <div class="mt-6 text-center">

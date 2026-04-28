@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AttemptController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\BugReportController;
 use App\Http\Controllers\DivisionController;
@@ -22,6 +23,10 @@ Route::middleware(['web'])->group(function () {
     Route::get('/check', [AuthController::class, 'check'])->name('auth.check');
     Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword'])->name('password.email');
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.update');
+
+    // Google OAuth
+    Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('auth.google.redirect');
+    Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('auth.google.callback');
 
     Route::middleware(['auth'])->group(function () {
         Route::get('/user', [AuthController::class, 'user'])->name('user');

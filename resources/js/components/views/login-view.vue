@@ -8,6 +8,24 @@
         </div>
 
         <form @submit.prevent="handleLogin" class="space-y-6">
+          <!-- Google Sign In -->
+          <a
+            href="/auth/google/redirect"
+            class="flex justify-center"
+          >
+            <img :src="'/google-signin.png'" alt="Sign in with Google" class="h-16" />
+          </a>
+
+          <!-- Divider -->
+          <div class="relative">
+            <div class="absolute inset-0 flex items-center">
+              <div class="w-full border-t border-border dark:border-border/50"></div>
+            </div>
+            <div class="relative flex justify-center text-sm">
+              <span class="px-2 bg-surface dark:bg-gray-900 text-text-muted dark:text-text-muted/70">ou</span>
+            </div>
+          </div>
+
           <!-- Email Field -->
           <div class="space-y-2">
             <label
@@ -55,6 +73,7 @@
           >
             {{ authStore.isLoading ? 'Connexion...' : 'Se connecter' }}
           </button>
+
         </form>
 
         <!-- Forgot Password Link -->
