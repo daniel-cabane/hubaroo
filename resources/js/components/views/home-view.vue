@@ -103,6 +103,13 @@
       </router-link>
     </div>
     </div>
+
+    <!-- Footer Links -->
+    <div class="mt-8 flex justify-center gap-4 text-xs text-text-muted">
+      <router-link to="/terms/service" class="hover:text-primary transition-colors">Conditions d'utilisation</router-link>
+      <span>·</span>
+      <router-link to="/terms/privacy" class="hover:text-primary transition-colors">Politique de confidentialité</router-link>
+    </div>
   </div>
 
   <!-- Recent Attempts Overlay (Bottom) -->
