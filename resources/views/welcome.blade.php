@@ -7,6 +7,28 @@
         <meta name="google-site-verification" content="Sas11eU7Kyn0in20dCFel06JZKem9H4BW6pRw-R-NtI" />
 
         <title>{{ config('app.name', 'Hubaroo') }}</title>
+        <meta name="description" content="Plateforme interactive pour le Kangourou des Mathématiques. Les enseignants créent des sessions de concours, organisent les élèves en classes et suivent les résultats en temps réel." />
+        <meta name="keywords" content="kangourou mathématiques, concours maths, session kangourou, math compétition, enseignants, élèves, exercices mathématiques" />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="{{ config('app.url') }}" />
+
+        <!-- Open Graph -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="{{ config('app.url') }}" />
+        <meta property="og:title" content="Hubaroo — Kangourou des Mathématiques" />
+        <meta property="og:description" content="Plateforme interactive pour le Kangourou des Mathématiques. Créez et rejoignez des sessions de concours, suivez les résultats en direct." />
+        <meta property="og:image" content="{{ asset('logo square.png') }}" />
+        <meta property="og:locale" content="fr_FR" />
+        <meta property="og:site_name" content="Hubaroo" />
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Hubaroo — Kangourou des Mathématiques" />
+        <meta name="twitter:description" content="Plateforme interactive pour le Kangourou des Mathématiques. Créez et rejoignez des sessions de concours, suivez les résultats en direct." />
+        <meta name="twitter:image" content="{{ asset('logo square.png') }}" />
+
+        <!-- Theme color -->
+        <meta name="theme-color" content="#d4500d" />
 
         <!-- Favicon -->
         <link rel="icon" type="image/png" href="{{ asset('icon.png') }}">

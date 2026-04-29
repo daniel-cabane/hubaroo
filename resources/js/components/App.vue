@@ -61,10 +61,13 @@
               class="absolute right-0 mt-2 w-56 bg-surface dark:bg-gray-900 rounded-lg shadow-xl border border-border py-1 z-50"
             >
               <template v-if="authStore.isAuthenticated">
-                <div class="px-4 py-2 border-b border-border">
+                <button
+                  @click="openEditNameModal"
+                  class="w-full text-left px-4 py-2 border-b border-border hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
                   <p class="text-sm font-medium text-text-main truncate">{{ authStore.user?.name || 'Compte' }}</p>
                   <p class="text-xs text-text-muted truncate">{{ authStore.user?.email }}</p>
-                </div>
+                </button>
                 <router-link
                   to="/my/sessions"
                   @click="showAccountMenu = false"
@@ -152,6 +155,9 @@
       <router-view />
     </main>
 
+    <!-- Recent Attempts Panel -->
+    <RecentAttemptsPanel />
+
     <!-- Logout Confirmation Modal -->
     <div
       v-if="showLogoutModal"
@@ -173,6 +179,43 @@
             class="flex-1 px-4 py-2 rounded-lg bg-error hover:bg-error/80 text-white font-medium transition-colors"
           >
             Déconnexion
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Name Modal -->
+    <div
+      v-if="showEditNameModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+      @click.self="closeEditNameModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-4">
+        <h3 class="text-lg font-bold text-text-main dark:text-surface">Modifier le nom</h3>
+
+        <input
+          v-model="editNameValue"
+          type="text"
+          placeholder="Votre nom"
+          class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          @keyup.enter="submitEditName"
+        />
+
+        <div v-if="editNameError" class="text-xs text-error">{{ editNameError }}</div>
+
+        <div class="flex gap-3">
+          <button
+            @click="closeEditNameModal"
+            class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            @click="submitEditName"
+            :disabled="!editNameValue.trim() || authStore.isLoading"
+            class="flex-1 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
+          >
+            {{ authStore.isLoading ? 'Enregistrement...' : 'Enregistrer' }}
           </button>
         </div>
       </div>
@@ -225,6 +268,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useBugReportStore } from '@/stores/bugReportStore';
 import AlertCenter from '@/components/AlertCenter.vue';
+import RecentAttemptsPanel from '@/components/RecentAttemptsPanel.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -235,6 +279,9 @@ const showAccountMenu = ref(false);
 const showBannerMenu = ref(false);
 const showBugReportModal = ref(false);
 const showLogoutModal = ref(false);
+const showEditNameModal = ref(false);
+const editNameValue = ref('');
+const editNameError = ref(null);
 const bugReportComment = ref('');
 const menuContainer = ref(null);
 const bannerMenuContainer = ref(null);
@@ -268,6 +315,30 @@ watch(() => authStore.isAuthenticated, (isAuthenticated) => {
     bugReportStore.fetchUnsolvedCount();
   }
 });
+
+function openEditNameModal() {
+  showAccountMenu.value = false;
+  editNameValue.value = authStore.user?.name || '';
+  editNameError.value = null;
+  showEditNameModal.value = true;
+}
+
+function closeEditNameModal() {
+  showEditNameModal.value = false;
+}
+
+async function submitEditName() {
+  if (!editNameValue.value.trim()) {
+    return;
+  }
+  editNameError.value = null;
+  try {
+    await authStore.updateName(editNameValue.value.trim());
+    showEditNameModal.value = false;
+  } catch {
+    editNameError.value = authStore.error;
+  }
+}
 
 function openBugReportModal() {
   showAccountMenu.value = false;

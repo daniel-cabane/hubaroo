@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Requests\UpdateUserNameRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -70,6 +71,20 @@ class AuthController extends Controller
         return response()->json([
             'authenticated' => $request->user() !== null,
             'user' => $request->user(),
+        ]);
+    }
+
+    /**
+     * Update the authenticated user's name.
+     */
+    public function updateName(UpdateUserNameRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->update(['name' => $request->validated('name')]);
+
+        return response()->json([
+            'message' => 'Name updated successfully.',
+            'user' => $user,
         ]);
     }
 

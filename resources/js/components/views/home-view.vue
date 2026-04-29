@@ -95,7 +95,7 @@
         to="/kangourou/join"
         class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-secondary/20 bg-surface p-10 shadow-sm transition-all hover:border-secondary hover:shadow-lg hover:-translate-y-1"
       >
-        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary transition-colors group-hover:bg-secondary group-hover:text-white">
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary transition-colors group-hover:bg-primary group-hover:text-white">
           <LogIn class="h-8 w-8" />
         </div>
         <h2 class="text-xl font-bold text-text-main">Rejoindre une session</h2>
@@ -109,51 +109,6 @@
       <router-link to="/terms/service" class="hover:text-primary transition-colors">Conditions d'utilisation</router-link>
       <span>·</span>
       <router-link to="/terms/privacy" class="hover:text-primary transition-colors">Politique de confidentialité</router-link>
-    </div>
-  </div>
-
-  <!-- Recent Attempts Overlay (Bottom) -->
-  <div v-if="displayAttempts.length > 0" class="fixed bottom-0 left-0 right-0 z-40 bg-gradient-to-t from-surface/95 to-surface/85 border-t border-border shadow-lg transition-all duration-300" :class="showGuestAttempts ? 'translate-y-0' : 'translate-y-[calc(100%-52px)]'">
-    <div class="max-w-3xl mx-auto p-4">
-      <!-- Header with Toggle -->
-      <div class="flex items-center justify-between pb-3 border-b border-border">
-        <h3 class="text-lg font-bold text-text-main">Mes tentatives récentes</h3>
-        <button
-          @click="showGuestAttempts = !showGuestAttempts"
-          class="text-text-muted hover:text-text-main transition-all"
-          :title="showGuestAttempts ? 'Masquer' : 'Afficher'"
-        >
-          <ChevronUp :class="['w-5 h-5 transition-transform cursor-pointer', showGuestAttempts ? 'rotate-180' : 'rotate-0']" />
-        </button>
-      </div>
-
-      <!-- Attempts Grid (always rendered) -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto mt-4">
-        <router-link
-          v-for="ga in displayAttempts"
-          :key="ga.id"
-          :to="ga.status === 'inProgress' && ga.kangourou_session?.status === 'active'
-            ? { name: 'Attempt', params: { code: ga.kangourou_session.code, attemptId: ga.id } }
-            : { name: 'Results', params: { code: ga.kangourou_session?.code, attemptId: ga.id } }"
-          class="group flex flex-col gap-2 p-3 rounded-lg bg-surface/50 dark:bg-gray-900 border border-border hover:border-primary hover:shadow-md transition-all"
-        >
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-text-main truncate">{{ ga.kangourou_session?.paper?.title || 'Session' }}</span>
-            <span
-              :class="ga.status === 'finished'
-                ? 'bg-success/10 text-success'
-                : 'bg-warning/10 text-warning'"
-              class="px-2 py-0.5 rounded text-xs font-semibold flex-shrink-0 ml-2"
-            >
-              {{ ga.status === 'finished' ? 'Terminée' : 'En cours' }}
-            </span>
-          </div>
-          <div class="flex items-center justify-between text-xs text-text-muted">
-            <span class="truncate">{{ ga.name || 'Anonyme' }}</span>
-            <span v-if="ga.score !== null && ga.kangourou_session?.status === 'expired'" class="flex-shrink-0 ml-2">{{ ga.score }}</span>
-          </div>
-        </router-link>
-      </div>
     </div>
   </div>
 
@@ -213,7 +168,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { PlusCircle, LogIn, X, ChevronUp } from 'lucide-vue-next';
+import { PlusCircle, LogIn, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
@@ -223,7 +178,6 @@ const divisionStore = useDivisionStore();
 const attemptStore = useAttemptStore();
 
 const showActiveSessions = ref(true);
-const showGuestAttempts = ref(true);
 const showClaimModal = ref(false);
 const selectedClaimIds = ref([]);
 const isClaiming = ref(false);

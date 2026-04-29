@@ -94,6 +94,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateName(name) {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const response = await axios.patch('/user/name', { name });
+      user.value = response.data.user;
+      return response.data;
+    } catch (err) {
+      error.value = err.response?.data?.errors?.name?.[0] || err.response?.data?.message || 'Failed to update name';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   function clearError() {
     error.value = null;
   }
@@ -108,6 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
     checkAuth,
     forgotPassword,
     resetPassword,
+    updateName,
     clearError,
   };
 });
