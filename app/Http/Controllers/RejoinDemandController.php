@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AttemptUpdated;
 use App\Events\RejoinDemandCreated;
 use App\Events\RejoinDemandResolved;
 use App\Models\Attempt;
@@ -48,10 +49,12 @@ class RejoinDemandController extends Controller
         $newExtraTime = max(0, $attempt->extra_time + $extraTime);
         $attempt->update([
             'status' => 'inProgress',
+            'termination' => 'none',
             'extra_time' => $newExtraTime,
         ]);
 
         broadcast(new RejoinDemandResolved($rejoinDemand, 'approved', $newExtraTime));
+        broadcast(new AttemptUpdated($attempt->fresh()));
 
         $rejoinDemand->delete();
 

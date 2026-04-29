@@ -6,7 +6,7 @@
       class="fixed left-0 top-1/2 -translate-y-1/2 z-40 bg-surface dark:bg-gray-900 border border-l-0 border-border rounded-r-lg px-1.5 py-3 shadow-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       title="Tentatives récentes"
     >
-      <History class="w-4 h-4 text-text-muted" />
+      <History class="w-4 h-4 text-text-muted cursor-pointer" />
     </button>
 
     <!-- Slide-in panel from left -->

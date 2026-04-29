@@ -191,7 +191,7 @@ async function requestRejoin() {
   }
 }
 
-// React to store updates for the pending demand (AlertCenter owns the Echo subscription)
+// React to store updates for the pending demand
 watch(() => rejoinDemandStore.studentDemands, (demands) => {
   if (!pendingDemandId.value) return;
   const demand = demands.find(d => d.id === pendingDemandId.value);

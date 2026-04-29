@@ -42,8 +42,8 @@
             </div>
           </div>
 
-          <!-- Alert Center (for session authors) -->
-          <AlertCenter v-if="!isAttemptView && authStore.isAuthenticated" />
+          <!-- Alert Center (for session authors and students) -->
+          <AlertCenter v-if="!isAttemptView" />
 
           <!-- Account menu -->
           <div v-if="!isAttemptView" class="relative" ref="menuContainer">

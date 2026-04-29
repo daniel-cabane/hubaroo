@@ -50,7 +50,7 @@
     </div>
 
     <!-- Question Carousel with side navigation -->
-    <div class="flex-1 flex items-center justify-center overflow-y-auto p-4">
+    <div class="flex-1 flex items-center justify-center overflow-hidden">
       <!-- Prev Button -->
       <button
         @click="prevQuestion"
@@ -60,96 +60,98 @@
         <ChevronLeft class="w-6 h-6" />
       </button>
 
-      <div class="max-w-2xl mx-4 flex-1 relative overflow-visible">
-        <div v-if="isShuffled && isInProgress" class="text-center mb-3 text-xs text-text-muted bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-1 inline-block">
-          Questions mélangées
-        </div>
-        <Transition :name="slideDirection" mode="out-in">
-          <div v-if="currentQuestion" :key="currentIndex" class="w-full">
-            <img
-              :src="'/' + currentQuestion.image"
-              :alt="'Question ' + (currentIndex + 1)"
-              class="mx-auto max-w-full rounded-lg all-around-shadow mb-6 select-none pointer-events-none"
-              draggable="false"
-              oncontextmenu="return false;"
-            />
+      <div class="w-full max-w-2xl mx-4 relative overflow-y-auto h-full px-6">
+        <div class="min-h-full flex flex-col items-center justify-center py-6">        
+          <div v-if="isShuffled && isInProgress" class="text-center mb-3 text-xs text-text-muted bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-1 inline-block">
+            Questions mélangées
+          </div>
+          <Transition :name="slideDirection" mode="out-in">
+            <div v-if="currentQuestion" :key="currentIndex" class="w-full">
+              <img
+                :src="'/' + currentQuestion.image"
+                :alt="'Question ' + (currentIndex + 1)"
+                class="mx-auto max-w-full rounded-lg all-around-shadow mb-6 select-none pointer-events-none"
+                draggable="false"
+                oncontextmenu="return false;"
+              />
 
-            <!-- Answer Buttons (Q1-24) -->
-            <div v-if="!isNumericQuestion" class="flex justify-center gap-3">
-              <button
-                v-for="letter in ['A', 'B', 'C', 'D', 'E']"
-                :key="letter"
-                @click="selectAnswer(letter)"
-                :disabled="!isInProgress"
-                class="w-16 h-16 rounded-xl text-xl font-bold transition-all shadow-lg"
-                :class="answerButtonClass(letter)"
-              >
-                {{ letter }}
-              </button>
-            </div>
-
-            <!-- Numeric Answer Display (Q25-26) -->
-            <div v-else class="flex flex-col items-center gap-4">
-              <label class="text-sm text-text-muted">Réponse numérique</label>
-              <div class="flex flex-col items-center gap-3">
-                <div
-                  class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-900 text-text-main dark:text-surface select-none"
-                  :class="numericInputClass"
-                >
-                  {{ numericInputValue !== '' ? numericInputValue : '—' }}
-                </div>
-                <p v-if="!isInProgress" class="text-sm text-text-muted">
-                  Correct : <span class="font-bold text-success">{{ currentQuestion?.correct_answer }}</span>
-                </p>
-                <!-- Keypad Toggle Button -->
+              <!-- Answer Buttons (Q1-24) -->
+              <div v-if="!isNumericQuestion" class="flex justify-center gap-3">
                 <button
-                  v-if="isInProgress"
-                  @click="showKeypad = !showKeypad"
-                  class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                  v-for="letter in ['A', 'B', 'C', 'D', 'E']"
+                  :key="letter"
+                  @click="selectAnswer(letter)"
+                  :disabled="!isInProgress"
+                  class="w-16 h-16 rounded-xl text-xl font-bold transition-all shadow-lg"
+                  :class="answerButtonClass(letter)"
                 >
-                  {{ showKeypad ? 'Masquer le clavier' : 'Afficher le clavier' }}
+                  {{ letter }}
                 </button>
               </div>
-            </div>
 
-            <!-- Keypad Overlay -->
-            <div
-              v-if="isInProgress && showKeypad"
-              class="fixed inset-0 z-40 bg-black/30 flex items-center justify-center"
-              @click.self="showKeypad = false"
-            >
-              <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 shadow-xl flex flex-col items-center gap-4 relative">
-                <!-- Close Button -->
-                <button
-                  @click="showKeypad = false"
-                  class="absolute top-3 right-3 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  <X class="w-5 h-5 text-text-main dark:text-surface" />
-                </button>
-                <!-- Answer Display in Overlay -->
-                <div
-                  class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-800 text-text-main dark:text-surface select-none"
-                  :class="numericInputClass"
-                >
-                  {{ numericInputValue !== '' ? numericInputValue : '—' }}
-                </div>
-                <!-- Keypad Buttons -->
-                <div class="grid grid-cols-3 gap-2">
-                  <button
-                    v-for="key in ['1','2','3','4','5','6','7','8','9','delete','0']"
-                    :key="key"
-                    @click="handleNumericKey(key === 'delete' ? '⌫' : key)"
-                    class="w-16 h-16 rounded-xl text-2xl font-bold transition-colors cursor-pointer shadow flex items-center justify-center"
-                    :class="key === 'delete' ? 'bg-gray-200 dark:bg-gray-700 text-error col-start-1' : 'bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700'"
+              <!-- Numeric Answer Display (Q25-26) -->
+              <div v-else class="flex flex-col items-center gap-4">
+                <label class="text-sm text-text-muted">Réponse numérique</label>
+                <div class="flex flex-col items-center gap-3">
+                  <div
+                    class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-900 text-text-main dark:text-surface select-none"
+                    :class="numericInputClass"
                   >
-                    <Delete v-if="key === 'delete'" class="w-6 h-6" />
-                    <span v-else>{{ key }}</span>
+                    {{ numericInputValue !== '' ? numericInputValue : '—' }}
+                  </div>
+                  <p v-if="!isInProgress" class="text-sm text-text-muted">
+                    Correct : <span class="font-bold text-success">{{ currentQuestion?.correct_answer }}</span>
+                  </p>
+                  <!-- Keypad Toggle Button -->
+                  <button
+                    v-if="isInProgress"
+                    @click="showKeypad = !showKeypad"
+                    class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    {{ showKeypad ? 'Masquer le clavier' : 'Afficher le clavier' }}
                   </button>
                 </div>
               </div>
+
+              <!-- Keypad Overlay -->
+              <div
+                v-if="isInProgress && showKeypad"
+                class="fixed inset-0 z-40 bg-black/30 flex items-center justify-center"
+                @click.self="showKeypad = false"
+              >
+                <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 shadow-xl flex flex-col items-center gap-4 relative">
+                  <!-- Close Button -->
+                  <button
+                    @click="showKeypad = false"
+                    class="absolute top-3 right-3 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <X class="w-5 h-5 text-text-main dark:text-surface" />
+                  </button>
+                  <!-- Answer Display in Overlay -->
+                  <div
+                    class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-800 text-text-main dark:text-surface select-none"
+                    :class="numericInputClass"
+                  >
+                    {{ numericInputValue !== '' ? numericInputValue : '—' }}
+                  </div>
+                  <!-- Keypad Buttons -->
+                  <div class="grid grid-cols-3 gap-2">
+                    <button
+                      v-for="key in ['1','2','3','4','5','6','7','8','9','delete','0']"
+                      :key="key"
+                      @click="handleNumericKey(key === 'delete' ? '⌫' : key)"
+                      class="w-16 h-16 rounded-xl text-2xl font-bold transition-colors cursor-pointer shadow flex items-center justify-center"
+                      :class="key === 'delete' ? 'bg-gray-200 dark:bg-gray-700 text-error col-start-1' : 'bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700'"
+                    >
+                      <Delete v-if="key === 'delete'" class="w-6 h-6" />
+                      <span v-else>{{ key }}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </Transition>
+          </Transition>
+        </div>
       </div>
 
       <!-- Next Button -->

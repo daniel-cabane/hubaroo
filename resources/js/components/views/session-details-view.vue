@@ -797,12 +797,14 @@ async function expireNow() {
   try {
     isManagingExpiry.value = true;
     error.value = null;
-    // Set expiry to current time
-    await sessionStore.updateSession(session.value.id, {
-      expires_at: new Date().toISOString(),
-    });
-    await refreshSession();
+    const now = new Date().toISOString();
+    // Optimistic update so the UI reflects expiry immediately
+    session.value.status = 'expired';
+    session.value.expires_at = now;
     showExpiryModal.value = false;
+    await sessionStore.updateSession(session.value.id, {
+      expires_at: now,
+    });
   } catch (err) {
     error.value = err.message || 'Failed to expire session';
   } finally {

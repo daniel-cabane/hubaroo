@@ -114,7 +114,7 @@
           </div>
 
           <!-- Time adjustment -->
-          <div class="flex items-center gap-2">
+          <!-- <div class="flex items-center gap-2">
             <label class="text-xs text-text-muted whitespace-nowrap">Temps ajouté (s) :</label>
             <input
               v-model.number="extraTimes[demand.id]"
@@ -124,7 +124,7 @@
               step="60"
               class="w-24 px-2 py-1 text-xs border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-1 focus:ring-primary"
             />
-          </div>
+          </div> -->
 
           <!-- Actions -->
           <div class="flex gap-2">
@@ -220,20 +220,28 @@ function listenForStudentDemand(demand) {
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside);
 
-  if (authStore.isAuthenticated) {
-    await demandStore.fetchMyDemands();
-
-    window.Echo.private(`App.Models.User.${authStore.user.id}`)
-      .listen('.RejoinDemandCreated', (event) => {
-        demandStore.addDemand(event.demand);
-      });
-  }
-
   // Subscribe to any demands the student already has pending in the store
   demandStore.studentDemands
     .filter(d => d.status === 'pending')
     .forEach(listenForStudentDemand);
 });
+
+async function setupTeacherChannel() {
+  await demandStore.fetchMyDemands();
+
+  window.Echo.private(`App.Models.User.${authStore.user.id}`)
+    .listen('.RejoinDemandCreated', (event) => {
+      demandStore.addDemand(event.demand);
+    });
+}
+
+// The component now mounts before auth resolves (no longer gated by v-if isAuthenticated),
+// so we watch for authentication becoming true to set up the teacher channel subscription.
+watch(() => authStore.isAuthenticated, (isAuth) => {
+  if (isAuth) {
+    setupTeacherChannel();
+  }
+}, { immediate: true });
 
 // Subscribe whenever a new student demand is added
 watch(() => demandStore.studentDemands.length, (newLen, oldLen) => {
