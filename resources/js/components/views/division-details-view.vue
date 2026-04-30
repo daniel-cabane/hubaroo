@@ -85,12 +85,15 @@
             <!-- Code -->
             <div>
               <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Code d'invitation</label>
-              <div class="flex gap-2">
-                <input
-                  :value="divisionStore.division.code"
-                  disabled
-                  class="flex-1 px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface/50 bg-gray-50 cursor-not-allowed font-mono font-bold text-sm"
-                />
+              <div class="flex gap-2 items-center mb-3">
+                <span class="flex-1 font-mono font-bold text-3xl text-text-main dark:text-surface">{{ divisionStore.division.code }}</span>
+                <button
+                  @click="showJoinInfoModal = true"
+                  title="Afficher le code de classe"
+                  class="text-text-muted hover:text-primary cursor-pointer transition-colors"
+                >
+                  <Fullscreen class="w-5 h-5" />
+                </button>
                 <button
                   @click="showChangeCodeConfirm = true"
                   :disabled="divisionStore.division.archived"
@@ -522,6 +525,38 @@
       </div>
     </div>
 
+    <!-- Join Class Info Modal -->
+    <div
+      v-if="showJoinInfoModal"
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center"
+      @click.self="showJoinInfoModal = false"
+    >
+      <div class="relative bg-surface dark:bg-gray-900 rounded-2xl p-12 max-w-3xl w-full mx-4 shadow-2xl flex flex-col items-center gap-6">
+        <button
+          @click="showJoinInfoModal = false"
+          class="absolute top-4 right-4 text-text-muted hover:text-text-main dark:text-surface/60 dark:hover:text-surface transition-colors cursor-pointer"
+        >
+          <X class="w-6 h-6" />
+        </button>
+
+        <p class="text-5xl font-semibold text-text-muted tracking-wide">hubaroo.online</p>
+
+        <div class="flex items-center gap-4 w-full">
+          <img
+            :src="'/mes classes.png'"
+            alt="Page Mes classes"
+            class="flex-1 max-h-[350px] object-contain"
+          />
+          <ChevronRight class="w-8 h-8 text-text-muted shrink-0" />
+          <div class="px-4 py-2 rounded-lg bg-primary text-surface font-medium text-lg shrink-0">
+            Rejoindre une classe
+          </div>
+        </div>
+
+        <p class="font-mono font-black text-8xl tracking-widest text-primary">{{ divisionStore.division?.code }}</p>
+      </div>
+    </div>
+
     <div
       v-if="showDeleteConfirm"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -550,7 +585,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, RefreshCw, X, Eye, Pencil } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
@@ -575,6 +610,7 @@ const showDeleteConfirm = ref(false);
 const showArchiveConfirm = ref(false);
 const showUnarchiveConfirm = ref(false);
 const showChangeCodeConfirm = ref(false);
+const showJoinInfoModal = ref(false);
 const showRemoveStudentConfirm = ref(false);
 const studentIdToRemove = ref(null);
 const showEditClassNameModal = ref(false);

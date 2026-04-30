@@ -9,6 +9,14 @@
       <div class="flex justify-between align-center mb-2 px-2">
         <h1 class="text-3xl font-bold text-text-main dark:text-surface">{{ session?.paper?.title }}</h1>
         <span class="text-3xl font-bold flex align-center gap-1">
+          <button
+            v-if="session?.status === 'active'"
+            @click="showJoinInfoModal = true"
+            class="text-text-main dark:text-surface hover:text-primary cursor-pointer transition-colors"
+            title="Afficher le code de session"
+          >
+            <Fullscreen class="w-8 h-8" />
+          </button>
           {{ session?.code }}
           <button
                 @click="showChangeCodeModal = true"
@@ -513,13 +521,40 @@
         </div>
       </div>
     </div>
+
+    <!-- Join Info Modal -->
+    <div
+      v-if="showJoinInfoModal"
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center"
+      @click.self="showJoinInfoModal = false"
+    >
+      <div class="relative bg-surface dark:bg-gray-900 rounded-2xl p-12 max-w-lg w-full mx-4 shadow-2xl flex flex-col items-center gap-8">
+        <button
+          @click="showJoinInfoModal = false"
+          class="absolute top-4 right-4 text-text-muted hover:text-text-main dark:text-surface/60 dark:hover:text-surface transition-colors cursor-pointer"
+        >
+          <X class="w-6 h-6" />
+        </button>
+
+        <p class="text-5xl font-semibold text-text-muted tracking-wide">hubaroo.online</p>
+
+        <div class="flex flex-col items-center gap-4">
+          <div class="flex h-20 w-20 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+            <LogIn class="h-10 w-10" />
+          </div>
+          <h2 class="text-2xl font-bold text-text-main dark:text-surface">Rejoindre une session</h2>
+        </div>
+
+        <p class="font-mono font-black text-8xl tracking-widest text-primary">{{ session?.code }}</p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronLeft, RefreshCw, Clock, Play } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, Clock, Play, LogIn, X, Fullscreen } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import AttemptsTable from '@/components/AttemptsTable.vue';
@@ -544,6 +579,7 @@ function setTab(tab) {
 }
 const showChangeCodeModal = ref(false);
 const isLoadingCodeChange = ref(false);
+const showJoinInfoModal = ref(false);
 const showExpiryModal = ref(false);
 const isManagingExpiry = ref(false);
 const showActivateModal = ref(false);
