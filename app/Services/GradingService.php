@@ -15,7 +15,7 @@ class GradingService
      * - Tier 3 (Q17-24): +tier3 for correct, -(tier3 * penalty_fraction) for incorrect
      * - Tier 4 (Q25-26): +tier4_bonus only if ALL Q1-24 answers are correct
      */
-    public function grade(Attempt $attempt): int
+    public function grade(Attempt $attempt): float
     {
         $session = $attempt->kangourouSession;
         $preferences = $session->getEffectivePreferences();
@@ -66,13 +66,13 @@ class GradingService
             $score += $grading['tier4_bonus'] * $tier4Count;
         }
 
-        return (int) round(max(0, $score));
+        return round(24 + $score, 2);
     }
 
     /**
      * Grade an attempt, save the score and mark answers as correct/incorrect.
      */
-    public function gradeAndSave(Attempt $attempt): int
+    public function gradeAndSave(Attempt $attempt): float
     {
         $session = $attempt->kangourouSession;
         $questions = $session->paper->questions()->orderByPivot('order')->get();

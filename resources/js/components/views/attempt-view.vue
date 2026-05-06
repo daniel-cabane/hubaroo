@@ -35,7 +35,7 @@
     </div>
 
     <!-- Question Nav Bar -->
-    <div ref="navBar" class="bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 overflow-x-auto">
+    <div ref="navBar" class="bg-surface dark:bg-gray-900 border-b border-border px-4 pt-3 pb-4 overflow-x-auto">
       <div class="flex gap-[4px] min-w-max">
         <button
           v-for="(answer, idx) in answers"

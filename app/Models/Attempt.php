@@ -37,7 +37,7 @@ class Attempt extends Model
     {
         return [
             'answers' => 'array',
-            'score' => 'integer',
+            'score' => 'float',
             'timer' => 'integer',
             'extra_time' => 'integer',
         ];

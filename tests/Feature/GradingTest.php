@@ -25,8 +25,8 @@ test('all correct answers gives maximum score with tier 4 bonus', function () {
 
     $score = $this->gradingService->grade($attempt);
 
-    // Tier 1: 8 * 3 = 24, Tier 2: 8 * 4 = 32, Tier 3: 8 * 5 = 40, Tier 4: 2 * 1 = 2
-    expect($score)->toBe(98);
+    // Tier 1: 8 * 3 = 24, Tier 2: 8 * 4 = 32, Tier 3: 8 * 5 = 40, Tier 4: 2 * 1 = 2; base offset: 24
+    expect($score)->toBe(122.0);
 });
 
 test('all unanswered gives score of 0', function () {
@@ -37,7 +37,7 @@ test('all unanswered gives score of 0', function () {
 
     $score = $this->gradingService->grade($attempt);
 
-    expect($score)->toBe(0);
+    expect($score)->toBe(24.0);
 });
 
 test('all wrong answers gives minimum score of 0', function () {
@@ -56,8 +56,8 @@ test('all wrong answers gives minimum score of 0', function () {
 
     $score = $this->gradingService->grade($attempt);
 
-    // Penalties would be -24 but minimum score is 0
-    expect($score)->toBe(0);
+    // Penalties of -24 + base offset 24 = 0
+    expect($score)->toBe(0.0);
 });
 
 test('tier 4 bonus only awarded when all Q1-24 are correct', function () {
@@ -80,8 +80,8 @@ test('tier 4 bonus only awarded when all Q1-24 are correct', function () {
 
     $score = $this->gradingService->grade($attempt);
 
-    // Tier 1: 24, Tier 2: 32, Tier 3: 40, Tier 4: 2 (all Q1-24 correct)
-    expect($score)->toBe(98);
+    // Tier 1: 24, Tier 2: 32, Tier 3: 40, Tier 4: 2 (all Q1-24 correct); base offset: 24
+    expect($score)->toBe(122.0);
 });
 
 test('tier 4 bonus not awarded when any Q1-24 is wrong', function () {
@@ -104,8 +104,8 @@ test('tier 4 bonus not awarded when any Q1-24 is wrong', function () {
 
     $score = $this->gradingService->grade($attempt);
 
-    // Tier 1: 7*3 - 0.75 = 20.25, Tier 2: 32, Tier 3: 40, Tier 4: 0 (Q1 wrong)
-    expect($score)->toBe(92);
+    // Tier 1: 7*3 - 0.75 = 20.25, Tier 2: 32, Tier 3: 40, Tier 4: 0 (Q1 wrong); base offset: 24
+    expect($score)->toBe(116.25);
 });
 
 test('gradeAndSave marks answers and saves score', function () {
@@ -158,9 +158,9 @@ test('tier 4 bonus always awarded when only_count_tier4_if_all_before_correct is
 
     $score = $this->gradingService->grade($attempt);
 
-    // Q1 wrong: 7*3 - 0.75 = 20.25 → 20 (floor), tier2: 32, tier3: 40, tier4 bonus: 2 (always awarded)
-    // Total: 7*3 + 8*4 + 8*5 + 2*1 - 0.25*3 = 21 + 32 + 40 + 2 - 0.75 = 94.25 → 94
-    expect($score)->toBe(94);
+    // Q1 wrong: 7*3 - 0.75 = 20.25, tier2: 32, tier3: 40, tier4 bonus: 2 (always awarded); base offset: 24
+    // Total: 7*3 + 8*4 + 8*5 + 2*1 - 0.75 + 24 = 21 + 32 + 40 + 2 - 0.75 + 24 = 118.25
+    expect($score)->toBe(118.25);
 });
 
 test('default preferences include all new fields', function () {
