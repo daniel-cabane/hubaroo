@@ -17,10 +17,13 @@ class QuestionFactory extends Factory
      */
     public function definition(): array
     {
+        $tier = fake()->numberBetween(1, 4);
+
         return [
             'image' => 'questions/'.fake()->uuid().'.png',
             'correct_answer' => fake()->randomElement(['A', 'B', 'C', 'D', 'E']),
-            'tier' => fake()->numberBetween(1, 4),
+            'tier' => $tier,
+            'difficulty' => 300 + 100 * (int) round(pow(2, $tier - 1)),
         ];
     }
 }

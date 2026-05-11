@@ -87,7 +87,7 @@
           <PlusCircle class="h-8 w-8" />
         </div>
         <h2 class="text-xl font-bold text-text-main">Créer une session</h2>
-        <p class="text-sm text-text-muted text-center">Choisissez un sujet et lancez une nouvelle session Kangourou pour vos élèves.</p>
+        <p class="text-sm text-text-muted text-center">Choisissez un sujet et lancez une nouvelle session Kangourou pour {{ authStore.user?.is_teacher ? 'vos élèves' : 'vous et vos amis' }}.</p>
       </router-link>
 
       <!-- Join Session -->

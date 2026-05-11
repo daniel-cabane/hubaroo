@@ -122,6 +122,21 @@
             </div>
           </div>
 
+          <!-- Birth Year (Students only) -->
+          <div v-if="form.role === 'Student'" class="space-y-2">
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80">Année de naissance</label>
+            <input
+              v-model.number="form.birth_year"
+              type="number"
+              :min="2000"
+              :max="currentYear"
+              @blur="touched.birth_year = true"
+              class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+            <p v-if="touched.birth_year && !isBirthYearValid" class="text-sm text-error">Veuillez entrer une année de naissance valide</p>
+          </div>
+
           <!-- Error Message -->
           <div v-if="error" class="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg text-sm">
             {{ error }}
@@ -163,6 +178,7 @@ import axios from 'axios';
 const router = useRouter();
 const isLoading = ref(false);
 const error = ref(null);
+const currentYear = new Date().getFullYear();
 
 const form = reactive({
   firstName: '',
@@ -171,6 +187,7 @@ const form = reactive({
   password: '',
   password_confirmation: '',
   role: '',
+  birth_year: null,
 });
 
 const touched = reactive({
@@ -179,6 +196,7 @@ const touched = reactive({
   email: false,
   password: false,
   password_confirmation: false,
+  birth_year: false,
 });
 
 // Validators
@@ -195,13 +213,19 @@ const isPasswordValid = computed(() => form.password.length >= 8);
 
 const isPasswordMatchValid = computed(() => form.password === form.password_confirmation);
 
+const isBirthYearValid = computed(() => {
+  if (form.role !== 'Student') { return true; }
+  return form.birth_year && form.birth_year >= 2000 && form.birth_year <= currentYear;
+});
+
 const isFormValid = computed(() => 
   isFirstNameValid.value &&
   isLastNameValid.value &&
   isEmailValid.value &&
   isPasswordValid.value &&
   isPasswordMatchValid.value &&
-  form.role !== ''
+  form.role !== '' &&
+  isBirthYearValid.value
 );
 
 async function handleRegister() {
@@ -227,6 +251,7 @@ async function handleRegister() {
       password: form.password,
       password_confirmation: form.password_confirmation,
       role: form.role,
+      birth_year: form.role === 'Student' ? form.birth_year : undefined,
     });
 
     router.push('/');

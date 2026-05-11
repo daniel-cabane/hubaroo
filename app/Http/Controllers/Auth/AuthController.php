@@ -26,6 +26,11 @@ class AuthController extends Controller
 
         $user->assignRole($request->validated('role'));
 
+        if ($request->validated('role') === 'Student' && $request->validated('birth_year') !== null) {
+            $age = (int) date('Y') - (int) $request->validated('birth_year');
+            $user->update(['mastery' => max($age - 8, 1) * 150]);
+        }
+
         Auth::login($user);
 
         return response()->json([

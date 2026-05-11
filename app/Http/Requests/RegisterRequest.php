@@ -27,6 +27,7 @@ class RegisterRequest extends FormRequest
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'in:Teacher,Student'],
+            'birth_year' => ['required_if:role,Student', 'nullable', 'integer', 'min:1900', 'max:'.date('Y')],
         ];
     }
 }

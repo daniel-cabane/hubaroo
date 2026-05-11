@@ -29,6 +29,7 @@ class User extends Authenticatable
         'password',
         'google_id',
         'email_verified_at',
+        'mastery',
     ];
 
     /**
@@ -49,6 +50,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'mastery',
     ];
 
     /**
@@ -61,6 +63,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'mastery' => 'integer',
         ];
     }
 

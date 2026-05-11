@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\AttemptNameUpdated;
 use App\Events\AttemptUpdated;
 use App\Http\Requests\UpdateAnswerRequest;
+use App\Jobs\UpdateMasteryAndDifficulty;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
 use App\Models\User;
@@ -163,6 +164,8 @@ class AttemptController extends Controller
         ]);
 
         $score = $this->gradingService->gradeAndSave($attempt);
+
+        UpdateMasteryAndDifficulty::dispatch($attempt);
 
         $fresh = $this->maskCorrectionIfNeeded($attempt->fresh());
         broadcast(new AttemptUpdated($fresh));

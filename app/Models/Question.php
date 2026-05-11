@@ -21,6 +21,7 @@ class Question extends Model
         'image',
         'correct_answer',
         'tier',
+        'difficulty',
     ];
 
     /**
@@ -32,6 +33,7 @@ class Question extends Model
     {
         return [
             'tier' => 'integer',
+            'difficulty' => 'integer',
         ];
     }
 

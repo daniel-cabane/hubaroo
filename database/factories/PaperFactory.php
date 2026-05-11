@@ -35,9 +35,13 @@ class PaperFactory extends Factory
     public function withQuestions(): static
     {
         return $this->afterCreating(function (Paper $paper) {
+            $levelValues = ['e' => 1, 'b' => 2, 'c' => 3, 'j' => 4, 'p' => 4, 's' => 5];
+            $level = $levelValues[$paper->level] ?? 1;
+
             for ($i = 1; $i <= 26; $i++) {
                 $tier = $i <= 8 ? 1 : ($i <= 16 ? 2 : ($i <= 24 ? 3 : 4));
-                $question = Question::factory()->create(['tier' => $tier]);
+                $difficulty = 300 * $level + 100 * (int) round(pow(2, $tier - 1));
+                $question = Question::factory()->create(['tier' => $tier, 'difficulty' => $difficulty]);
                 $paper->questions()->attach($question->id, ['order' => $i]);
             }
         });
