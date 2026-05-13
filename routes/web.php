@@ -6,7 +6,11 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\BugReportController;
+use App\Http\Controllers\CourseController;
 use App\Http\Controllers\DivisionController;
+use App\Http\Controllers\JumpAttemptController;
+use App\Http\Controllers\JumpController;
+use App\Http\Controllers\JumpRejoinDemandController;
 use App\Http\Controllers\KangourouSessionController;
 use App\Http\Controllers\PaperController;
 use App\Http\Controllers\RejoinDemandController;
@@ -101,6 +105,27 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/bug-reports/{bugReport}', [AdminController::class, 'updateBugReport'])->name('admin.bug-reports.update');
         Route::delete('/bug-reports/{bugReport}', [AdminController::class, 'destroyBugReport'])->name('admin.bug-reports.destroy');
     });
+
+    // Courses & Jumps
+    Route::get('/api/divisions/{division}/courses', [CourseController::class, 'index'])->name('courses.index');
+    Route::post('/api/divisions/{division}/courses', [CourseController::class, 'store'])->name('courses.store');
+    Route::patch('/api/courses/{course}', [CourseController::class, 'update'])->name('courses.update');
+    Route::delete('/api/courses/{course}', [CourseController::class, 'destroy'])->name('courses.destroy');
+    Route::get('/api/courses/{course}/details', [CourseController::class, 'details'])->name('courses.details');
+
+    Route::post('/api/courses/{course}/jumps', [JumpController::class, 'store'])->name('jumps.store');
+    Route::patch('/api/jumps/{jump}', [JumpController::class, 'update'])->name('jumps.update');
+    Route::delete('/api/jumps/{jump}', [JumpController::class, 'destroy'])->name('jumps.destroy');
+
+    Route::post('/api/jumps/{jump}/attempts', [JumpAttemptController::class, 'store'])->name('jump-attempts.store');
+    Route::get('/api/jump-attempts/{jumpAttempt}', [JumpAttemptController::class, 'show'])->name('jump-attempts.show');
+    Route::patch('/api/jump-attempts/{jumpAttempt}/answer', [JumpAttemptController::class, 'updateAnswer'])->name('jump-attempts.updateAnswer');
+    Route::post('/api/jump-attempts/{jumpAttempt}/submit', [JumpAttemptController::class, 'submit'])->name('jump-attempts.submit');
+
+    Route::post('/api/jump-attempts/{jumpAttempt}/rejoin-demand', [JumpRejoinDemandController::class, 'store'])->name('jump-rejoin-demands.store');
+    Route::get('/api/my/jump-rejoin-demands', [JumpRejoinDemandController::class, 'myIndex'])->name('jump-rejoin-demands.myIndex');
+    Route::post('/api/jump-rejoin-demands/{jumpRejoinDemand}/approve', [JumpRejoinDemandController::class, 'approve'])->name('jump-rejoin-demands.approve');
+    Route::delete('/api/jump-rejoin-demands/{jumpRejoinDemand}', [JumpRejoinDemandController::class, 'reject'])->name('jump-rejoin-demands.reject');
 });
 
 Route::fallback(function () {

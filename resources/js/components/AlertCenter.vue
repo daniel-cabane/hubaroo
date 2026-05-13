@@ -73,9 +73,88 @@
       </template>
 
       <!-- Teacher demands -->
-      <div v-if="demandStore.demands.length === 0 && demandStore.studentDemands.length === 0" class="px-4 py-6 text-center text-sm text-text-muted">
+      <div v-if="demandStore.demands.length === 0 && demandStore.studentDemands.length === 0 && jumpDemandStore.demands.length === 0 && jumpDemandStore.studentDemands.length === 0" class="px-4 py-6 text-center text-sm text-text-muted">
         Aucune demande en attente
       </div>
+
+      <!-- Jump teacher demands -->
+      <div class="divide-y divide-border">
+        <div
+          v-for="jd in jumpDemandStore.demands"
+          :key="'jd-' + jd.id"
+          class="px-4 py-4 space-y-3"
+        >
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="text-sm font-semibold text-text-main">{{ jd.attempt?.user?.name || 'Élève' }}</p>
+              <p class="text-xs text-text-muted">{{ jd.attempt?.jump?.course?.title }}</p>
+              <p class="text-xs text-text-muted font-mono">Saut #{{ jd.attempt?.jump_id }} · {{ jd.attempt?.answered_count ?? '?' }} rép. · {{ formatTermination(jd.attempt?.termination) }}</p>
+            </div>
+            <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(jd.created_at) }}</span>
+          </div>
+          <div class="flex gap-2">
+            <button
+              @click="approveJumpDemand(jd)"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
+            >
+              Accepter
+            </button>
+            <button
+              @click="jumpDemandStore.rejectDemand(jd.id)"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
+            >
+              Refuser
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Jump student demands -->
+      <template v-if="jumpDemandStore.studentDemands.length > 0">
+        <div
+          v-for="jsd in jumpDemandStore.studentDemands"
+          :key="'jsd-' + jsd.id"
+          class="px-4 py-3 border-b border-border space-y-2"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-sm font-semibold text-text-main">Demande de reprise (Saut)</p>
+            <span
+              v-if="jsd.status === 'pending'"
+              class="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium whitespace-nowrap"
+            >En cours d'examen</span>
+            <span
+              v-else-if="jsd.status === 'approved'"
+              class="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium whitespace-nowrap"
+            >Acceptée</span>
+            <span
+              v-else
+              class="text-xs px-2 py-0.5 rounded-full bg-error/10 text-error font-medium whitespace-nowrap"
+            >Refusée</span>
+          </div>
+          <div v-if="jsd.status === 'approved'" class="flex gap-2">
+            <router-link
+              :to="{ name: 'JumpAttempt', params: { jumpId: jsd.jumpId, attemptId: jsd.attemptId } }"
+              @click="isOpen = false; jumpDemandStore.removeStudentDemand(jsd.id)"
+              class="flex-1 text-center px-3 py-1.5 text-xs font-medium rounded-lg bg-success text-white hover:bg-success/80 transition-colors"
+            >
+              Rejoindre le saut
+            </router-link>
+            <button
+              @click="jumpDemandStore.removeStudentDemand(jsd.id)"
+              class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              Ignorer
+            </button>
+          </div>
+          <button
+            v-else-if="jsd.status === 'denied'"
+            @click="jumpDemandStore.removeStudentDemand(jsd.id)"
+            class="text-xs text-text-muted hover:text-text-main transition-colors"
+          >
+            Fermer
+          </button>
+        </div>
+      </template>
 
       <div class="divide-y divide-border">
         <div
@@ -151,15 +230,22 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Bell } from 'lucide-vue-next';
 import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';
+import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 import { useAuthStore } from '@/stores/authStore';
 
 const demandStore = useRejoinDemandStore();
+const jumpDemandStore = useJumpRejoinDemandStore();
 const authStore = useAuthStore();
 const isOpen = ref(false);
 const container = ref(null);
 const extraTimes = reactive({});
 
-const totalCount = computed(() => demandStore.demands.length + demandStore.studentDemands.length);
+const totalCount = computed(() =>
+  demandStore.demands.length +
+  demandStore.studentDemands.length +
+  jumpDemandStore.demands.length +
+  jumpDemandStore.studentDemands.filter(d => d.status !== 'pending').length
+);
 
 function toggle() {
   isOpen.value = !isOpen.value;
@@ -207,6 +293,20 @@ async function reject(demand) {
   delete extraTimes[demand.id];
 }
 
+async function approveJumpDemand(demand) {
+  await jumpDemandStore.approveDemand(demand.id);
+}
+
+function listenForStudentJumpDemand(demand) {
+  window.Echo.channel(`jump-rejoin.${demand.id}`)
+    .listen('.JumpRejoinDemandResolved', (event) => {
+      jumpDemandStore.resolveStudentDemand(demand.id, event.resolution, event.extra_time);
+      if (event.resolution === 'approved') {
+        isOpen.value = true;
+      }
+    });
+}
+
 function listenForStudentDemand(demand) {
   window.Echo.channel(`rejoin.${demand.id}`)
     .listen('.RejoinDemandResolved', (event) => {
@@ -224,14 +324,22 @@ onMounted(async () => {
   demandStore.studentDemands
     .filter(d => d.status === 'pending')
     .forEach(listenForStudentDemand);
+
+  jumpDemandStore.studentDemands
+    .filter(d => d.status === 'pending')
+    .forEach(listenForStudentJumpDemand);
 });
 
 async function setupTeacherChannel() {
   await demandStore.fetchMyDemands();
+  await jumpDemandStore.fetchMyDemands();
 
   window.Echo.private(`App.Models.User.${authStore.user.id}`)
     .listen('.RejoinDemandCreated', (event) => {
       demandStore.addDemand(event.demand);
+    })
+    .listen('.JumpRejoinDemandCreated', (event) => {
+      jumpDemandStore.addDemand(event.demand);
     });
 }
 
@@ -253,11 +361,22 @@ watch(() => demandStore.studentDemands.length, (newLen, oldLen) => {
   }
 });
 
+// Subscribe whenever a new jump student demand is added
+watch(() => jumpDemandStore.studentDemands.length, (newLen, oldLen) => {
+  if (newLen > oldLen) {
+    const newest = jumpDemandStore.studentDemands[0];
+    if (newest?.status === 'pending') {
+      listenForStudentJumpDemand(newest);
+    }
+  }
+});
+
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
   if (authStore.user?.id) {
     window.Echo.private(`App.Models.User.${authStore.user.id}`)
-      .stopListening('.RejoinDemandCreated');
+      .stopListening('.RejoinDemandCreated')
+      .stopListening('.JumpRejoinDemandCreated');
   }
 });
 </script>

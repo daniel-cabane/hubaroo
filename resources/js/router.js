@@ -14,6 +14,9 @@ import MySessionsView from "./components/views/my-sessions-view.vue";
 import MyAttemptsView from "./components/views/my-attempts-view.vue";
 import MyDivisionsView from "./components/views/my-divisions-view.vue";
 import DivisionDetailsView from "./components/views/division-details-view.vue";
+import CourseDetailsView from "./components/views/course-details-view.vue";
+import JumpAttemptView from "./components/views/jump-attempt-view.vue";
+import JumpResultsView from "./components/views/jump-results-view.vue";
 import PaperView from "./components/views/paper-view.vue";
 import AdminView from "./components/views/admin-view.vue";
 import PrivacyPolicyView from "./components/views/privacy-policy-view.vue";
@@ -104,6 +107,24 @@ const routes = [
         path: "/my/divisions/:id",
         name: "DivisionDetails",
         component: DivisionDetailsView,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: "/my/divisions/:id/courses/:courseId",
+        name: "CourseDetails",
+        component: CourseDetailsView,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: "/parcours/jump/:jumpId/attempt/:attemptId?",
+        name: "JumpAttempt",
+        component: JumpAttemptView,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: "/parcours/jump/:jumpId/results/:attemptId",
+        name: "JumpResults",
+        component: JumpResultsView,
         meta: { requiresAuth: true }
     },
     {

@@ -249,6 +249,39 @@
           </ul>
         </div>
 
+        <!-- Courses (Parcours) -->
+        <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-text-main dark:text-surface">Parcours</h3>
+            <button
+              @click="showNewCourseModal = true"
+              class="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary text-surface rounded-lg hover:bg-primary-hover transition-colors cursor-pointer"
+            >
+              <Plus class="w-4 h-4" />
+              Nouveau
+            </button>
+          </div>
+          <div v-if="!courseStore.courses.length" class="text-sm text-text-muted">Aucun parcours.</div>
+          <ul v-else class="space-y-2">
+            <li
+              v-for="course in courseStore.courses"
+              :key="course.id"
+              class="flex items-center justify-between py-1"
+            >
+              <router-link
+                :to="{ name: 'CourseDetails', params: { id: divisionId, courseId: course.id } }"
+                class="text-sm font-medium text-primary hover:underline"
+              >
+                {{ course.title }}
+              </router-link>
+              <div class="flex items-center gap-2">
+                <span v-if="course.archived" class="text-xs bg-gray-200 dark:bg-gray-700 text-text-muted px-2 py-0.5 rounded-full">Archivé</span>
+                <span class="text-xs text-text-muted">{{ course.jumps_count ?? 0 }} saut{{ (course.jumps_count ?? 0) !== 1 ? 's' : '' }}</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
         <!-- Expired Sessions with Attempts -->
         <div v-if="expiredSessionsWithAttempts.length > 0" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
           <h3 class="font-semibold text-text-main dark:text-surface">Sessions expirées</h3>
@@ -278,8 +311,8 @@
     <!-- Student View -->
     <template v-else-if="!isTeacher && divisionStore.division">
       <div class="mb-6">
-        <h2 class="text-2xl font-bold text-text-main dark:text-surface">{{ divisionStore.division.name }}</h2>
-        <p class="text-text-muted text-sm mt-1">{{ divisionStore.division.teacher?.name }}</p>
+        <h2 class="text-8xl text-center font-bold text-text-main dark:text-surface">{{ divisionStore.division.name }}</h2>
+        <p class="text-text-muted text-center text-sm mt-1">{{ divisionStore.division.teacher?.name }}</p>
       </div>
 
       <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-3">Sessions disponibles</h3>
@@ -297,7 +330,172 @@
           <p class="text-sm text-text-muted mt-1">{{ formatTimeUntilExpiration(session.expires_at) }}</p>
         </router-link>
       </div>
+
+      <!-- Courses (student view) -->
+      <template v-if="courseStore.courses.length">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mt-8 mb-4">Parcours</h3>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 mb-4 border-b border-border overflow-x-auto">
+          <button
+            v-for="course in courseStore.courses"
+            :key="course.id"
+            @click="activeCourseId = course.id"
+            class="px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors cursor-pointer"
+            :class="activeCourseId === course.id
+              ? 'border-primary text-primary'
+              : 'border-transparent text-text-muted hover:text-text-main'"
+          >
+            {{ course.title }}
+          </button>
+        </div>
+
+        <!-- Active tab content -->
+        <div v-if="activeCourse" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-5">
+          <!-- Tab header -->
+          <div class="flex items-center justify-between mb-5">
+            <p class="font-semibold text-text-main dark:text-surface">{{ activeCourse.title }}</p>
+            <p class="text-2xl font-bold text-primary">{{ activeCourseTotal }}</p>
+            <router-link
+              v-if="activeCourseActiveJump"
+              :to="{ name: 'JumpAttempt', params: { jumpId: activeCourseActiveJump.id } }"
+              class="px-4 py-2 rounded-lg bg-primary text-surface hover:bg-primary-hover transition-colors text-sm font-medium"
+            >
+              Saut actif — Commencer
+            </router-link>
+            <span v-else class="text-sm text-text-muted">Aucun saut actif</span>
+          </div>
+
+          <!-- Graph toggle -->
+          <div class="flex items-center gap-3 mb-4" v-if="activeCourseExpiredJumps.length">
+            <span class="text-xs text-text-muted">Score par saut</span>
+            <button
+              @click="graphCumulative = !graphCumulative"
+              :class="[
+                'relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer',
+                graphCumulative ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
+              ]"
+            >
+              <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform', graphCumulative ? 'translate-x-4.5' : 'translate-x-0.5']" />
+            </button>
+            <span class="text-xs text-text-muted">Total cumulé</span>
+          </div>
+
+          <!-- Line graph -->
+          <div v-if="activeCourseExpiredJumps.length" ref="svgContainer" class="w-full">
+            <svg :viewBox="`0 0 ${svgW} ${svgH}`" class="w-full" style="height:180px" preserveAspectRatio="none">
+              <!-- Grid lines -->
+              <line v-for="i in 4" :key="i"
+                :x1="svgPad" :y1="svgPad + (i - 1) * (svgH - 2 * svgPad) / 3"
+                :x2="svgW - svgPad" :y2="svgPad + (i - 1) * (svgH - 2 * svgPad) / 3"
+                stroke="currentColor" stroke-opacity="0.08" stroke-width="1"
+              />
+              <!-- Zero line -->
+              <line
+                :x1="svgPad" :y1="svgYZero"
+                :x2="svgW - svgPad" :y2="svgYZero"
+                stroke="currentColor" stroke-opacity="0.15" stroke-width="1"
+              />
+              <!-- Area fill -->
+              <path :d="svgAreaPath" fill="var(--color-primary)" fill-opacity="0.08" />
+              <!-- Line -->
+              <polyline :points="svgLinePoints" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+              <!-- Dots -->
+              <g v-for="(pt, i) in svgPoints" :key="i" style="cursor:pointer" @click="openJumpDetail(pt.jump)">
+                <circle :cx="pt.x" :cy="pt.y" r="7" fill="var(--color-primary)" fill-opacity="0.15" />
+                <circle :cx="pt.x" :cy="pt.y" r="4" fill="var(--color-primary)" />
+                <text :x="pt.x" :y="pt.y - 12" text-anchor="middle" font-size="16" fill="currentColor" opacity="0.7">{{ pt.label }}</text>
+              </g>
+              <!-- X labels -->
+              <text v-for="(pt, i) in svgPoints" :key="'l' + i"
+                :x="pt.x" :y="svgH - 4"
+                text-anchor="middle" font-size="14" fill="currentColor" opacity="0.6"
+              >S{{ i + 1 }}</text>
+            </svg>
+          </div>
+          <p v-else class="text-sm text-text-muted text-center py-6">Aucun saut terminé pour l'instant.</p>
+        </div>
+      </template>
     </template>
+
+    <!-- Jump Detail Modal (student) -->
+    <div
+      v-if="showJumpDetailModal && selectedJumpDetail"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      @click.self="showJumpDetailModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-border">
+          <div>
+            <h3 class="text-lg font-semibold text-text-main dark:text-surface">Saut {{ jumpDetailNumber(selectedJumpDetail.jump) }}</h3>
+            <p class="text-sm text-text-muted">{{ formatJumpDate(selectedJumpDetail.jump.created_at) }}</p>
+          </div>
+          <button @click="showJumpDetailModal = false" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div v-if="jumpDetailLoading" class="flex items-center justify-center p-10">
+          <RefreshCw class="w-6 h-6 animate-spin text-text-muted" />
+        </div>
+        <div v-else class="p-4 overflow-y-auto flex-1 space-y-3">
+          <p class="text-center text-3xl font-bold text-primary mb-1">Score : {{ selectedJumpDetail.attempt.score }}</p>
+          <div
+            v-for="(item, idx) in selectedJumpDetail.attempt.question_list"
+            :key="idx"
+            class="flex flex-col rounded-lg border overflow-hidden"
+            :class="{
+              'border-success': item.status === 'correct',
+              'border-error': item.status === 'incorrect',
+              'border-border': item.status === 'pending',
+            }"
+          >
+            <img
+              v-if="item.image"
+              :src="'/' + item.image"
+              :alt="'Question ' + (idx + 1)"
+              class="w-full object-contain bg-gray-50 dark:bg-gray-800 select-none pointer-events-none"
+              draggable="false"
+              oncontextmenu="return false;"
+            />
+            <div
+              class="flex items-center justify-between p-3"
+              :class="{
+                'bg-success/5': item.status === 'correct',
+                'bg-error/5': item.status === 'incorrect',
+              }"
+            >
+              <div class="flex items-center gap-3">
+                <span
+                  class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                  :class="{
+                    'bg-success text-white': item.status === 'correct',
+                    'bg-error text-white': item.status === 'incorrect',
+                    'bg-gray-200 dark:bg-gray-700 text-text-muted': item.status === 'pending',
+                  }"
+                >{{ idx + 1 }}</span>
+                <div>
+                  <p class="text-sm font-medium text-text-main dark:text-surface">Question #{{ item.id }}</p>
+                  <p class="text-xs text-text-muted">Difficulté : {{ item.difficulty }}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-sm font-medium"
+                  :class="{
+                    'text-success': item.status === 'correct',
+                    'text-error': item.status === 'incorrect',
+                    'text-text-muted': item.status === 'pending',
+                  }"
+                >
+                  {{ item.status === 'correct' ? '+' + item.difficulty : item.status === 'incorrect' ? '0' : '—' }}
+                </p>
+                <p v-if="item.answer" class="text-xs text-text-muted">Réponse : {{ item.answer }}</p>
+                <p v-if="item.status === 'incorrect' && item.correct_answer" class="text-xs text-success font-medium">Correcte : {{ item.correct_answer }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Expired Session Attempts Modal -->
     <div
@@ -557,6 +755,32 @@
       </div>
     </div>
 
+    <!-- New Course Modal -->
+    <div
+      v-if="showNewCourseModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="showNewCourseModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-sm">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Nouveau parcours</h3>
+        <form @submit.prevent="handleCreateCourse" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Titre</label>
+            <input
+              v-model="newCourseTitle"
+              type="text"
+              required
+              class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            />
+          </div>
+          <div class="flex justify-end gap-2">
+            <button type="button" @click="showNewCourseModal = false" class="px-4 py-2 text-sm text-text-muted cursor-pointer hover:text-text-main transition-colors">Annuler</button>
+            <button type="submit" :disabled="courseStore.isLoading" class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium disabled:opacity-50 cursor-pointer transition-colors">Créer</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div
       v-if="showDeleteConfirm"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -583,19 +807,121 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import axios from 'axios';
 import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
+import { useCourseStore } from '@/stores/courseStore';
 import DivisionAttemptsTable from '@/components/DivisionAttemptsTable.vue';
+import { Plus } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const divisionStore = useDivisionStore();
 const sessionStore = useKangourouSessionStore();
+const courseStore = useCourseStore();
+
+const showNewCourseModal = ref(false);
+const newCourseTitle = ref('');
+
+// Student course tabs & graph
+const activeCourseId = ref(null);
+const graphCumulative = ref(true);
+
+const showJumpDetailModal = ref(false);
+const selectedJumpDetail = ref(null);
+const jumpDetailLoading = ref(false);
+
+const activeCourse = computed(() => {
+  if (!courseStore.courses.length) return null;
+  if (activeCourseId.value) {
+    return courseStore.courses.find(c => c.id === activeCourseId.value) ?? courseStore.courses[0];
+  }
+  // Default: course with the highest jump id
+  let best = courseStore.courses[0];
+  let bestJumpId = -1;
+  for (const course of courseStore.courses) {
+    for (const jump of course.jumps ?? []) {
+      if (jump.id > bestJumpId) {
+        bestJumpId = jump.id;
+        best = course;
+      }
+    }
+  }
+  return best;
+});
+
+const activeCourseActiveJump = computed(() =>
+  activeCourse.value?.jumps?.find(j => j.status === 'active') ?? null
+);
+
+const activeCourseExpiredJumps = computed(() =>
+  (activeCourse.value?.jumps ?? []).filter(j => j.status === 'expired')
+);
+
+const activeCourseTotal = computed(() =>
+  activeCourseExpiredJumps.value.reduce((sum, j) => sum + (j.attempts?.[0]?.score ?? 0), 0)
+);
+
+// SVG graph constants
+const svgW = ref(600);
+const svgContainer = ref(null);
+const svgH = 160;
+const svgPad = 30;
+let svgResizeObserver = null;
+
+const svgGraphValues = computed(() => {
+  const jumps = activeCourseExpiredJumps.value;
+  if (!jumps.length) return [];
+  const scores = jumps.map(j => j.attempts?.[0]?.score ?? 0);
+  if (graphCumulative.value) {
+    let acc = 0;
+    return scores.map(s => { acc += s; return acc; });
+  }
+  return scores;
+});
+
+const svgYZero = computed(() => {
+  const vals = svgGraphValues.value;
+  if (!vals.length) return svgH / 2;
+  const minVal = Math.min(0, ...vals);
+  const maxVal = Math.max(0, ...vals);
+  const range = maxVal - minVal || 1;
+  return svgPad + ((maxVal - 0) / range) * (svgH - 2 * svgPad);
+});
+
+const svgPoints = computed(() => {
+  const vals = svgGraphValues.value;
+  if (!vals.length) return [];
+  const n = vals.length;
+  const minVal = Math.min(0, ...vals);
+  const maxVal = Math.max(0, ...vals);
+  const range = maxVal - minVal || 1;
+  const xStep = n > 1 ? (svgW.value - 2 * svgPad) / (n - 1) : 0;
+  return vals.map((v, i) => ({
+    x: svgPad + i * xStep,
+    y: svgPad + ((maxVal - v) / range) * (svgH - 2 * svgPad),
+    label: v,
+    jump: activeCourseExpiredJumps.value[i],
+  }));
+});
+
+const svgLinePoints = computed(() =>
+  svgPoints.value.map(p => `${p.x},${p.y}`).join(' ')
+);
+
+const svgAreaPath = computed(() => {
+  const pts = svgPoints.value;
+  if (!pts.length) return '';
+  const zero = svgYZero.value;
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  return `M${first.x},${zero} ` + pts.map(p => `L${p.x},${p.y}`).join(' ') + ` L${last.x},${zero} Z`;
+});
 
 const divisionId = computed(() => Number(route.params.id));
 const isTeacher = computed(() => {
@@ -655,6 +981,17 @@ function isSessionOpen(sessionId) {
   return openSessionIds.value.includes(sessionId);
 }
 
+watch(svgContainer, (el) => {
+  svgResizeObserver?.disconnect();
+  if (el) {
+    svgResizeObserver = new ResizeObserver(entries => {
+      svgW.value = entries[0].contentRect.width || 600;
+    });
+    svgResizeObserver.observe(el);
+    svgW.value = el.offsetWidth || 600;
+  }
+});
+
 onMounted(async () => {
   await divisionStore.fetchDivision(divisionId.value);
   if (divisionStore.division) {
@@ -663,6 +1000,7 @@ onMounted(async () => {
   if (isTeacher.value) {
     await sessionStore.fetchMySessions();
   }
+  await courseStore.fetchCourses(divisionId.value);
 
   window.Echo.private(`division.${divisionId.value}`)
     .listen('.StudentJoinedDivision', (e) => {
@@ -699,6 +1037,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  svgResizeObserver?.disconnect();
   window.Echo.leave(`division.${divisionId.value}`);
   if (expiredSessionChannelId.value !== null) {
     window.Echo.leave(`session.${expiredSessionChannelId.value}`);
@@ -707,6 +1046,31 @@ onUnmounted(() => {
     window.Echo.leave(`session.${activeSessionChannelId.value}`);
   }
 });
+
+function jumpDetailNumber(jump) {
+  if (!activeCourse.value?.jumps) return '';
+  const sorted = [...activeCourseExpiredJumps.value].sort((a, b) => a.id - b.id);
+  return sorted.findIndex(j => j.id === jump.id) + 1;
+}
+
+function formatJumpDate(val) {
+  if (!val) return '';
+  return new Date(val).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+async function openJumpDetail(jump) {
+  const attempt = jump?.attempts?.[0];
+  if (!attempt?.id) return;
+  showJumpDetailModal.value = true;
+  jumpDetailLoading.value = true;
+  selectedJumpDetail.value = { jump, attempt };
+  try {
+    const res = await axios.get(`/api/jump-attempts/${attempt.id}`);
+    selectedJumpDetail.value = { jump, attempt: res.data.attempt };
+  } finally {
+    jumpDetailLoading.value = false;
+  }
+}
 
 async function handleRename() {
   await divisionStore.updateDivision(divisionId.value, { name: editName.value });
@@ -887,6 +1251,17 @@ function closeActiveSessionModal() {
     activeSessionChannelId.value = null;
   }
   activeSessionDetail.value = null;
+}
+
+async function handleCreateCourse() {
+  try {
+    await courseStore.createCourse(divisionId.value, newCourseTitle.value);
+    showNewCourseModal.value = false;
+    newCourseTitle.value = '';
+    await courseStore.fetchCourses(divisionId.value);
+  } catch {
+    // error handled by store
+  }
 }
 
 async function handleToggleSession(session) {

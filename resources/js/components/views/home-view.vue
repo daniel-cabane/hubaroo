@@ -72,6 +72,43 @@
       </button>
     </div>
 
+    <!-- Active Jumps Overlay -->
+    <div v-if="authStore.isAuthenticated && !authStore.user?.is_teacher && showActiveJumps && activeJumps.length > 0" class="fixed top-20 left-0 right-0 z-39 max-h-[400px] overflow-y-auto bg-gradient-to-b from-success/10 to-success/5 border-b border-success/20 p-4">
+      <div class="container mx-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface">Sauts en cours</h3>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <router-link
+            v-for="jump in activeJumps"
+            :key="jump.id"
+            :to="{ name: 'JumpAttempt', params: { jumpId: jump.id } }"
+            class="group flex flex-col gap-2 p-3 rounded-lg bg-surface dark:bg-gray-900 border border-success/30 hover:border-success hover:shadow-md transition-all"
+          >
+            <div class="text-xs text-text-muted flex justify-end">{{ jump.division_name }}</div>
+            <p class="font-medium text-lg text-text-main dark:text-surface truncate">{{ jump.course?.title }}</p>
+            <p class="text-xs text-text-muted">{{ jump.nb_questions }} questions · {{ jump.time }} min</p>
+          </router-link>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toggle Button for Jumps -->
+    <div v-if="authStore.isAuthenticated && !authStore.user?.is_teacher && activeJumps.length > 0" class="fixed top-20 right-48 z-40">
+      <button
+        @click="showActiveJumps = !showActiveJumps"
+        :class="[
+          'px-3 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2',
+          showActiveJumps
+            ? 'bg-success text-white shadow-lg'
+            : 'bg-success/10 text-success hover:bg-success/20'
+        ]"
+      >
+        <span class="inline-flex items-center justify-center w-5 h-5 bg-white/20 rounded-full text-xs">{{ activeJumps.length }}</span>
+        {{ showActiveJumps ? 'Masquer' : 'Sauts actifs' }}
+      </button>
+    </div>
+
     <div class="flex items-center justify-center min-h-[calc(100vh-64px)]">
       <div 
         class=" gap-8 max-w-3xl w-full justify-items-center"
@@ -172,12 +209,15 @@ import { PlusCircle, LogIn, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
+import { useCourseStore } from '@/stores/courseStore';
 
 const authStore = useAuthStore();
 const divisionStore = useDivisionStore();
 const attemptStore = useAttemptStore();
+const courseStore = useCourseStore();
 
 const showActiveSessions = ref(true);
+const showActiveJumps = ref(true);
 const showClaimModal = ref(false);
 const selectedClaimIds = ref([]);
 const isClaiming = ref(false);
@@ -212,6 +252,18 @@ const activeSessions = computed(() => {
     }
   });
   return sessions;
+});
+
+const activeJumps = computed(() => {
+  const jumps = [];
+  divisionStore.divisions.forEach(division => {
+    if (division.active_jumps) {
+      division.active_jumps.forEach(jump => {
+        jumps.push({ ...jump, division_name: division.name });
+      });
+    }
+  });
+  return jumps;
 });
 
 async function handleAcceptInvite(inviteId) {
@@ -278,6 +330,15 @@ onMounted(async () => {
           const div = divisionStore.divisions.find(d => d.id === division.id);
           if (!div) { return; }
           div.kangourou_sessions = (div.kangourou_sessions ?? []).filter(s => s.id !== e.session.id);
+        })
+        .listen('.JumpActivated', (e) => {
+          const div = divisionStore.divisions.find(d => d.id === division.id);
+          if (!div) { return; }
+          if (!div.active_jumps) { div.active_jumps = []; }
+          const alreadyExists = div.active_jumps.some(j => j.id === e.jump.id);
+          if (!alreadyExists) {
+            div.active_jumps.push(e.jump);
+          }
         });
     });
 

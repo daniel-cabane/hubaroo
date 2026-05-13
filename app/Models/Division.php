@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Str;
 
 class Division extends Model
@@ -57,6 +58,17 @@ class Division extends Model
     public function kangourouSessions(): BelongsToMany
     {
         return $this->belongsToMany(KangourouSession::class);
+    }
+
+    public function courses(): HasMany
+    {
+        return $this->hasMany(Course::class);
+    }
+
+    public function activeJumps(): HasManyThrough
+    {
+        return $this->hasManyThrough(Jump::class, Course::class)
+            ->where('jumps.status', 'active');
     }
 
     public static function generateCode(): string

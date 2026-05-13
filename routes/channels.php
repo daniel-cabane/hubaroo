@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Division;
+use App\Models\Jump;
 use App\Models\KangourouSession;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -20,6 +21,22 @@ Broadcast::channel('division.{divisionId}', function ($user, $divisionId) {
     if (! $division) {
         return false;
     }
+
+    if ((int) $division->teacher_id === (int) $user->id) {
+        return true;
+    }
+
+    return $division->students()->where('users.id', $user->id)->exists();
+});
+
+Broadcast::channel('jump.{jumpId}', function ($user, $jumpId) {
+    $jump = Jump::with('course.division')->find($jumpId);
+
+    if (! $jump) {
+        return false;
+    }
+
+    $division = $jump->course->division;
 
     if ((int) $division->teacher_id === (int) $user->id) {
         return true;

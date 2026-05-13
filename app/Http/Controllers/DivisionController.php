@@ -32,6 +32,7 @@ class DivisionController extends Controller
             $divisions = $user->divisions()
                 ->with('teacher')
                 ->with('kangourouSessions', fn ($q) => $q->where('status', 'active')->with('paper'))
+                ->with('activeJumps.course')
                 ->withCount('students')
                 ->latest()
                 ->get();

@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ExpireJumps;
 use App\Jobs\ExpireKangourouSessions;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -10,3 +11,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::job(new ExpireKangourouSessions)->everyMinute();
+Schedule::job(new ExpireJumps)->everyMinute();
