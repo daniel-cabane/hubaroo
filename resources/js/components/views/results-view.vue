@@ -35,11 +35,12 @@
       <!-- Delayed correction notice -->
       <div v-if="!correctionAvailable" class="mb-8 p-4 bg-info/10 border border-info/30 rounded-lg text-center space-y-3">
         <p class="text-sm text-text-main dark:text-surface">La correction sera disponible à la fin de la session.</p>
+        <p v-if="terminationLabel" class="text-sm font-medium" :class="attempt.termination === 'submitted' ? 'text-success' : 'text-warning'">{{ terminationLabel }}</p>
         <div v-if="rejoinApproved" class="text-sm text-success font-medium">Demande acceptée ! Consultez le centre d'alertes (🔔) pour rejoindre.</div>
         <div v-else-if="rejoinDenied" class="text-sm text-error font-medium">Votre demande de reprise a été refusée.</div>
         <div v-else-if="pendingDemandId" class="text-sm text-text-muted italic">Demande de reprise envoyée, en attente de validation...</div>
         <button
-          v-else
+          v-else-if="attempt.termination !== 'timeout'"
           @click="requestRejoin"
           :disabled="isRequestingRejoin"
           class="px-4 py-2 rounded-lg bg-info hover:bg-info/80 text-white text-sm font-medium transition-colors disabled:opacity-50"
@@ -134,6 +135,11 @@ const correctAnswers = computed(() => {
 
 const correctionAvailable = computed(() => {
   return correctAnswers.value.length > 0 && correctAnswers.value[0] != null;
+});
+
+const terminationLabel = computed(() => {
+  const map = { blurred: 'Vous avez quitté la page', timeout: 'Temps expiré', submitted: 'Tentative validée' };
+  return map[attempt.value?.termination] ?? null;
 });
 
 function reviewRowClass(answer) {

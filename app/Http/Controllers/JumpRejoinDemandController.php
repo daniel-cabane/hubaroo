@@ -52,6 +52,7 @@ class JumpRejoinDemandController extends Controller
             'status' => 'inProgress',
             'termination' => 'none',
             'extra_time' => $newExtraTime,
+            'timer' => $attempt->timer + $extraTime,
         ]);
 
         broadcast(new JumpRejoinDemandResolved($jumpRejoinDemand, 'approved', $newExtraTime));
@@ -83,6 +84,36 @@ class JumpRejoinDemandController extends Controller
             $query->where('teacher_id', $request->user()->id);
         })->with(['jumpAttempt.user', 'jumpAttempt.jump.course'])->get();
 
-        return response()->json(['demands' => $demands]);
+        $formatted = $demands->map(function ($demand) {
+            $attempt = $demand->jumpAttempt;
+            $answeredCount = collect($attempt->question_list)
+                ->filter(fn ($q) => isset($q['answer']) && $q['answer'] !== null)
+                ->count();
+
+            return [
+                'id' => $demand->id,
+                'created_at' => $demand->created_at,
+                'attempt' => [
+                    'id' => $attempt->id,
+                    'jump_id' => $attempt->jump_id,
+                    'user' => [
+                        'id' => $attempt->user->id,
+                        'name' => $attempt->user->name,
+                    ],
+                    'timer' => $attempt->timer,
+                    'extra_time' => $attempt->extra_time,
+                    'termination' => $attempt->termination,
+                    'status' => $attempt->status,
+                    'answered_count' => $answeredCount,
+                    'jump' => [
+                        'id' => $attempt->jump->id,
+                        'rank' => $attempt->jump->rank,
+                        'course' => ['title' => $attempt->jump->course->title],
+                    ],
+                ],
+            ];
+        });
+
+        return response()->json(['demands' => $formatted]);
     }
 }

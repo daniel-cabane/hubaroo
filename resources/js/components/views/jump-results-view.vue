@@ -16,7 +16,7 @@
         {{ jumpAttemptStore.attempt.jump?.course?.title }}
       </h1>
       <p class="text-text-muted mb-6">
-        Saut {{ jumpAttemptStore.attempt.jump?.id }}
+        Saut {{ jumpAttemptStore.attempt.jump?.rank }}
       </p>
 
       <!-- Awaiting expiry -->
@@ -25,7 +25,9 @@
         <p class="text-lg font-medium text-text-main dark:text-surface">Résultats disponibles après expiration</p>
         <p class="text-sm text-text-muted">Expiration {{ formatRelativeDate(jumpAttemptStore.attempt.jump?.expiration) }}</p>
 
-        <div v-if="jumpAttemptStore.attempt.status === 'finished' && !isJumpExpired" class="pt-4">
+        <p v-if="terminationLabel" class="text-sm font-medium" :class="jumpAttemptStore.attempt.termination === 'submitted' ? 'text-success' : 'text-warning'">{{ terminationLabel }}</p>
+
+        <div v-if="jumpAttemptStore.attempt.status === 'finished' && !isJumpExpired && jumpAttemptStore.attempt.termination !== 'timeout'" class="pt-4">
           <div v-if="!rejoinDemandSent">
             <p class="text-sm text-text-muted mb-3">Avez-vous quitté par erreur ?</p>
             <button
@@ -33,7 +35,7 @@
               :disabled="jumpAttemptStore.isLoading"
               class="px-6 py-2 rounded-lg bg-info hover:bg-info-hover text-surface font-medium cursor-pointer transition-colors disabled:opacity-50"
             >
-              Demander à rejoindre
+              Demander à reprendre
             </button>
           </div>
           <div v-else class="text-success font-medium">
@@ -130,12 +132,18 @@ const jumpRejoinDemandStore = useJumpRejoinDemandStore();
 const rejoinDemandSent = ref(false);
 const currentDemandId = ref(null);
 let expiryWatcher = null;
+let jumpChannel = null;
 
 const questionList = computed(() => jumpAttemptStore.attempt?.question_list ?? []);
 
 const isJumpExpired = computed(() => jumpAttemptStore.attempt?.jump?.status === 'expired');
 
 const correctCount = computed(() => questionList.value.filter(q => q.status === 'correct').length);
+
+const terminationLabel = computed(() => {
+  const map = { blurred: 'Vous avez quitté la page', timeout: 'Temps expiré', submitted: 'Tentative validée' };
+  return map[jumpAttemptStore.attempt?.termination] ?? null;
+});
 
 function formatDate(val) {
   if (!val) return '—';
@@ -159,7 +167,7 @@ function formatRelativeDate(val) {
 async function handleRejoinRequest() {
   try {
     const data = await jumpAttemptStore.createRejoinDemand(jumpAttemptStore.attempt.id);
-    currentDemandId.value = data?.demand?.id;
+    currentDemandId.value = data?.id;
     rejoinDemandSent.value = true;
 
     if (currentDemandId.value) {
@@ -188,12 +196,28 @@ async function handleRejoinRequest() {
 async function loadAttempt() {
   await jumpAttemptStore.fetchAttempt(route.params.attemptId);
 
-  // If not expired, schedule a poll / listen for expiry
-  if (!isJumpExpired.value && jumpAttemptStore.attempt?.jump?.expiration) {
-    const expiresAt = new Date(jumpAttemptStore.attempt.jump.expiration).getTime();
-    const msLeft = expiresAt - Date.now();
-    if (msLeft > 0 && msLeft < 3_600_000) {
-      expiryWatcher = setTimeout(() => loadAttempt(), msLeft + 2000);
+  if (!isJumpExpired.value && jumpAttemptStore.attempt?.jump?.id) {
+    const jumpId = jumpAttemptStore.attempt.jump.id;
+
+    // Listen for real-time expiry event
+    jumpChannel = window.Echo.channel(`jump.${jumpId}`)
+      .listen('.JumpExpired', async () => {
+        if (expiryWatcher) {
+          clearTimeout(expiryWatcher);
+          expiryWatcher = null;
+        }
+        await jumpAttemptStore.fetchAttempt(route.params.attemptId);
+      });
+
+    // Fallback timeout for jumps expiring within the hour (covers missed events)
+    const expiration = jumpAttemptStore.attempt.jump.expiration;
+    if (expiration) {
+      const msLeft = new Date(expiration).getTime() - Date.now();
+      if (msLeft > 0 && msLeft < 3_600_000) {
+        expiryWatcher = setTimeout(async () => {
+          await jumpAttemptStore.fetchAttempt(route.params.attemptId);
+        }, msLeft + 2000);
+      }
     }
   }
 }
@@ -204,6 +228,10 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (expiryWatcher) clearTimeout(expiryWatcher);
+  if (jumpChannel) {
+    window.Echo.leave(`jump.${jumpAttemptStore.attempt?.jump?.id}`);
+    jumpChannel = null;
+  }
   if (currentDemandId.value) {
     window.Echo.leave(`jump-rejoin.${currentDemandId.value}`);
   }

@@ -277,10 +277,11 @@ function handleKeydown(e) {
 }
 
 function startCountdown(timeLimitMinutes, extraTimeSeconds = 0) {
-  // For jumps, deadline = now + remaining time
-  const totalSeconds = timeLimitMinutes * 60 + extraTimeSeconds;
-  const spentSeconds = jumpAttemptStore.attempt.timer ?? 0;
-  remainingSeconds.value = Math.max(0, totalSeconds - spentSeconds);
+  const storedTimer = jumpAttemptStore.attempt.timer ?? 0;
+  // timer stores remaining seconds at last save; 0 means fresh start.
+  remainingSeconds.value = storedTimer > 0
+    ? storedTimer
+    : timeLimitMinutes * 60 + extraTimeSeconds;
 
   timerInterval = setInterval(() => {
     remainingSeconds.value = Math.max(0, remainingSeconds.value - 1);
@@ -346,8 +347,12 @@ onMounted(async () => {
       await jumpAttemptStore.startAttempt(jumpId);
     } catch (err) {
       if (err.response?.status === 409 && err.response?.data?.requires_rejoin) {
-        // Handle rejoin
-        router.replace({ name: 'JumpResults', params: { jumpId, attemptId: err.response.data.attempt.id } });
+        const existingAttempt = err.response.data.attempt;
+        if (existingAttempt?.status === 'inProgress') {
+          router.replace({ name: 'JumpAttempt', params: { jumpId, attemptId: existingAttempt.id } });
+        } else {
+          router.replace({ name: 'JumpResults', params: { jumpId, attemptId: existingAttempt.id } });
+        }
         return;
       }
       throw err;
@@ -361,6 +366,22 @@ onMounted(async () => {
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
+
+    window.Echo.channel(`jump.${route.params.jumpId}`)
+      .listen('.JumpExpired', () => {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        clearInterval(blurInterval);
+        blurInterval = null;
+        showBlurAlarm.value = false;
+        window.removeEventListener('keydown', handleKeydown);
+        window.removeEventListener('blur', handleBlur);
+        window.removeEventListener('focus', handleFocus);
+        router.replace({
+          name: 'JumpResults',
+          params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
+        });
+      });
   }
 });
 
@@ -370,5 +391,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('blur', handleBlur);
   window.removeEventListener('focus', handleFocus);
+  window.Echo.leave(`jump.${route.params.jumpId}`);
 });
 </script>

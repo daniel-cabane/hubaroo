@@ -412,7 +412,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ChevronLeft, Plus, X, Clock, Trash2 } from 'lucide-vue-next';
 import { useCourseStore } from '@/stores/courseStore';
@@ -637,8 +637,30 @@ async function loadDetails() {
   courseData.value = data;
 }
 
+let subscribedJumpIds = [];
+
+function subscribeToActiveJumps() {
+  const activeJumps = courseData.value?.jumps?.filter(j => j.status === 'active') ?? [];
+  for (const jump of activeJumps) {
+    if (subscribedJumpIds.includes(jump.id)) continue;
+    subscribedJumpIds.push(jump.id);
+    window.Echo.channel(`jump.${jump.id}`)
+      .listen('.JumpExpired', async () => {
+        await loadDetails();
+      });
+  }
+}
+
 onMounted(async () => {
   await loadDetails();
   updateAutoQuestions();
+  subscribeToActiveJumps();
+});
+
+onUnmounted(() => {
+  for (const id of subscribedJumpIds) {
+    window.Echo.leave(`jump.${id}`);
+  }
+  subscribedJumpIds = [];
 });
 </script>

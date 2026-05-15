@@ -87,8 +87,8 @@
           <div class="flex items-start justify-between gap-2">
             <div>
               <p class="text-sm font-semibold text-text-main">{{ jd.attempt?.user?.name || 'Élève' }}</p>
-              <p class="text-xs text-text-muted">{{ jd.attempt?.jump?.course?.title }}</p>
-              <p class="text-xs text-text-muted font-mono">Saut #{{ jd.attempt?.jump_id }} · {{ jd.attempt?.answered_count ?? '?' }} rép. · {{ formatTermination(jd.attempt?.termination) }}</p>
+              <p class="text-xs text-text-muted">{{ jd.attempt?.jump?.course?.title }} &nbsp&nbsp·&nbsp&nbsp Saut #{{ jd.attempt?.jump?.rank }} </p>
+              <p class="text-xs text-text-muted font-mono">{{ jd.attempt?.answered_count ?? '?' }} rép. · {{ formatTimer(jd.attempt?.timer) }} restant · {{ formatTermination(jd.attempt?.termination) }}</p>
             </div>
             <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(jd.created_at) }}</span>
           </div>

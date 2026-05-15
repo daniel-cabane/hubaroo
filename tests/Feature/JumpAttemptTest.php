@@ -62,6 +62,23 @@ test('student gets 409 with requires_rejoin when attempt already exists', functi
     $response->assertStatus(409)->assertJsonPath('requires_rejoin', true);
 });
 
+test('409 response includes attempt status so client can route correctly', function () {
+    JumpAttempt::create([
+        'jump_id' => $this->jump->id,
+        'user_id' => $this->student->id,
+        'question_list' => [],
+        'score' => 0,
+        'status' => 'inProgress',
+        'timer' => 0,
+        'extra_time' => 0,
+        'termination' => 'none',
+    ]);
+
+    $response = $this->actingAs($this->student)->postJson("/api/jumps/{$this->jump->id}/attempts");
+
+    $response->assertStatus(409)->assertJsonPath('attempt.status', 'inProgress');
+});
+
 test('student can update an answer', function () {
     $attempt = JumpAttempt::create([
         'jump_id' => $this->jump->id,

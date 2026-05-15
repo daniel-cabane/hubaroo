@@ -342,7 +342,7 @@
             :key="course.id"
             @click="activeCourseId = course.id"
             class="px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors cursor-pointer"
-            :class="activeCourseId === course.id
+            :class="activeCourse?.id === course.id
               ? 'border-primary text-primary'
               : 'border-transparent text-text-muted hover:text-text-main'"
           >
@@ -354,15 +354,24 @@
         <div v-if="activeCourse" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-5">
           <!-- Tab header -->
           <div class="flex items-center justify-between mb-5">
-            <p class="font-semibold text-text-main dark:text-surface">{{ activeCourse.title }}</p>
-            <p class="text-2xl font-bold text-primary">{{ activeCourseTotal }}</p>
+            <p class="text-3xl font-semibold text-text-main dark:text-surface">{{ activeCourse.title }}</p>
+            <p class="text-3xl font-bold text-primary">{{ activeCourseTotal }} pts</p>
             <router-link
-              v-if="activeCourseActiveJump"
+              v-if="canStartActiveJump"
               :to="{ name: 'JumpAttempt', params: { jumpId: activeCourseActiveJump.id } }"
               class="px-4 py-2 rounded-lg bg-primary text-surface hover:bg-primary-hover transition-colors text-sm font-medium"
             >
               Saut actif — Commencer
             </router-link>
+            <button
+              v-else-if="activeJumpRejoinableAttempt && pendingRejoinAttemptId !== activeJumpRejoinableAttempt.id"
+              @click="requestRejoinForActiveJump"
+              :disabled="jumpAttemptStore.isLoading"
+              class="px-4 py-2 rounded-lg bg-info hover:bg-info-hover text-surface text-sm font-medium cursor-pointer transition-colors disabled:opacity-50"
+            >
+              Demander à reprendre
+            </button>
+            <span v-else-if="activeJumpRejoinableAttempt" class="text-sm text-text-muted">Demande envoyée</span>
             <span v-else class="text-sm text-text-muted">Aucun saut actif</span>
           </div>
 
@@ -815,6 +824,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useCourseStore } from '@/stores/courseStore';
+import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
+import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 import DivisionAttemptsTable from '@/components/DivisionAttemptsTable.vue';
 import { Plus } from 'lucide-vue-next';
 
@@ -824,6 +835,8 @@ const authStore = useAuthStore();
 const divisionStore = useDivisionStore();
 const sessionStore = useKangourouSessionStore();
 const courseStore = useCourseStore();
+const jumpAttemptStore = useJumpAttemptStore();
+const jumpRejoinDemandStore = useJumpRejoinDemandStore();
 
 const showNewCourseModal = ref(false);
 const newCourseTitle = ref('');
@@ -859,6 +872,45 @@ const activeCourseActiveJump = computed(() =>
   activeCourse.value?.jumps?.find(j => j.status === 'active') ?? null
 );
 
+// Show the button only if the student has no attempt yet, or was approved to rejoin (status back to inProgress)
+const canStartActiveJump = computed(() => {
+  const jump = activeCourseActiveJump.value;
+  if (!jump) return false;
+  const attempt = jump.attempts?.[0];
+  return !attempt || attempt.status === 'inProgress';
+});
+
+// Show rejoin button if the student finished with blurred/submitted (not timeout)
+const activeJumpRejoinableAttempt = computed(() => {
+  const jump = activeCourseActiveJump.value;
+  if (!jump) return null;
+  const attempt = jump.attempts?.[0];
+  if (!attempt || attempt.status !== 'finished') return null;
+  if (attempt.termination === 'timeout') return null;
+  return attempt;
+});
+
+const pendingRejoinAttemptId = ref(null);
+
+async function requestRejoinForActiveJump() {
+  const attempt = activeJumpRejoinableAttempt.value;
+  if (!attempt) return;
+  try {
+    const data = await jumpAttemptStore.createRejoinDemand(attempt.id);
+    const demandId = data?.id;
+    if (demandId) {
+      pendingRejoinAttemptId.value = attempt.id;
+      jumpRejoinDemandStore.addStudentDemand({
+        id: demandId,
+        attemptId: attempt.id,
+        jumpId: activeCourseActiveJump.value.id,
+      });
+    }
+  } catch {
+    // error handled by store
+  }
+}
+
 const activeCourseExpiredJumps = computed(() =>
   (activeCourse.value?.jumps ?? []).filter(j => j.status === 'expired')
 );
@@ -873,6 +925,20 @@ const svgContainer = ref(null);
 const svgH = 160;
 const svgPad = 30;
 let svgResizeObserver = null;
+let activeJumpChannelId = null;
+
+function subscribeToActiveJump(jumpId) {
+  if (activeJumpChannelId === jumpId) return;
+  if (activeJumpChannelId) {
+    window.Echo.leave(`jump.${activeJumpChannelId}`);
+  }
+  activeJumpChannelId = jumpId;
+  window.Echo.channel(`jump.${jumpId}`)
+    .listen('.JumpExpired', async () => {
+      activeJumpChannelId = null;
+      await courseStore.fetchCourses(divisionId.value);
+    });
+}
 
 const svgGraphValues = computed(() => {
   const jumps = activeCourseExpiredJumps.value;
@@ -1033,12 +1099,24 @@ onMounted(async () => {
         }
         divisionStore.division.kangourou_sessions.push(session);
       }
+    })
+    .listen('.JumpActivated', async (e) => {
+      await courseStore.fetchCourses(divisionId.value);
+      subscribeToActiveJump(e.jump.id);
     });
+
+  // Subscribe to the active jump's channel if one exists
+  if (activeCourseActiveJump.value?.id) {
+    subscribeToActiveJump(activeCourseActiveJump.value.id);
+  }
 });
 
 onUnmounted(() => {
   svgResizeObserver?.disconnect();
   window.Echo.leave(`division.${divisionId.value}`);
+  if (activeJumpChannelId) {
+    window.Echo.leave(`jump.${activeJumpChannelId}`);
+  }
   if (expiredSessionChannelId.value !== null) {
     window.Echo.leave(`session.${expiredSessionChannelId.value}`);
   }

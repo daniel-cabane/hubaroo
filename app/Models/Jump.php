@@ -17,6 +17,11 @@ class Jump extends Model
     /**
      * @var list<string>
      */
+    protected $appends = ['rank'];
+
+    /**
+     * @var list<string>
+     */
     protected $fillable = [
         'course_id',
         'nb_questions',
@@ -63,5 +68,12 @@ class Jump extends Model
     public function isExpired(): bool
     {
         return $this->status === 'expired';
+    }
+
+    public function getRankAttribute(): int
+    {
+        return Jump::where('course_id', $this->course_id)
+            ->where('id', '<=', $this->id)
+            ->count();
     }
 }

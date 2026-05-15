@@ -33,7 +33,7 @@ class JumpRejoinDemandCreated implements ShouldBroadcast
     {
         $attempt = $this->demand->jumpAttempt->load('user', 'jump.course');
         $answeredCount = collect($attempt->question_list)
-            ->filter(fn ($q) => ($q['status'] ?? 'pending') !== 'pending')
+            ->filter(fn ($q) => isset($q['answer']) && $q['answer'] !== null)
             ->count();
 
         return [
@@ -54,6 +54,7 @@ class JumpRejoinDemandCreated implements ShouldBroadcast
                     'answered_count' => $answeredCount,
                     'jump' => [
                         'id' => $attempt->jump->id,
+                        'rank' => $attempt->jump->rank,
                         'course' => [
                             'title' => $attempt->jump->course->title,
                         ],
