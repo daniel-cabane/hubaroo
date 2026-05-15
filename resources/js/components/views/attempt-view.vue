@@ -22,6 +22,22 @@
       </button>
     </div>
 
+    <!-- Image Zoom Overlay -->
+    <div
+      v-if="showImageOverlay"
+      class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-zoom-out"
+      @click="showImageOverlay = false"
+    >
+      <img
+        :src="'/' + currentQuestion?.image"
+        :alt="'Question ' + (currentIndex + 1)"
+        class="rounded-lg select-none pointer-events-none"
+        style="width: 90vw; max-height: 90vh; object-fit: contain;"
+        draggable="false"
+        oncontextmenu="return false;"
+      />
+    </div>
+
     <!-- Tab Blur Alarm Overlay -->
     <div
       v-if="showBlurAlarm"
@@ -70,9 +86,10 @@
               <img
                 :src="'/' + currentQuestion.image"
                 :alt="'Question ' + (currentIndex + 1)"
-                class="mx-auto max-w-full rounded-lg all-around-shadow mb-6 select-none pointer-events-none"
+                class="mx-auto max-w-full rounded-lg all-around-shadow mb-6 select-none cursor-zoom-in"
                 draggable="false"
                 oncontextmenu="return false;"
+                @click="showImageOverlay = true"
               />
 
               <!-- Answer Buttons (Q1-24) -->
@@ -268,6 +285,7 @@ const blurCountdown = ref(10);
 const remainingSeconds = ref(0);
 const numericInputValue = ref('');
 const showKeypad = ref(false);
+const showImageOverlay = ref(false);
 const questionOrder = ref([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
 const isShuffled = ref(false);
 

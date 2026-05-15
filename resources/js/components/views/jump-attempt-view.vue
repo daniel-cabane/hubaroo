@@ -10,7 +10,7 @@
         <p class="text-md font-medium text-error">Saut en cours - Ne pas quitter cette page</p>
       </div>
       <div class="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-text-muted truncate max-w-xs text-center">
-        {{ jumpAttemptStore.attempt?.jump?.course?.title }}
+        {{ jumpAttemptStore.attempt?.user?.name }}
       </div>
       <button
         @click="toggleTimer"
@@ -20,6 +20,22 @@
         <span v-if="showTimer || isLastMinute">{{ formattedTime }}</span>
         <span v-else>Afficher le chrono</span>
       </button>
+    </div>
+
+    <!-- Image Zoom Overlay -->
+    <div
+      v-if="showImageOverlay"
+      class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-zoom-out"
+      @click="showImageOverlay = false"
+    >
+      <img
+        :src="'/' + currentQuestion?.image"
+        :alt="'Question ' + (currentIndex + 1)"
+        class="rounded-lg select-none pointer-events-none"
+        style="width: 90vw; max-height: 90vh; object-fit: contain;"
+        draggable="false"
+        oncontextmenu="return false;"
+      />
     </div>
 
     <!-- Tab Blur Alarm Overlay -->
@@ -66,9 +82,10 @@
               <img
                 :src="'/' + currentQuestion.image"
                 :alt="'Question ' + (currentIndex + 1)"
-                class="mx-auto max-w-full rounded-lg all-around-shadow mb-6 select-none pointer-events-none"
+                class="mx-auto max-w-full rounded-lg all-around-shadow mb-6 select-none cursor-zoom-in"
                 draggable="false"
                 oncontextmenu="return false;"
+                @click="showImageOverlay = true"
               />
 
               <!-- Answer Buttons (A-E) -->
@@ -146,6 +163,7 @@ const showTimer = ref(false);
 const showBlurAlarm = ref(false);
 const blurCountdown = ref(10);
 const remainingSeconds = ref(0);
+const showImageOverlay = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
@@ -394,3 +412,39 @@ onUnmounted(() => {
   window.Echo.leave(`jump.${route.params.jumpId}`);
 });
 </script>
+
+<style scoped>
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.slide-left-enter-from {
+  transform: translateX(40px);
+  opacity: 0;
+}
+.slide-left-leave-to {
+  transform: translateX(-40px);
+  opacity: 0;
+}
+
+.slide-right-enter-from {
+  transform: translateX(-40px);
+  opacity: 0;
+}
+.slide-right-leave-to {
+  transform: translateX(40px);
+  opacity: 0;
+}
+.all-around-shadow {
+  box-shadow: 0 0 15px 5px rgba(0, 0, 0, 0.1);
+}
+img {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+</style>
