@@ -102,6 +102,7 @@
                         :class="{
                           'bg-warning/15 text-warning': jump.status === 'draft',
                           'bg-success/15 text-success': jump.status === 'active',
+                          'bg-primary/15 text-primary': jump.status === 'expiring',
                           'bg-text-muted/15 text-text-muted': jump.status === 'expired',
                         }"
                       >{{ jumpStatusLabel(jump.status) }}</button>
@@ -109,6 +110,10 @@
                         v-if="openMenuJumpId === jump.id"
                         class="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-20 bg-surface dark:bg-gray-800 border border-border rounded-lg shadow-lg py-1 min-w-[160px] text-left"
                       >
+                        <button
+                          @click.stop="openJumpObservation(jump); openMenuJumpId = null"
+                          class="w-full px-3 py-1.5 text-xs text-text-main dark:text-surface hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer text-left flex items-center gap-2"
+                        ><Eye class="w-3.5 h-3.5 shrink-0" /> Voir les détails</button>
                         <button
                           v-if="jump.status === 'draft'"
                           @click.stop="activateJump(jump); openMenuJumpId = null"
@@ -331,6 +336,79 @@
       </div>
     </div>
 
+    <!-- Jump Observation Modal -->
+    <div
+      v-if="showJumpObservationModal && observedJump"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      @click.self="closeJumpObservation"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-border">
+          <div>
+            <h3 class="text-lg font-semibold text-text-main dark:text-surface flex items-center gap-2">
+              Saut {{ jumpNumber(observedJump) }}
+              <span v-if="observedJump.status === 'active'" class="text-xs text-success bg-success/10 px-2 py-0.5 rounded-full">En direct</span>
+            </h3>
+            <p class="text-sm text-text-muted">{{ courseData.students?.length ?? 0 }} élève{{ (courseData.students?.length ?? 0) !== 1 ? 's' : '' }}</p>
+          </div>
+          <button @click="closeJumpObservation" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="overflow-y-auto flex-1">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-800 border-b border-border sticky top-0">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold text-text-main dark:text-surface">Élève</th>
+                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Statut</th>
+                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Temps restant</th>
+                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Réponses</th>
+                <th v-if="observedJump.status === 'expired'" class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Score</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              <tr
+                v-for="student in courseData.students"
+                :key="student.id"
+                class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <td class="px-4 py-3 font-medium text-text-main dark:text-surface">
+                  {{ student.pivot?.class_name ?? student.name }}
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span v-if="!getAttempt(observedJump, student)" class="text-xs text-text-muted">Non commencé</span>
+                  <span v-else-if="getAttempt(observedJump, student).status === 'inProgress'" class="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success">En cours</span>
+                  <span v-else class="text-xs px-2 py-0.5 rounded-full bg-text-muted/10 text-text-muted">Terminé</span>
+                </td>
+                <td class="px-4 py-3 text-center font-mono text-sm text-text-muted">
+                  <template v-if="getAttempt(observedJump, student)?.status === 'inProgress'">
+                    {{ formatObservationTimer(getAttempt(observedJump, student).timer) }}
+                  </template>
+                  <span v-else class="opacity-30">—</span>
+                </td>
+                <td class="px-4 py-3">
+                  <div v-if="getAttempt(observedJump, student)" class="flex gap-1 justify-center flex-wrap">
+                    <span
+                      v-for="(item, idx) in getAttempt(observedJump, student).question_list"
+                      :key="idx"
+                      class="w-6 h-6 rounded text-xs font-bold flex items-center justify-center"
+                      :class="observedJump.status === 'expired'
+                        ? item.status === 'correct' ? 'bg-success text-white' : item.status === 'incorrect' ? 'bg-error text-white' : 'bg-gray-200 dark:bg-gray-700 text-text-muted'
+                        : (item.answer !== null && item.answer !== undefined) ? 'bg-primary/20 text-primary' : 'bg-gray-200 dark:bg-gray-700 text-text-muted'"
+                    >{{ idx + 1 }}</span>
+                  </div>
+                  <span v-else class="block text-center opacity-30 text-xs">—</span>
+                </td>
+                <td v-if="observedJump.status === 'expired'" class="px-4 py-3 text-center font-semibold text-primary">
+                  {{ getAttempt(observedJump, student)?.score ?? '—' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Attempt Detail Modal -->
     <div
       v-if="showAttemptDetailModal && selectedAttemptDetail"
@@ -412,9 +490,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, Plus, X, Clock, Trash2 } from 'lucide-vue-next';
+import { ChevronLeft, Plus, X, Clock, Trash2, Eye } from 'lucide-vue-next';
 import { useCourseStore } from '@/stores/courseStore';
 
 const route = useRoute();
@@ -426,6 +504,9 @@ const divisionId = computed(() => route.params.id);
 const courseData = ref(null);
 
 const showNewJumpModal = ref(false);
+const showJumpObservationModal = ref(false);
+const observingJumpId = ref(null);
+const observedJump = computed(() => courseData.value?.jumps?.find(j => j.id === observingJumpId.value) ?? null);
 const showDeleteCourseConfirm = ref(false);
 const showArchiveConfirm = ref(false);
 const showDeleteJumpConfirm = ref(false);
@@ -452,8 +533,15 @@ const newJump = ref({
 
 function updateAutoQuestions() {
   if (newJump.value.autoQuestions) {
-    newJump.value.nb_questions = Math.max(1, Math.floor(newJump.value.time / 2));
+    newJump.value.nb_questions = Math.max(1, Math.ceil(newJump.value.time / 2));
   }
+}
+
+function formatObservationTimer(seconds) {
+  if (!seconds) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function formatJumpDate(val) {
@@ -468,7 +556,7 @@ function jumpNumber(jump) {
 }
 
 function jumpStatusLabel(status) {
-  const labels = { draft: 'Brouillon', active: 'Actif', expired: 'Expiré' };
+  const labels = { draft: 'Brouillon', active: 'Actif', expiring: 'En notation', expired: 'Expiré' };
   return labels[status] ?? status;
 }
 
@@ -533,7 +621,7 @@ async function handleSaveExpiry() {
 
 async function handleExpireNow() {
   try {
-    await courseStore.updateJump(editingJump.value.id, { expiration: new Date().toISOString(), status: 'expired' });
+    await courseStore.updateJump(editingJump.value.id, { expiration: new Date().toISOString(), status: 'expiring' });
     showEditExpiryModal.value = false;
     await loadDetails();
   } catch {
@@ -638,18 +726,67 @@ async function loadDetails() {
 }
 
 let subscribedJumpIds = [];
+let observedJumpPrivateChannelId = null;
+let expiringPollTimer = null;
+
+function openJumpObservation(jump) {
+  observingJumpId.value = jump.id;
+  showJumpObservationModal.value = true;
+
+  loadDetails();
+
+  if (jump.status === 'active') {
+    observedJumpPrivateChannelId = jump.id;
+    window.Echo.private(`jump.${jump.id}`)
+      .listen('.JumpAttemptUpdated', (e) => {
+        const jumpData = courseData.value?.jumps?.find(j => j.id === jump.id);
+        if (!jumpData) { return; }
+        const idx = jumpData.attempts.findIndex(a => a.user_id === e.attempt.user_id);
+        if (idx !== -1) {
+          jumpData.attempts[idx] = e.attempt;
+        } else {
+          jumpData.attempts.push(e.attempt);
+        }
+      });
+  }
+}
+
+function closeJumpObservation() {
+  if (observedJumpPrivateChannelId) {
+    window.Echo.leaveChannel(`private-jump.${observedJumpPrivateChannelId}`);
+    observedJumpPrivateChannelId = null;
+  }
+  showJumpObservationModal.value = false;
+  observingJumpId.value = null;
+}
 
 function subscribeToActiveJumps() {
-  const activeJumps = courseData.value?.jumps?.filter(j => j.status === 'active') ?? [];
+  const activeJumps = courseData.value?.jumps?.filter(j => j.status === 'active' || j.status === 'expiring') ?? [];
   for (const jump of activeJumps) {
     if (subscribedJumpIds.includes(jump.id)) continue;
     subscribedJumpIds.push(jump.id);
     window.Echo.channel(`jump.${jump.id}`)
       .listen('.JumpExpired', async () => {
         await loadDetails();
+        subscribeToActiveJumps();
       });
   }
 }
+
+watch(
+  () => courseData.value?.jumps?.some(j => j.status === 'expiring'),
+  (hasExpiring) => {
+    if (hasExpiring && !expiringPollTimer) {
+      expiringPollTimer = setInterval(async () => {
+        await loadDetails();
+        subscribeToActiveJumps();
+      }, 3000);
+    } else if (!hasExpiring && expiringPollTimer) {
+      clearInterval(expiringPollTimer);
+      expiringPollTimer = null;
+    }
+  },
+);
 
 onMounted(async () => {
   await loadDetails();
@@ -662,5 +799,13 @@ onUnmounted(() => {
     window.Echo.leave(`jump.${id}`);
   }
   subscribedJumpIds = [];
+  if (observedJumpPrivateChannelId) {
+    window.Echo.leaveChannel(`private-jump.${observedJumpPrivateChannelId}`);
+    observedJumpPrivateChannelId = null;
+  }
+  if (expiringPollTimer) {
+    clearInterval(expiringPollTimer);
+    expiringPollTimer = null;
+  }
 });
 </script>

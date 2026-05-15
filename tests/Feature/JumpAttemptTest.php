@@ -27,6 +27,7 @@ test('student can start a jump attempt', function () {
 
     $response->assertCreated()->assertJsonStructure(['attempt' => ['id', 'question_list', 'status']]);
     expect(JumpAttempt::where('jump_id', $this->jump->id)->where('user_id', $this->student->id)->exists())->toBeTrue();
+    Event::assertDispatched(JumpAttemptUpdated::class);
 });
 
 test('student not in division cannot start attempt', function () {

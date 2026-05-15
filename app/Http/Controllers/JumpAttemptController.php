@@ -55,6 +55,8 @@ class JumpAttemptController extends Controller
             'termination' => 'none',
         ]);
 
+        broadcast(new JumpAttemptUpdated($attempt->fresh()->load('user:id,name,email')));
+
         return response()->json([
             'message' => 'Attempt created.',
             'attempt' => $this->withQuestionImages($attempt->load('jump.course')),

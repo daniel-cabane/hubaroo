@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\JumpFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -70,10 +71,12 @@ class Jump extends Model
         return $this->status === 'expired';
     }
 
-    public function getRankAttribute(): int
+    public function rank(): Attribute
     {
-        return Jump::where('course_id', $this->course_id)
-            ->where('id', '<=', $this->id)
-            ->count();
+        return Attribute::make(
+            get: fn () => Jump::where('course_id', $this->course_id)
+                ->where('id', '<=', $this->id)
+                ->count(),
+        );
     }
 }

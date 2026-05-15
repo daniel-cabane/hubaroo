@@ -43,7 +43,7 @@ class JumpController extends Controller
         $this->authorize('update', $jump->course->division);
 
         $request->validate([
-            'status' => ['sometimes', 'in:draft,active,expired'],
+            'status' => ['sometimes', 'in:draft,active,expiring,expired'],
             'expiration' => ['sometimes', 'nullable', 'date'],
             'nb_questions' => ['sometimes', 'integer', 'min:1', 'max:30'],
             'time' => ['sometimes', 'integer', 'min:5', 'max:60'],

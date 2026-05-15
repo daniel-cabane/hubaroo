@@ -4,6 +4,8 @@ use App\Events\JumpActivated;
 use App\Models\Course;
 use App\Models\Division;
 use App\Models\Jump;
+use App\Models\JumpAttempt;
+use App\Models\Question;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
 
@@ -128,4 +130,35 @@ test('teacher can delete a jump', function () {
 
     $response->assertOk();
     expect(Jump::find($jump->id))->toBeNull();
+});
+
+test('course details includes attempt data with correct answers for teacher observation', function () {
+    $question = Question::factory()->create(['difficulty' => 1000, 'correct_answer' => 'A']);
+    $jump = Jump::factory()->expired()->create(['course_id' => $this->course->id, 'nb_questions' => 1]);
+    JumpAttempt::create([
+        'jump_id' => $jump->id,
+        'user_id' => $this->student->id,
+        'question_list' => [['id' => $question->id, 'answer' => 'A', 'status' => 'correct', 'difficulty' => 1000]],
+        'score' => 1000,
+        'status' => 'finished',
+        'timer' => 120,
+        'extra_time' => 0,
+        'termination' => 'submitted',
+    ]);
+
+    $response = $this->actingAs($this->teacher)->getJson("/api/courses/{$this->course->id}/details");
+
+    $response->assertOk();
+    $jumpData = collect($response->json('jumps'))->firstWhere('id', $jump->id);
+    expect($jumpData['attempts'])->toHaveCount(1);
+    $questionItem = $jumpData['attempts'][0]['question_list'][0];
+    expect($questionItem['correct_answer'])->toBe('A')
+        ->and($questionItem['answer'])->toBe('A')
+        ->and($jumpData['attempts'][0]['timer'])->toBe(120);
+});
+
+test('student cannot access course details endpoint', function () {
+    $response = $this->actingAs($this->student)->getJson("/api/courses/{$this->course->id}/details");
+
+    $response->assertForbidden();
 });

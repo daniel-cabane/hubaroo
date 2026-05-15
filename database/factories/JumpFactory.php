@@ -41,4 +41,12 @@ class JumpFactory extends Factory
             'expiration' => now()->subMinutes(5),
         ]);
     }
+
+    public function expiring(): static
+    {
+        return $this->state(fn () => [
+            'status' => 'expiring',
+            'expiration' => now()->subMinutes(1),
+        ]);
+    }
 }

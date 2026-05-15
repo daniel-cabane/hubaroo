@@ -15,21 +15,25 @@ class ExpireJumps
 
     public function handle(): void
     {
-        $jumps = Jump::where('status', 'active')
+        // Transition active jumps that have reached their expiration to 'expiring'
+        Jump::where('status', 'active')
             ->where('expiration', '<=', now())
-            ->get();
+            ->update(['status' => 'expiring']);
+
+        // Grade all expiring jumps (auto-expired above + manually set to 'expiring' by teacher)
+        $jumps = Jump::where('status', 'expiring')->get();
 
         foreach ($jumps as $jump) {
-            $jump->update(['status' => 'expired']);
             $this->gradeAllAttemptsForJump($jump);
+            $jump->update(['status' => 'expired']);
             broadcast(new JumpExpired($jump));
         }
 
         // Also grade any finished attempts for already-expired jumps that were missed
         $ungradedAttempts = JumpAttempt::where('status', 'finished')
-            ->whereRaw("JSON_SEARCH(question_list, 'one', 'pending', NULL, '$[*].status') IS NOT NULL")
             ->with('jump')
-            ->get();
+            ->get()
+            ->filter(fn ($a) => collect($a->question_list ?? [])->contains(fn ($q) => ($q['status'] ?? '') === 'pending'));
 
         $byJump = $ungradedAttempts->groupBy('jump_id');
         foreach ($byJump as $jumpId => $attempts) {

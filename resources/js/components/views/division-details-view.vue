@@ -869,13 +869,13 @@ const activeCourse = computed(() => {
 });
 
 const activeCourseActiveJump = computed(() =>
-  activeCourse.value?.jumps?.find(j => j.status === 'active') ?? null
+  activeCourse.value?.jumps?.find(j => j.status === 'active' || j.status === 'expiring') ?? null
 );
 
 // Show the button only if the student has no attempt yet, or was approved to rejoin (status back to inProgress)
 const canStartActiveJump = computed(() => {
   const jump = activeCourseActiveJump.value;
-  if (!jump) return false;
+  if (!jump || jump.status !== 'active') return false;
   const attempt = jump.attempts?.[0];
   return !attempt || attempt.status === 'inProgress';
 });
@@ -883,7 +883,7 @@ const canStartActiveJump = computed(() => {
 // Show rejoin button if the student finished with blurred/submitted (not timeout)
 const activeJumpRejoinableAttempt = computed(() => {
   const jump = activeCourseActiveJump.value;
-  if (!jump) return null;
+  if (!jump || jump.status !== 'active') return null;
   const attempt = jump.attempts?.[0];
   if (!attempt || attempt.status !== 'finished') return null;
   if (attempt.termination === 'timeout') return null;
