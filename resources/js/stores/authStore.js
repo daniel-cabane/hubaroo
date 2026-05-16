@@ -110,6 +110,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function assignRole(role) {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const response = await axios.post('/user/role', { role });
+      user.value = response.data.user;
+      return response.data;
+    } catch (err) {
+      error.value = err.response?.data?.message || 'Failed to assign role';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   function clearError() {
     error.value = null;
   }
@@ -125,6 +141,7 @@ export const useAuthStore = defineStore('auth', () => {
     forgotPassword,
     resetPassword,
     updateName,
+    assignRole,
     clearError,
   };
 });

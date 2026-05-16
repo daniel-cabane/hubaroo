@@ -36,6 +36,7 @@ Route::middleware(['web'])->group(function () {
     Route::middleware(['auth'])->group(function () {
         Route::get('/user', [AuthController::class, 'user'])->name('user');
         Route::patch('/user/name', [AuthController::class, 'updateName'])->name('user.updateName');
+        Route::post('/user/role', [AuthController::class, 'assignRole'])->name('user.assignRole');
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     });
 });

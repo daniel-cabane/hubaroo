@@ -39,6 +39,7 @@ class User extends Authenticatable
      */
     protected $appends = [
         'is_teacher',
+        'is_student',
         'is_admin',
     ];
 
@@ -104,6 +105,13 @@ class User extends Authenticatable
     {
         return Attribute::make(
             get: fn () => $this->hasRole('Teacher'),
+        );
+    }
+
+    protected function isStudent(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->hasRole('Student'),
         );
     }
 

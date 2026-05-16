@@ -221,6 +221,47 @@
       </div>
     </div>
 
+    <!-- Role Selection Modal (unclosable) -->
+    <div
+      v-if="authStore.isAuthenticated && authStore.user && !authStore.user.is_teacher && !authStore.user.is_student"
+      class="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl p-8 max-w-sm w-full mx-4 shadow-xl space-y-6">
+        <div class="text-center space-y-2">
+          <h3 class="text-xl font-bold text-text-main dark:text-surface">Bienvenue sur Hubaroo !</h3>
+          <p class="text-sm text-text-muted">Pour continuer, veuillez choisir votre rôle.</p>
+        </div>
+        <div class="flex flex-col gap-3">
+          <button
+            @click="selectedRole = 'Teacher'"
+            :class="selectedRole === 'Teacher'
+              ? 'border-primary bg-primary text-surface'
+              : 'border-primary bg-primary/10 hover:bg-primary/20 text-primary'"
+            class="w-full py-3 rounded-xl border-2 font-semibold text-lg transition-colors"
+          >
+            Enseignant
+          </button>
+          <button
+            @click="selectedRole = 'Student'"
+            :class="selectedRole === 'Student'
+              ? 'border-primary bg-primary text-surface'
+              : 'border-primary bg-primary/10 hover:bg-primary/20 text-primary'"
+            class="w-full py-3 rounded-xl border-2 font-semibold text-lg transition-colors"
+          >
+            Élève
+          </button>
+        </div>
+        <button
+          @click="handleAssignRole(selectedRole)"
+          :disabled="!selectedRole || authStore.isLoading"
+          class="w-full py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-surface font-semibold transition-colors disabled:opacity-40"
+        >
+          {{ authStore.isLoading ? 'Enregistrement...' : 'Confirmer' }}
+        </button>
+        <div v-if="roleAssignError" class="text-xs text-error text-center">{{ roleAssignError }}</div>
+      </div>
+    </div>
+
     <!-- Bug Report Modal -->
     <div
       v-if="showBugReportModal"
@@ -283,6 +324,8 @@ const showEditNameModal = ref(false);
 const editNameValue = ref('');
 const editNameError = ref(null);
 const bugReportComment = ref('');
+const roleAssignError = ref(null);
+const selectedRole = ref(null);
 const menuContainer = ref(null);
 const bannerMenuContainer = ref(null);
 
@@ -380,6 +423,15 @@ function dismissAttempt() {
 function openLogoutModal() {
   showAccountMenu.value = false;
   showLogoutModal.value = true;
+}
+
+async function handleAssignRole(role) {
+  roleAssignError.value = null;
+  try {
+    await authStore.assignRole(role);
+  } catch {
+    roleAssignError.value = authStore.error || 'Une erreur est survenue.';
+  }
 }
 
 async function handleLogout() {

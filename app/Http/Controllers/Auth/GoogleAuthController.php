@@ -39,7 +39,6 @@ class GoogleAuthController extends Controller
                     'google_id' => $googleUser->getId(),
                     'email_verified_at' => now(),
                 ]);
-                $user->assignRole('Student');
             }
         }
 

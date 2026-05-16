@@ -94,6 +94,29 @@ class AuthController extends Controller
     }
 
     /**
+     * Assign a role (Teacher or Student) to a user who has none.
+     */
+    public function assignRole(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'role' => ['required', 'in:Teacher,Student'],
+        ]);
+
+        $user = $request->user();
+
+        if ($user->hasRole('Teacher') || $user->hasRole('Student')) {
+            return response()->json(['message' => 'Role already assigned.'], 422);
+        }
+
+        $user->assignRole($validated['role']);
+
+        return response()->json([
+            'message' => 'Role assigned successfully.',
+            'user' => $user->fresh(),
+        ]);
+    }
+
+    /**
      * Logout the user.
      */
     public function logout(Request $request): JsonResponse
