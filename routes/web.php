@@ -14,6 +14,7 @@ use App\Http\Controllers\JumpRejoinDemandController;
 use App\Http\Controllers\KangourouSessionController;
 use App\Http\Controllers\PaperController;
 use App\Http\Controllers\RejoinDemandController;
+use App\Http\Controllers\SuggestedQuestionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -85,6 +86,7 @@ Route::middleware(['auth'])->group(function () {
     // Session ↔ Division management
     Route::post('/api/kangourou-sessions/{session}/divisions/{division}', [DivisionController::class, 'openForDivision'])->name('sessions.openForDivision');
     Route::delete('/api/kangourou-sessions/{session}/divisions/{division}', [DivisionController::class, 'closeForDivision'])->name('sessions.closeForDivision');
+    Route::patch('/api/divisions/{division}/kangourou-sessions/{kangourouSession}/questions/{questionId}/reviewed', [DivisionController::class, 'toggleQuestionReviewed'])->name('sessions.toggleQuestionReviewed');
 
     // Invites
     Route::get('/api/my/invites', [DivisionController::class, 'myInvites'])->name('divisions.myInvites');
@@ -126,6 +128,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/my/jump-rejoin-demands', [JumpRejoinDemandController::class, 'myIndex'])->name('jump-rejoin-demands.myIndex');
     Route::post('/api/jump-rejoin-demands/{jumpRejoinDemand}/approve', [JumpRejoinDemandController::class, 'approve'])->name('jump-rejoin-demands.approve');
     Route::delete('/api/jump-rejoin-demands/{jumpRejoinDemand}', [JumpRejoinDemandController::class, 'reject'])->name('jump-rejoin-demands.reject');
+
+    // Suggested Questions
+    Route::get('/api/courses/{course}/suggested-questions', [SuggestedQuestionController::class, 'index'])->name('suggested-questions.index');
+    Route::patch('/api/suggested-questions/{suggestedQuestion}/toggle-public', [SuggestedQuestionController::class, 'togglePublic'])->name('suggested-questions.togglePublic');
+    Route::delete('/api/suggested-questions/{suggestedQuestion}', [SuggestedQuestionController::class, 'destroy'])->name('suggested-questions.destroy');
+    Route::get('/api/divisions/{division}/public-suggested-questions', [SuggestedQuestionController::class, 'publicForDivision'])->name('suggested-questions.publicForDivision');
 });
 
 Route::fallback(function () {

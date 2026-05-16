@@ -3,8 +3,10 @@
 use App\Events\SessionExpired;
 use App\Jobs\ExpireKangourouSessions;
 use App\Models\Attempt;
+use App\Models\Division;
 use App\Models\KangourouSession;
 use App\Models\Paper;
+use App\Models\User;
 use App\Services\GradingService;
 use Illuminate\Support\Facades\Event;
 
@@ -83,4 +85,38 @@ test('job broadcasts SessionExpired event for each expired session', function ()
     (new ExpireKangourouSessions)->handle(app(GradingService::class));
 
     Event::assertDispatched(SessionExpired::class, fn ($e) => $e->session->id === $session->id);
+});
+
+test('job computes analysis per division when session expires', function () {
+    $division = Division::factory()->create();
+    $student = User::factory()->create();
+    $division->students()->attach($student->id);
+
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+    ]);
+    $division->kangourouSessions()->attach($session->id);
+
+    // Build a finished attempt with Q1 correct and the rest unanswered
+    $questions = $this->paper->questions()->orderByPivot('order')->get();
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => $questions[0]->correct_answer, 'status' => 'correct'];
+
+    Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'user_id' => $student->id,
+        'answers' => $answers,
+    ]);
+
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
+
+    $pivot = $division->kangourouSessions()->where('kangourou_session_id', $session->id)->first()->pivot;
+
+    expect($pivot->analysis)->toBeArray()
+        ->and($pivot->analysis[0]['question_id'])->toBe($questions[0]->id)
+        ->and($pivot->analysis[0]['success_ratio'])->toEqual(1.0)
+        ->and($pivot->analysis[0]['reviewed'])->toBeFalse()
+        ->and($pivot->analysis[1]['success_ratio'])->toEqual(0.0);
 });

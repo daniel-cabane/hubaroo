@@ -27,6 +27,7 @@ class ExpireJumps
             $this->gradeAllAttemptsForJump($jump);
             $jump->update(['status' => 'expired']);
             broadcast(new JumpExpired($jump));
+            AnalyseJump::dispatch($jump->fresh());
         }
 
         // Also grade any finished attempts for already-expired jumps that were missed

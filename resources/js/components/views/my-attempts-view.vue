@@ -18,18 +18,23 @@
           <p class="font-medium text-text-main dark:text-surface">
             {{ attempt.kangourou_session?.paper?.title }}
           </p>
-          <p class="text-sm text-text-muted">
-            {{ attempt.status === 'finished' ? `Score : ${attempt.score}` : 'En cours' }}
-            &middot; {{ new Date(attempt.created_at).toLocaleDateString() }}
+          <p class="text-sm text-text-muted">{{ new Date(attempt.created_at).toLocaleDateString() }}
           </p>
         </div>
+        <div v-if="attempt.kangourou_session?.status !== 'active'"">{{ attempt.score ?? 0}} pt<span v-if="attempt.score>=2">s</span></div>
         <router-link
-          v-if="attempt.status === 'finished'"
+          v-if="attempt.status === 'finished' && attempt.kangourou_session?.status !== 'active'"
           :to="{ name: 'Results', params: { code: attempt.kangourou_session?.code, attemptId: attempt.id } }"
           class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface text-sm font-medium transition-colors"
         >
           Voir les résultats
         </router-link>
+        <span
+          v-else-if="attempt.status === 'finished'"
+          class="px-4 py-2 rounded-lg bg-primary/40 text-surface text-sm font-medium cursor-not-allowed"
+        >
+          Voir les résultats
+        </span>
         <router-link
           v-else
           :to="{ name: 'Attempt', params: { code: attempt.kangourou_session?.code, attemptId: attempt.id } }"

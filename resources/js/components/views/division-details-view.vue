@@ -42,6 +42,7 @@
             Activer
           </button>
           <button
+            v-if="divisionStore.division.archived"
             @click="showDeleteConfirm = true"
             class="px-3 py-1.5 text-sm bg-error/10 text-error border border-error/30 rounded-lg hover:bg-error/20 transition-colors cursor-pointer"
           >
@@ -277,6 +278,13 @@
               <div class="flex items-center gap-2">
                 <span v-if="course.archived" class="text-xs bg-gray-200 dark:bg-gray-700 text-text-muted px-2 py-0.5 rounded-full">Archivé</span>
                 <span class="text-xs text-text-muted">{{ course.jumps_count ?? 0 }} saut{{ (course.jumps_count ?? 0) !== 1 ? 's' : '' }}</span>
+                <button
+                  @click="openSuggestedQuestionsModal(course)"
+                  class="text-text-muted hover:text-primary transition-colors cursor-pointer"
+                  title="Questions suggérées"
+                >
+                  <Lightbulb class="w-4 h-4" />
+                </button>
               </div>
             </li>
           </ul>
@@ -290,16 +298,25 @@
             <li
               v-for="session in expiredSessionsWithAttempts"
               :key="session.id"
+              class="flex items-center gap-1"
             >
               <button
                 @click="openExpiredSessionModal(session)"
-                class="w-full flex items-center cursor-pointer justify-between group hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 py-1 rounded-lg transition-colors text-left"
+                class="flex-1 flex items-center cursor-pointer justify-between group hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 py-1 rounded-lg transition-colors text-left"
               >
                 <div>
                   <p class="text-sm font-medium text-text-main dark:text-surface group-hover:text-primary transition-colors">{{ session.paper?.title }}</p>
                   <p class="text-xs text-text-muted">{{ session.attempts_count }} tentative{{ session.attempts_count > 1 ? 's' : '' }}</p>
                 </div>
                 <span class="text-xs bg-gray-100 dark:bg-gray-800 text-text-muted px-2 py-0.5 rounded-full">{{ formatExpiredTime(session.expires_at) }}</span>
+              </button>
+              <button
+                v-if="session.pivot?.analysis"
+                @click="openAnalysisModal(session)"
+                class="text-text-muted hover:text-primary transition-colors cursor-pointer shrink-0 p-1"
+                title="Questions à revoir"
+              >
+                <BookOpen class="w-5 h-5" />
               </button>
             </li>
           </ul>
@@ -313,6 +330,27 @@
       <div class="mb-6">
         <h2 class="text-8xl text-center font-bold text-text-main dark:text-surface">{{ divisionStore.division.name }}</h2>
         <p class="text-text-muted text-center text-sm mt-1">{{ divisionStore.division.teacher?.name }}</p>
+      </div>
+
+      <!-- Public Suggested Questions -->
+      <div v-if="publicSuggestedQuestions.length" class="mb-6 bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
+        <h3 class="font-semibold text-text-main dark:text-surface mb-3 flex items-center gap-2">
+          <Lightbulb class="w-4 h-4 text-primary" />
+          Questions à revoir
+        </h3>
+        <div class="space-y-3">
+          <div v-for="sq in publicSuggestedQuestions" :key="sq.id">
+            <div class="flex items-center justify-between cursor-pointer group" @click="openPublicQuestionOverlay(sq)">
+              <div class="flex items-center gap-2">
+                <div class="flex gap-0.5">
+                  <Star v-for="n in sq.level" :key="n" class="w-3.5 h-3.5 fill-warning text-warning" />
+                </div>
+                <span class="text-xs text-text-muted">{{ sq.course_title }}</span>
+              </div>
+              <Eye class="w-4 h-4 text-text-muted group-hover:text-primary transition-colors" />
+            </div>
+          </div>
+        </div>
       </div>
 
       <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-3">Sessions disponibles</h3>
@@ -551,6 +589,106 @@
             @delete="openDeleteAttemptModal($event, 'active')"
           />
         </div>
+      </div>
+    </div>
+
+    <!-- Analysis Modal (Questions à revoir) -->
+    <div
+      v-if="showAnalysisModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      @click.self="closeAnalysisModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-border">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface">Questions à revoir — {{ analysisModalSession?.paper?.title }}</h3>
+          <button @click="closeAnalysisModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1">
+          <div v-if="isLoadingAnalysis" class="text-sm text-text-muted text-center py-8">Chargement...</div>
+          <template v-else>
+            <div class="grid grid-cols-[auto_auto_auto_auto] gap-x-3 gap-y-2 items-center">
+              <span class="text-xs font-medium text-text-muted uppercase tracking-wide text-center">Q.</span>
+              <span class="text-xs font-medium text-text-muted uppercase tracking-wide text-center">Réussite</span>
+              <span class="text-xs font-medium text-text-muted uppercase tracking-wide text-center">Revue</span>
+              <span></span>
+              <template v-for="(item, index) in currentAnalysisData" :key="item.question_id">
+                <span class="text-sm font-medium text-text-main dark:text-surface text-center">{{ index + 1 }}</span>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-32">
+                    <div
+                      class="h-2 rounded-full transition-all"
+                      :class="successRatioBarClass(item.success_ratio)"
+                      :style="{ width: `${Math.round(item.success_ratio * 100)}%` }"
+                    />
+                  </div>
+                  <span class="text-sm font-semibold tabular-nums" :class="successRatioTextClass(item.success_ratio)">
+                    {{ Math.round(item.success_ratio * 100) }}%
+                  </span>
+                </div>
+                <button
+                  @click="toggleReviewed(item.question_id)"
+                  :class="[
+                    'px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer',
+                    item.reviewed
+                      ? 'bg-success/20 text-success hover:bg-success/30'
+                      : 'bg-gray-100 dark:bg-gray-800 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-700',
+                  ]"
+                >
+                  {{ item.reviewed ? 'Oui' : 'Non' }}
+                </button>
+                <button
+                  @click="openQuestionOverlay(item)"
+                  class="text-text-muted hover:text-primary transition-colors cursor-pointer"
+                  title="Voir la question"
+                >
+                  <Eye class="w-4 h-4" />
+                </button>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Question Image Overlay -->
+    <div
+      v-if="showQuestionOverlay && selectedAnalysisQuestion"
+      class="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-60 p-6 gap-4"
+      @click.self="closeQuestionOverlay"
+    >
+      <img
+        :src="'/' + selectedAnalysisQuestion.image"
+        :alt="`Question ${selectedAnalysisQuestion.questionNumber}`"
+        class="max-h-[80vh] object-contain rounded-lg"
+        style="width: 80vw;"
+      />
+      <div class="flex items-center gap-4">
+        <button
+          v-if="!revealAnswer"
+          @click="revealAnswer = true"
+          class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium transition-colors cursor-pointer"
+        >
+          Révéler la réponse
+        </button>
+        <div v-else class="px-6 py-3 bg-surface dark:bg-gray-900 rounded-xl text-2xl font-bold text-success">
+          {{ selectedAnalysisQuestion.correct_answer }}
+        </div>
+        <button
+          @click="toggleReviewed(selectedAnalysisQuestion.question_id)"
+          :class="[
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer',
+            selectedAnalysisQuestion.reviewed
+              ? 'bg-success/20 text-success hover:bg-success/30'
+              : 'bg-gray-100 dark:bg-gray-700 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-600',
+          ]"
+        >
+          {{ selectedAnalysisQuestion.reviewed ? 'Revue ✓' : 'Marquer comme revue' }}
+        </button>
+        <button @click="closeQuestionOverlay" class="text-gray-400 hover:text-white transition-colors cursor-pointer">
+          <X class="w-6 h-6" />
+        </button>
       </div>
     </div>
 
@@ -812,6 +950,154 @@
         </div>
       </div>
     </div>
+
+    <!-- Suggested Questions Modal (teacher) -->
+    <div
+      v-if="showSuggestedQuestionsModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="closeSuggestedQuestionsModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface flex items-center gap-2">
+            <Lightbulb class="w-5 h-5 text-primary" />
+            Questions suggérées — {{ suggestedQuestionsCourseName }}
+          </h3>
+          <button @click="closeSuggestedQuestionsModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div v-if="isLoadingSuggestedQuestions" class="flex justify-center py-8">
+          <span class="text-text-muted text-sm">Chargement...</span>
+        </div>
+        <div v-else-if="!suggestedQuestions.length" class="py-8 text-center text-text-muted text-sm">
+          Aucune question suggérée pour l'instant.
+        </div>
+        <div v-else class="overflow-y-auto space-y-6">
+          <div v-for="level in [1, 2, 3]" :key="level">
+            <div v-if="suggestedQuestionsByLevel(level).length">
+              <div class="flex items-center gap-2 mb-2">
+                <Star v-for="n in level" :key="n" class="w-4 h-4 fill-warning text-warning" />
+                <span class="text-xs text-text-muted uppercase tracking-wide">Niveau {{ level }}</span>
+              </div>
+              <div class="space-y-2">
+                <div
+                  v-for="sq in suggestedQuestionsByLevel(level)"
+                  :key="sq.id"
+                  class="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 transition-colors"
+                >
+                  <button
+                    @click="openSuggestedQuestionOverlay(sq)"
+                    class="flex-1 text-left cursor-pointer group"
+                  >
+                    <img
+                      v-if="sq.question.image"
+                      :src="'/' + sq.question.image"
+                      class="h-10 object-contain group-hover:opacity-80 transition-opacity"
+                      alt="Question"
+                    />
+                    <span v-else class="text-sm text-text-muted">Question #{{ sq.question.id }}</span>
+                  </button>
+                  <button
+                    @click="handleToggleSuggestedPublic(sq)"
+                    :class="['p-1.5 rounded-lg transition-colors cursor-pointer', sq.is_public ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-primary hover:bg-primary/10']"
+                    :title="sq.is_public ? 'Retirer de la vue élèves' : 'Rendre public'"
+                  >
+                    <Globe class="w-4 h-4" />
+                  </button>
+                  <button
+                    @click="handleDeleteSuggestedQuestion(sq)"
+                    class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                    title="Supprimer"
+                  >
+                    <Trash2 class="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggested Question Overlay (teacher) -->
+    <div
+      v-if="showSuggestedQuestionOverlay && selectedSuggestedQuestion"
+      class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]"
+      @click.self="closeSuggestedQuestionOverlay"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-2xl p-6 w-full max-w-[80vw] flex flex-col items-center gap-4">
+        <button @click="closeSuggestedQuestionOverlay" class="self-end text-text-muted hover:text-text-main transition-colors cursor-pointer">
+          <X class="w-5 h-5" />
+        </button>
+        <img
+          v-if="selectedSuggestedQuestion.question.image"
+          :src="'/' + selectedSuggestedQuestion.question.image"
+          class="max-h-64 object-contain"
+          alt="Question"
+        />
+        <div v-if="revealSuggestedAnswer" class="text-xl font-bold text-success">
+          Réponse : {{ selectedSuggestedQuestion.question.correct_answer }}
+        </div>
+        <div class="flex gap-3">
+          <button
+            v-if="!revealSuggestedAnswer"
+            @click="revealSuggestedAnswer = true"
+            class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          >
+            Révéler la réponse
+          </button>
+          <button
+            @click="handleToggleSuggestedPublic(selectedSuggestedQuestion)"
+            :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2', selectedSuggestedQuestion.is_public ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'bg-gray-100 dark:bg-gray-800 text-text-muted hover:text-primary']"
+          >
+            <Globe class="w-4 h-4" />
+            {{ selectedSuggestedQuestion.is_public ? 'Retirer' : 'Rendre public' }}
+          </button>
+          <button
+            @click="handleDeleteSuggestedQuestion(selectedSuggestedQuestion); closeSuggestedQuestionOverlay()"
+            class="px-4 py-2 bg-error/10 text-error hover:bg-error/20 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2"
+          >
+            <Trash2 class="w-4 h-4" />
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Public Question Overlay (student) -->
+    <div
+      v-if="showPublicQuestionOverlay && selectedPublicQuestion"
+      class="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      @click.self="closePublicQuestionOverlay"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-2xl p-6 w-full max-w-[80vw] flex flex-col items-center gap-4">
+        <button @click="closePublicQuestionOverlay" class="self-end text-text-muted hover:text-text-main transition-colors cursor-pointer">
+          <X class="w-5 h-5" />
+        </button>
+        <div class="flex items-center gap-1 self-start">
+          <Star v-for="n in selectedPublicQuestion.level" :key="n" class="w-4 h-4 fill-warning text-warning" />
+          <span class="text-xs text-text-muted ml-1">{{ selectedPublicQuestion.course_title }}</span>
+        </div>
+        <img
+          v-if="selectedPublicQuestion.question.image"
+          :src="'/' + selectedPublicQuestion.question.image"
+          class="max-h-64 object-contain"
+          alt="Question"
+        />
+        <div v-if="revealPublicAnswer" class="text-xl font-bold text-success">
+          Réponse : {{ selectedPublicQuestion.question.correct_answer }}
+        </div>
+        <button
+          v-if="!revealPublicAnswer"
+          @click="revealPublicAnswer = true"
+          class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium transition-colors cursor-pointer"
+        >
+          Révéler la réponse
+        </button>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -819,7 +1105,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
-import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, BookOpen, Lightbulb, Star, Trash2, Globe } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
@@ -1023,6 +1309,30 @@ const selectedAttemptContext = ref(null);
 const deleteAttemptConfirmed = ref(false);
 const isDeletingAttempt = ref(false);
 
+const showAnalysisModal = ref(false);
+const analysisModalSession = ref(null);
+const analysisQuestions = ref([]);
+const isLoadingAnalysis = ref(false);
+const selectedAnalysisQuestion = ref(null);
+const showQuestionOverlay = ref(false);
+const revealAnswer = ref(false);
+
+// Suggested Questions (teacher)
+const showSuggestedQuestionsModal = ref(false);
+const suggestedQuestionsCourseName = ref('');
+const suggestedQuestionsForCourse = ref(null);
+const suggestedQuestions = ref([]);
+const isLoadingSuggestedQuestions = ref(false);
+const showSuggestedQuestionOverlay = ref(false);
+const selectedSuggestedQuestion = ref(null);
+const revealSuggestedAnswer = ref(false);
+
+// Public Suggested Questions (student)
+const publicSuggestedQuestions = ref([]);
+const showPublicQuestionOverlay = ref(false);
+const selectedPublicQuestion = ref(null);
+const revealPublicAnswer = ref(false);
+
 const selectedAttemptSessionDetail = computed(() =>
   selectedAttemptContext.value === 'active' ? activeSessionDetail.value : expiredSessionDetail.value
 );
@@ -1065,6 +1375,13 @@ onMounted(async () => {
   }
   if (isTeacher.value) {
     await sessionStore.fetchMySessions();
+  } else {
+    try {
+      const res = await axios.get(`/api/divisions/${divisionId.value}/public-suggested-questions`);
+      publicSuggestedQuestions.value = res.data.suggested_questions ?? [];
+    } catch {
+      // handled silently
+    }
   }
   await courseStore.fetchCourses(divisionId.value);
 
@@ -1349,6 +1666,167 @@ async function handleToggleSession(session) {
     await divisionStore.openSessionForDivision(session.id, divisionId.value);
   }
   await divisionStore.fetchDivision(divisionId.value);
+}
+
+const currentAnalysisData = computed(() => {
+  if (!analysisModalSession.value || !analysisQuestions.value.length) { return []; }
+  const analysis = analysisModalSession.value.pivot?.analysis ?? [];
+  return analysisQuestions.value.map((question, index) => ({
+    ...question,
+    question_id: question.id,
+    questionNumber: index + 1,
+    success_ratio: analysis[index]?.success_ratio ?? 0,
+    reviewed: analysis[index]?.reviewed ?? false,
+  }));
+});
+
+function successRatioBarClass(ratio) {
+  if (ratio >= 0.7) { return 'bg-success'; }
+  if (ratio >= 0.4) { return 'bg-warning'; }
+  return 'bg-error';
+}
+
+function successRatioTextClass(ratio) {
+  if (ratio >= 0.7) { return 'text-success'; }
+  if (ratio >= 0.4) { return 'text-warning'; }
+  return 'text-error';
+}
+
+async function openAnalysisModal(session) {
+  analysisModalSession.value = session;
+  showAnalysisModal.value = true;
+  isLoadingAnalysis.value = true;
+  analysisQuestions.value = [];
+  try {
+    const res = await axios.get(`/api/kangourou-sessions/${session.code}`);
+    analysisQuestions.value = res.data.session?.paper?.questions ?? [];
+  } catch {
+    // handled silently
+  } finally {
+    isLoadingAnalysis.value = false;
+  }
+}
+
+function closeAnalysisModal() {
+  showAnalysisModal.value = false;
+  analysisModalSession.value = null;
+  analysisQuestions.value = [];
+}
+
+async function toggleReviewed(questionId) {
+  if (!analysisModalSession.value) { return; }
+  const session = analysisModalSession.value;
+  try {
+    const res = await axios.patch(
+      `/api/divisions/${divisionId.value}/kangourou-sessions/${session.id}/questions/${questionId}/reviewed`
+    );
+    const updated = res.data.analysis;
+    // Update the local pivot analysis
+    const sessions = divisionStore.division?.kangourou_sessions ?? [];
+    const idx = sessions.findIndex(s => s.id === session.id);
+    if (idx !== -1) {
+      sessions[idx] = { ...sessions[idx], pivot: { ...sessions[idx].pivot, analysis: updated } };
+    }
+    analysisModalSession.value = { ...session, pivot: { ...session.pivot, analysis: updated } };
+    // Sync question overlay reviewed state
+    if (selectedAnalysisQuestion.value?.question_id === questionId) {
+      const updatedItem = updated.find(a => a.question_id === questionId);
+      if (updatedItem) {
+        selectedAnalysisQuestion.value = { ...selectedAnalysisQuestion.value, reviewed: updatedItem.reviewed };
+      }
+    }
+  } catch {
+    // handled silently
+  }
+}
+
+function openQuestionOverlay(item) {
+  selectedAnalysisQuestion.value = item;
+  revealAnswer.value = false;
+  showQuestionOverlay.value = true;
+}
+
+function closeQuestionOverlay() {
+  showQuestionOverlay.value = false;
+  selectedAnalysisQuestion.value = null;
+  revealAnswer.value = false;
+}
+
+// Suggested Questions functions (teacher)
+function suggestedQuestionsByLevel(level) {
+  return suggestedQuestions.value.filter(sq => sq.level === level);
+}
+
+async function openSuggestedQuestionsModal(course) {
+  suggestedQuestionsForCourse.value = course;
+  suggestedQuestionsCourseName.value = course.title;
+  showSuggestedQuestionsModal.value = true;
+  isLoadingSuggestedQuestions.value = true;
+  suggestedQuestions.value = [];
+  try {
+    const res = await axios.get(`/api/courses/${course.id}/suggested-questions`);
+    suggestedQuestions.value = res.data.suggested_questions ?? [];
+  } catch {
+    // handled silently
+  } finally {
+    isLoadingSuggestedQuestions.value = false;
+  }
+}
+
+function closeSuggestedQuestionsModal() {
+  showSuggestedQuestionsModal.value = false;
+  suggestedQuestionsForCourse.value = null;
+  suggestedQuestions.value = [];
+}
+
+function openSuggestedQuestionOverlay(sq) {
+  selectedSuggestedQuestion.value = sq;
+  revealSuggestedAnswer.value = false;
+  showSuggestedQuestionOverlay.value = true;
+}
+
+function closeSuggestedQuestionOverlay() {
+  showSuggestedQuestionOverlay.value = false;
+  selectedSuggestedQuestion.value = null;
+  revealSuggestedAnswer.value = false;
+}
+
+async function handleToggleSuggestedPublic(sq) {
+  try {
+    const res = await axios.patch(`/api/suggested-questions/${sq.id}/toggle-public`);
+    const updated = res.data.suggested_question;
+    const idx = suggestedQuestions.value.findIndex(q => q.id === sq.id);
+    if (idx !== -1) {
+      suggestedQuestions.value[idx] = { ...suggestedQuestions.value[idx], is_public: updated.is_public };
+    }
+    if (selectedSuggestedQuestion.value?.id === sq.id) {
+      selectedSuggestedQuestion.value = { ...selectedSuggestedQuestion.value, is_public: updated.is_public };
+    }
+  } catch {
+    // handled silently
+  }
+}
+
+async function handleDeleteSuggestedQuestion(sq) {
+  try {
+    await axios.delete(`/api/suggested-questions/${sq.id}`);
+    suggestedQuestions.value = suggestedQuestions.value.filter(q => q.id !== sq.id);
+  } catch {
+    // handled silently
+  }
+}
+
+// Public question overlay (student)
+function openPublicQuestionOverlay(sq) {
+  selectedPublicQuestion.value = sq;
+  revealPublicAnswer.value = false;
+  showPublicQuestionOverlay.value = true;
+}
+
+function closePublicQuestionOverlay() {
+  showPublicQuestionOverlay.value = false;
+  selectedPublicQuestion.value = null;
+  revealPublicAnswer.value = false;
 }
 
 function formatExpiredTime(expiresAt) {

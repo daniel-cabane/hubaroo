@@ -249,6 +249,14 @@ const totalCount = computed(() =>
 
 function toggle() {
   isOpen.value = !isOpen.value;
+  if (isOpen.value) {
+    demandStore.studentDemands
+      .filter(sd => sd.status === 'denied')
+      .forEach(sd => demandStore.removeStudentDemand(sd.id));
+    jumpDemandStore.studentDemands
+      .filter(jsd => jsd.status === 'denied')
+      .forEach(jsd => jumpDemandStore.removeStudentDemand(jsd.id));
+  }
 }
 
 function handleClickOutside(e) {

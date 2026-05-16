@@ -286,4 +286,27 @@ class DivisionController extends Controller
 
         return response()->json(['invites' => $invites]);
     }
+
+    public function toggleQuestionReviewed(Division $division, KangourouSession $kangourouSession, int $questionId, Request $request): JsonResponse
+    {
+        $this->authorize('update', $division);
+
+        $pivot = $division->kangourouSessions()->where('kangourou_session_id', $kangourouSession->id)->first()?->pivot;
+
+        if (! $pivot || ! $pivot->analysis) {
+            return response()->json(['message' => 'Analysis not found.'], 404);
+        }
+
+        $analysis = collect($pivot->analysis)->map(function (array $item) use ($questionId): array {
+            if ($item['question_id'] === $questionId) {
+                $item['reviewed'] = ! $item['reviewed'];
+            }
+
+            return $item;
+        })->all();
+
+        $division->kangourouSessions()->updateExistingPivot($kangourouSession->id, ['analysis' => $analysis]);
+
+        return response()->json(['analysis' => $analysis]);
+    }
 }

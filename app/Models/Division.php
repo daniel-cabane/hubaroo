@@ -57,7 +57,9 @@ class Division extends Model
 
     public function kangourouSessions(): BelongsToMany
     {
-        return $this->belongsToMany(KangourouSession::class);
+        return $this->belongsToMany(KangourouSession::class)
+            ->using(DivisionKangourouSession::class)
+            ->withPivot('analysis');
     }
 
     public function courses(): HasMany
