@@ -142,3 +142,26 @@ test('student can fetch their own attempt', function () {
 
     $response->assertOk()->assertJsonStructure(['attempt']);
 });
+
+test('authenticated user can fetch their jump attempts', function () {
+    JumpAttempt::create([
+        'jump_id' => $this->jump->id,
+        'user_id' => $this->student->id,
+        'question_list' => [],
+        'score' => 0,
+        'status' => 'inProgress',
+        'timer' => 0,
+        'extra_time' => 0,
+        'termination' => 'none',
+    ]);
+
+    $response = $this->actingAs($this->student)->getJson('/api/my/jump-attempts');
+
+    $response->assertOk()
+        ->assertJsonStructure(['attempts' => [['id', 'jump_id', 'user_id', 'status', 'updated_at']]])
+        ->assertJsonCount(1, 'attempts');
+});
+
+test('guest cannot fetch my jump attempts', function () {
+    $this->getJson('/api/my/jump-attempts')->assertUnauthorized();
+});

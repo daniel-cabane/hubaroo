@@ -10,8 +10,6 @@ class JumpAttempt extends Model
 {
     protected $table = 'jump_user';
 
-    public $timestamps = false;
-
     /**
      * @var list<string>
      */

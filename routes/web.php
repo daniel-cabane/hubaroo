@@ -121,6 +121,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/api/jumps/{jump}', [JumpController::class, 'destroy'])->name('jumps.destroy');
 
     Route::post('/api/jumps/{jump}/attempts', [JumpAttemptController::class, 'store'])->name('jump-attempts.store');
+    Route::get('/api/my/jump-attempts', [JumpAttemptController::class, 'myIndex'])->name('jump-attempts.myIndex');
     Route::get('/api/jump-attempts/{jumpAttempt}', [JumpAttemptController::class, 'show'])->name('jump-attempts.show');
     Route::patch('/api/jump-attempts/{jumpAttempt}/answer', [JumpAttemptController::class, 'updateAnswer'])->name('jump-attempts.updateAnswer');
     Route::post('/api/jump-attempts/{jumpAttempt}/submit', [JumpAttemptController::class, 'submit'])->name('jump-attempts.submit');

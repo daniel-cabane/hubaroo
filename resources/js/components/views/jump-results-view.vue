@@ -51,7 +51,7 @@
           <p class="text-sm text-text-muted mb-2">Score total</p>
           <p class="text-5xl font-bold text-primary">{{ jumpAttemptStore.attempt.score }}</p>
           <p class="text-sm text-text-muted mt-2">
-            {{ correctCount }} / {{ questionList.length }} correctes
+            {{ correctCount }} / {{ questionList.length }} réponse<span v-if="correctCount>1">s</span> correcte<span v-if="correctCount>1">s</span>
           </p>
         </div>
 

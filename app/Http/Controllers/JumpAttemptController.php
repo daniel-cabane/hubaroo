@@ -185,6 +185,16 @@ class JumpAttemptController extends Controller
         return $data;
     }
 
+    public function myIndex(Request $request): JsonResponse
+    {
+        $attempts = JumpAttempt::where('user_id', $request->user()->id)
+            ->with('jump.course.division')
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json(['attempts' => $attempts]);
+    }
+
     private function authorizeAttemptAccess(JumpAttempt $attempt, ?User $user): void
     {
         if (! $user) {
