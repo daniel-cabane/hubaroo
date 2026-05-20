@@ -10,7 +10,7 @@
         <p class="text-md font-medium text-error">Saut en cours - Ne pas quitter cette page</p>
       </div>
       <div class="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-text-muted truncate max-w-xs text-center">
-        {{ jumpAttemptStore.attempt?.user?.name }}
+        {{ authStore.user?.name }}
       </div>
       <button
         @click="toggleTimer"
@@ -211,10 +211,12 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
+import { useAuthStore } from '@/stores/authStore';
 
 const route = useRoute();
 const router = useRouter();
 const jumpAttemptStore = useJumpAttemptStore();
+const authStore = useAuthStore();
 
 const currentIndex = ref(0);
 const slideDirection = ref('slide-left');

@@ -114,6 +114,7 @@
         </div>
       </div>
     </template>
+
   </div>
 </template>
 
@@ -180,12 +181,6 @@ async function handleRejoinRequest() {
       window.Echo.channel(`jump-rejoin.${currentDemandId.value}`)
         .listen('.JumpRejoinDemandResolved', (event) => {
           jumpRejoinDemandStore.resolveStudentDemand(currentDemandId.value, event.resolution, event.extra_time);
-          if (event.resolution === 'approved') {
-            router.push({
-              name: 'JumpAttempt',
-              params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
-            });
-          }
         });
     }
   } catch {

@@ -58,8 +58,8 @@ class JumpQuestionSelector
             return $selected;
         }
 
-        // Q4..Qn: linearly spaced from mastery to min(2300, mastery + 200*growth)
-        $maxDifficulty = min(2300, $mastery + 200 * $growth);
+        // Q4..Qn: linearly spaced from mastery to min(2300, mastery + 100*growth)
+        $maxDifficulty = min(2300, $mastery + 100 * $growth);
         $remaining = $nbQuestions - 3;
 
         for ($k = 1; $k <= $remaining; $k++) {
@@ -80,10 +80,12 @@ class JumpQuestionSelector
     {
         $selectedIds = collect($alreadySelected)->pluck('id')->toArray();
 
-        return $questions
+        $pool = $questions
             ->reject(fn (Question $q) => in_array($q->id, $selectedIds))
             ->sortBy(fn (Question $q) => abs($q->difficulty - $target))
-            ->first();
+            ->take(20);
+
+        return $pool->isNotEmpty() ? $pool->random() : null;
     }
 
     /**
