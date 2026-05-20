@@ -89,7 +89,7 @@
               />
 
               <!-- Answer Buttons (A-E) -->
-              <div class="flex justify-center gap-3">
+              <div v-if="!isNumericQuestion" class="flex justify-center gap-3">
                 <button
                   v-for="letter in ['A', 'B', 'C', 'D', 'E']"
                   :key="letter"
@@ -100,6 +100,67 @@
                 >
                   {{ letter }}
                 </button>
+              </div>
+
+              <!-- Numeric Answer Display (Tier 4) -->
+              <div v-else class="flex flex-col items-center gap-4">
+                <label class="text-sm text-text-muted">Réponse numérique</label>
+                <div class="flex flex-col items-center gap-3">
+                  <div
+                    class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-900 text-text-main dark:text-surface select-none"
+                    :class="numericInputClass"
+                  >
+                    {{ numericInputValue !== '' ? numericInputValue : '—' }}
+                  </div>
+                  <p v-if="!isInProgress" class="text-sm text-text-muted">
+                    Correct : <span class="font-bold text-success">{{ currentQuestion?.correct_answer }}</span>
+                  </p>
+                  <!-- Keypad Toggle Button -->
+                  <button
+                    v-if="isInProgress"
+                    @click="showKeypad = !showKeypad"
+                    class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+                  >
+                    {{ showKeypad ? 'Masquer le clavier' : 'Afficher le clavier' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Keypad Overlay -->
+              <div
+                v-if="isInProgress && showKeypad"
+                class="fixed inset-0 z-40 bg-black/30 flex items-center justify-center"
+                @click.self="showKeypad = false"
+              >
+                <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 shadow-xl flex flex-col items-center gap-4 relative">
+                  <!-- Close Button -->
+                  <button
+                    @click="showKeypad = false"
+                    class="absolute top-3 right-3 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    <X class="w-5 h-5 text-text-main dark:text-surface" />
+                  </button>
+                  <!-- Answer Display in Overlay -->
+                  <div
+                    class="w-32 h-16 text-3xl font-bold flex items-center justify-center rounded-xl border-2 bg-surface dark:bg-gray-800 text-text-main dark:text-surface select-none"
+                    :class="numericInputClass"
+                  >
+                    {{ numericInputValue !== '' ? numericInputValue : '—' }}
+                  </div>
+                  <!-- Keypad Buttons -->
+                  <div class="grid grid-cols-3 gap-2">
+                    <button
+                      v-for="key in ['1','2','3','4','5','6','7','8','9','delete','0']"
+                      :key="key"
+                      @click="handleNumericKey(key === 'delete' ? '\u232b' : key)"
+                      class="w-16 h-16 rounded-xl text-2xl font-bold transition-colors cursor-pointer shadow flex items-center justify-center"
+                      :class="key === 'delete' ? 'bg-gray-200 dark:bg-gray-700 text-error col-start-1' : 'bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-gray-200 dark:hover:bg-gray-700'"
+                    >
+                      <Delete v-if="key === 'delete'" class="w-6 h-6" />
+                      <span v-else>{{ key }}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </Transition>
@@ -148,7 +209,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 
 const route = useRoute();
@@ -164,6 +225,8 @@ const showBlurAlarm = ref(false);
 const blurCountdown = ref(10);
 const remainingSeconds = ref(0);
 const showImageOverlay = ref(false);
+const numericInputValue = ref('');
+const showKeypad = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
@@ -176,6 +239,17 @@ const currentQuestion = computed(() => {
   const item = questionList.value[currentIndex.value];
   if (!item) return null;
   return item;
+});
+
+const isNumericQuestion = computed(() => currentQuestion.value?.tier === 4);
+
+const numericInputClass = computed(() => {
+  if (isInProgress.value) return 'border-border';
+  const item = questionList.value[currentIndex.value];
+  const answer = item?.answer;
+  const correct = item?.correct_answer;
+  if (answer === null || answer === undefined || answer === '') return 'border-border';
+  return answer === correct ? 'border-success bg-success/5' : 'border-error bg-error/5';
 });
 
 const answeredCount = computed(() =>
@@ -222,12 +296,14 @@ function answerButtonClass(letter) {
 }
 
 function goToQuestion(idx) {
+  if (isNumericQuestion.value) saveNumericAnswer();
   slideDirection.value = idx > currentIndex.value ? 'slide-left' : 'slide-right';
   currentIndex.value = idx;
 }
 
 function prevQuestion() {
   if (currentIndex.value > 0) {
+    if (isNumericQuestion.value) saveNumericAnswer();
     slideDirection.value = 'slide-right';
     currentIndex.value--;
   }
@@ -235,8 +311,40 @@ function prevQuestion() {
 
 function nextQuestion() {
   if (currentIndex.value < questionList.value.length - 1) {
+    if (isNumericQuestion.value) saveNumericAnswer();
     slideDirection.value = 'slide-left';
     currentIndex.value++;
+  }
+}
+
+function handleNumericKey(key) {
+  if (!isInProgress.value) return;
+  if (key === '\u232b') {
+    numericInputValue.value = numericInputValue.value.slice(0, -1);
+  } else {
+    const newStr = numericInputValue.value + key;
+    const num = parseInt(newStr, 10);
+    if (!isNaN(num) && num <= 1000000) {
+      numericInputValue.value = String(num);
+    }
+  }
+  saveNumericAnswer();
+}
+
+async function saveNumericAnswer() {
+  if (!isInProgress.value) return;
+  const val = numericInputValue.value;
+  const answer = val === '' ? null : String(parseInt(val, 10));
+  if (val !== '' && (isNaN(parseInt(val, 10)) || parseInt(val, 10) < 0 || parseInt(val, 10) > 1000000)) return;
+  try {
+    await jumpAttemptStore.updateAnswer(
+      jumpAttemptStore.attempt.id,
+      currentIndex.value,
+      answer,
+      remainingSeconds.value
+    );
+  } catch {
+    // handled by store
   }
 }
 
@@ -285,6 +393,20 @@ function handleKeydown(e) {
   }
   if (e.key === 'ArrowLeft') { e.preventDefault(); prevQuestion(); return; }
   if (e.key === 'ArrowRight') { e.preventDefault(); nextQuestion(); return; }
+
+  if (isNumericQuestion.value && isInProgress.value) {
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      handleNumericKey('\u232b');
+      return;
+    }
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      handleNumericKey(e.key);
+      return;
+    }
+    return;
+  }
 
   const letterMap = { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E' };
   const digit = parseInt(e.key, 10);
@@ -345,11 +467,15 @@ function handleFocus() {
   }
 }
 
-watch(currentIndex, () => {
+watch(currentIndex, (newIdx) => {
+  const item = questionList.value[newIdx];
+  if (item?.tier === 4) {
+    numericInputValue.value = item.answer ?? '';
+  }
   nextTick(() => {
     const container = navBar.value;
     if (!container) return;
-    const btn = container.querySelectorAll('button')[currentIndex.value];
+    const btn = container.querySelectorAll('button')[newIdx];
     if (btn) btn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   });
 });

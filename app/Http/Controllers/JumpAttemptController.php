@@ -78,6 +78,7 @@ class JumpAttemptController extends Controller
             $question = $questions->get($item['id']);
             if ($question) {
                 $item['image'] = $question->image;
+                $item['tier'] = $question->tier;
             }
 
             if ($shouldHideCorrectAnswers && $attempt->status === 'inProgress') {
@@ -174,6 +175,7 @@ class JumpAttemptController extends Controller
             $question = $questions->get($item['id']);
             if ($question) {
                 $item['image'] = $question->image;
+                $item['tier'] = $question->tier;
             }
 
             return $item;
