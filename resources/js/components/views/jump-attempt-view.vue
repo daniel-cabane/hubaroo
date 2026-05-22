@@ -208,7 +208,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -232,6 +232,7 @@ const showKeypad = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
+const isSubmitting = ref(false);
 
 const questionList = computed(() => jumpAttemptStore.attempt?.question_list ?? []);
 const isInProgress = computed(() => jumpAttemptStore.isInProgress);
@@ -368,6 +369,7 @@ async function selectAnswer(letter) {
 
 async function handleSubmit() {
   showSubmitModal.value = false;
+  isSubmitting.value = true;
   try {
     await jumpAttemptStore.submitAttempt(jumpAttemptStore.attempt.id, remainingSeconds.value, 'submitted');
     router.replace({
@@ -375,6 +377,7 @@ async function handleSubmit() {
       params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
     });
   } catch {
+    isSubmitting.value = false;
     // handled by store
   }
 }
@@ -436,6 +439,7 @@ function startCountdown(timeLimitMinutes, extraTimeSeconds = 0) {
 
 async function autoSubmit(termination = 'timeout') {
   if (!isInProgress.value) return;
+  isSubmitting.value = true;
   try {
     await jumpAttemptStore.submitAttempt(jumpAttemptStore.attempt.id, remainingSeconds.value, termination);
     router.replace({
@@ -443,9 +447,44 @@ async function autoSubmit(termination = 'timeout') {
       params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
     });
   } catch {
+    isSubmitting.value = false;
     // handled by store
   }
 }
+
+function submitBeacon() {
+  if (!jumpAttemptStore.attempt?.id) return;
+  const csrfMatch = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+  const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
+  fetch(`/api/jump-attempts/${jumpAttemptStore.attempt.id}/submit`, {
+    method: 'POST',
+    keepalive: true,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-XSRF-TOKEN': csrfToken,
+    },
+    body: JSON.stringify({ timer: remainingSeconds.value, termination: 'abandoned' }),
+  });
+}
+
+function handleBeforeUnload(e) {
+  if (!isInProgress.value) return;
+  e.preventDefault();
+  e.returnValue = '';
+  submitBeacon();
+}
+
+onBeforeRouteLeave(async () => {
+  if (!isInProgress.value || isSubmitting.value) {
+    return true;
+  }
+  const confirmed = window.confirm('Êtes-vous sûr de vouloir quitter ? Votre saut sera soumis automatiquement.');
+  if (!confirmed) {
+    return false;
+  }
+  await autoSubmit('abandoned');
+  return false;
+});
 
 function handleBlur() {
   if (isInProgress.value) {
@@ -505,11 +544,26 @@ onMounted(async () => {
     }
   }
 
+  const loadedAttempt = jumpAttemptStore.attempt;
+  if (!loadedAttempt) {
+    router.replace({ name: 'Home' });
+    return;
+  }
+  if (loadedAttempt.jump?.status !== 'active') {
+    router.replace({ name: 'JumpResults', params: { jumpId, attemptId: loadedAttempt.id } });
+    return;
+  }
+  if (loadedAttempt.status === 'finished') {
+    router.replace({ name: 'JumpResults', params: { jumpId, attemptId: loadedAttempt.id } });
+    return;
+  }
+
   if (isInProgress.value) {
     const jump = jumpAttemptStore.attempt?.jump;
     const extraTimeSeconds = jumpAttemptStore.attempt?.extra_time ?? 0;
     startCountdown(jump?.time ?? 15, extraTimeSeconds);
     window.addEventListener('keydown', handleKeydown);
+    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
 
@@ -521,6 +575,7 @@ onMounted(async () => {
         blurInterval = null;
         showBlurAlarm.value = false;
         window.removeEventListener('keydown', handleKeydown);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
         window.removeEventListener('blur', handleBlur);
         window.removeEventListener('focus', handleFocus);
         router.replace({
@@ -535,6 +590,7 @@ onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
   window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('blur', handleBlur);
   window.removeEventListener('focus', handleFocus);
   window.Echo.leave(`jump.${route.params.jumpId}`);

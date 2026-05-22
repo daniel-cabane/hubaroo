@@ -262,7 +262,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
@@ -291,6 +291,7 @@ const isShuffled = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
+const isSubmitting = ref(false);
 
 const session = computed(() => sessionStore.session);
 const answers = computed(() => attemptStore.attempt?.answers || []);
@@ -427,13 +428,15 @@ async function selectAnswer(letter) {
 
 async function handleSubmit() {
   showSubmitModal.value = false;
+  isSubmitting.value = true;
   try {
-    const result = await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, 'submitted');
+    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, 'submitted');
     router.replace({
       name: 'Results',
       params: { code: route.params.code, attemptId: attemptStore.attempt.id },
     });
   } catch {
+    isSubmitting.value = false;
     // error handled by store
   }
 }
@@ -582,6 +585,7 @@ function startCountdown(timeLimitMinutes) {
 
 async function autoSubmit(termination = 'timeout') {
   if (!isInProgress.value) return;
+  isSubmitting.value = true;
   try {
     await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, termination);
     router.replace({
@@ -589,9 +593,44 @@ async function autoSubmit(termination = 'timeout') {
       params: { code: route.params.code, attemptId: attemptStore.attempt.id },
     });
   } catch {
+    isSubmitting.value = false;
     // error handled by store
   }
 }
+
+function submitBeacon() {
+  if (!attemptStore.attempt?.id) return;
+  const csrfMatch = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+  const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : '';
+  fetch(`/api/attempts/${attemptStore.attempt.id}/submit`, {
+    method: 'POST',
+    keepalive: true,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-XSRF-TOKEN': csrfToken,
+    },
+    body: JSON.stringify({ timer: remainingSeconds.value, termination: 'abandoned' }),
+  });
+}
+
+function handleBeforeUnload(e) {
+  if (!isInProgress.value) return;
+  e.preventDefault();
+  e.returnValue = '';
+  submitBeacon();
+}
+
+onBeforeRouteLeave(async () => {
+  if (!isInProgress.value || isSubmitting.value) {
+    return true;
+  }
+  const confirmed = window.confirm('Êtes-vous sûr de vouloir quitter ? Votre session sera soumise automatiquement.');
+  if (!confirmed) {
+    return false;
+  }
+  await autoSubmit('abandoned');
+  return false;
+});
 
 function handleBlur() {
   if (isInProgress.value) {
@@ -623,11 +662,21 @@ onMounted(async () => {
     await sessionStore.fetchSession(code);
     await attemptStore.fetchAttempt(attemptId);
 
+    if (session.value?.status !== 'active') {
+      router.replace({ name: 'Results', params: { code, attemptId } });
+      return;
+    }
+    if (attemptStore.attempt?.status === 'finished') {
+      router.replace({ name: 'Results', params: { code, attemptId } });
+      return;
+    }
+
     if (currentIndex.value >= 24) {
       numericInputValue.value = answers.value[currentIndex.value]?.answer ?? '';
     }
 
     window.addEventListener('keydown', handleKeydown);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     if (isInProgress.value) {
       const preferences = session.value?.preferences || {};
@@ -671,6 +720,7 @@ onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
   window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('blur', handleBlur);
   window.removeEventListener('focus', handleFocus);
   if (session.value?.id) {

@@ -11,7 +11,7 @@
         <nav class="flex space-x-4 items-center">
           <!-- Active attempt banner -->
           <div
-            v-if="attemptStore.activeRecovery"
+            v-if="attemptStore.activeRecovery || jumpAttemptStore.activeJumpRecovery"
             class="flex items-center gap-2 bg-surface/20 rounded-lg px-3 py-1"
           >
             <span class="text-sm font-medium text-surface/70">Tentative en cours</span>
@@ -307,6 +307,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { CircleUserRound, ChevronDown, User, Layers, ClipboardList, GraduationCap, BookOpen, ShieldCheck, Bug, LogOut, LogIn, UserPlus } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useAttemptStore } from '@/stores/attemptStore';
+import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useBugReportStore } from '@/stores/bugReportStore';
 import AlertCenter from '@/components/AlertCenter.vue';
 import RecentAttemptsPanel from '@/components/RecentAttemptsPanel.vue';
@@ -315,6 +316,7 @@ const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
 const attemptStore = useAttemptStore();
+const jumpAttemptStore = useJumpAttemptStore();
 const bugReportStore = useBugReportStore();
 const showAccountMenu = ref(false);
 const showBannerMenu = ref(false);
@@ -329,7 +331,7 @@ const selectedRole = ref(null);
 const menuContainer = ref(null);
 const bannerMenuContainer = ref(null);
 
-const isAttemptView = computed(() => route.name === 'Attempt');
+const isAttemptView = computed(() => route.name === 'Attempt' || route.name === 'JumpAttempt');
 const logoSrc = '/logo%20dark.png';
 
 function handleClickOutside(e) {
@@ -343,6 +345,7 @@ function handleClickOutside(e) {
 
 onMounted(() => {
   attemptStore.checkRecovery();
+  jumpAttemptStore.checkJumpRecovery();
   document.addEventListener('click', handleClickOutside);
   if (authStore.isAuthenticated) {
     bugReportStore.fetchUnsolvedCount();
@@ -407,6 +410,15 @@ async function submitBugReport() {
 }
 
 function resumeStoredAttempt() {
+  if (jumpAttemptStore.activeJumpRecovery) {
+    const stored = jumpAttemptStore.activeJumpRecovery;
+    jumpAttemptStore.activeJumpRecovery = null;
+    router.push({
+      name: 'JumpAttempt',
+      params: { jumpId: stored.jump_id, attemptId: stored.attempt_id },
+    });
+    return;
+  }
   const stored = attemptStore.activeRecovery;
   attemptStore.activeRecovery = null;
   router.push({
@@ -417,6 +429,10 @@ function resumeStoredAttempt() {
 
 function dismissAttempt() {
   showBannerMenu.value = false;
+  if (jumpAttemptStore.activeJumpRecovery) {
+    jumpAttemptStore.dismissJumpRecovery();
+    return;
+  }
   attemptStore.dismissRecovery();
 }
 

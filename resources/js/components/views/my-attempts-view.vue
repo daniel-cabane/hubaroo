@@ -29,29 +29,53 @@
         >
           Voir les résultats
         </router-link>
-        <span
+        <router-link
           v-else-if="attempt.status === 'finished'"
           class="px-4 py-2 rounded-lg bg-primary/40 text-surface text-sm font-medium cursor-not-allowed"
         >
           Voir les résultats
-        </span>
-        <router-link
-          v-else
-          :to="{ name: 'Attempt', params: { code: attempt.kangourou_session?.code, attemptId: attempt.id } }"
-          class="px-4 py-2 rounded-lg bg-info hover:bg-info/80 text-surface text-sm font-medium transition-colors"
-        >
-          Reprendre
         </router-link>
+        <div v-else class="flex flex-col items-end gap-1">
+          <button
+            @click="requestRejoin(attempt)"
+            :disabled="sentRejoinIds.has(attempt.id)"
+            class="px-4 py-2 rounded-lg bg-info hover:bg-info/80 text-surface text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ sentRejoinIds.has(attempt.id) ? 'Demande envoyée' : 'Demander à reprendre' }}
+          </button>
+          <span v-if="rejoinError[attempt.id]" class="text-xs text-error">{{ rejoinError[attempt.id] }}</span>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useAttemptStore } from '@/stores/attemptStore';
+import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';
 
 const attemptStore = useAttemptStore();
+const rejoinDemandStore = useRejoinDemandStore();
+
+const sentRejoinIds = ref(new Set());
+const rejoinError = ref({});
+
+async function requestRejoin(attempt) {
+  rejoinError.value[attempt.id] = null;
+  try {
+    const demand = await rejoinDemandStore.createDemand(attempt.id);
+    rejoinDemandStore.addStudentDemand({
+      id: demand.id,
+      attemptId: attempt.id,
+      sessionCode: attempt.kangourou_session?.code,
+      sessionTitle: attempt.kangourou_session?.paper?.title ?? null,
+    });
+    sentRejoinIds.value = new Set([...sentRejoinIds.value, attempt.id]);
+  } catch {
+    rejoinError.value[attempt.id] = rejoinDemandStore.error || 'Erreur lors de l\'envoi.';
+  }
+}
 
 onMounted(() => {
   attemptStore.fetchMyAttempts();

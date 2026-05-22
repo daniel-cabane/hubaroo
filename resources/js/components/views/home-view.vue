@@ -1,81 +1,99 @@
 <template>
-  <div class="min-h-[calc(100vh-64px)] p-6">
-    <!-- Highlight Overlay -->
+  <div class="min-h-[calc(100vh-64px)] p-6 flex flex-col">
+    <!-- Dans la poche -->
     <div
-      v-if="authStore.isAuthenticated && showHighlights && ((!authStore.user?.is_teacher && (divisionStore.invites.length > 0 || activeJumps.length > 0 || publicSuggestedQuestions.length > 0)) || activeSessions.length > 0)"
-      class="fixed top-20 left-0 right-0 z-40 max-h-[400px] overflow-y-auto bg-gradient-to-b from-primary/10 to-primary/5 border-b border-primary/20 p-4"
+      v-if="authStore.isAuthenticated && ((!authStore.user?.is_teacher && (divisionStore.invites.length > 0 || activeJumps.length > 0 || publicSuggestedQuestions.length > 0)) || activeSessions.length > 0)"
+      class="mb-4 rounded-xl border border-primary/20 overflow-hidden"
     >
-      <div class="container mx-auto">
-        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Dans la poche</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <!-- Classe Invites -->
-          <div v-if="!authStore.user?.is_teacher && divisionStore.invites.length > 0">
-            <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Invitations de classe</h4>
-            <div class="space-y-2">
-              <div v-for="invite in divisionStore.invites" :key="invite.id" class="flex items-center justify-between p-3 bg-surface dark:bg-gray-900 rounded-lg border border-secondary/20">
-                <div>
-                  <p class="font-medium text-sm text-text-main dark:text-surface">{{ invite.division?.name }}</p>
-                  <p class="text-xs text-text-muted">Invitation à rejoindre la classe</p>
-                </div>
-                <div class="flex gap-2">
-                  <button @click="openInviteModal(invite.id)" class="px-2 py-1 rounded-lg bg-success hover:bg-success/80 text-white text-xs font-medium transition-colors">Accepter</button>
-                  <button @click="divisionStore.declineInvite(invite.id)" class="px-2 py-1 rounded-lg bg-error/20 hover:bg-error/30 text-error text-xs font-medium transition-colors">Refuser</button>
+      <!-- Toggle Header -->
+      <button
+        @click="showHighlights = !showHighlights"
+        class="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 transition-colors"
+      >
+        <h3 class="text-base font-semibold text-text-main dark:text-surface">Dans la poche</h3>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-5 h-5 bg-primary/20 text-primary rounded-full text-xs font-medium">{{ (!authStore.user?.is_teacher ? divisionStore.invites.length + activeJumps.length + publicSuggestedQuestions.length : 0) + activeSessions.length }}</span>
+          <span class="text-sm text-primary font-medium">{{ showHighlights ? 'Masquer' : 'Afficher' }}</span>
+          <ChevronDown class="w-4 h-4 text-primary transition-transform duration-300" :class="showHighlights ? 'rotate-180' : ''" />
+        </div>
+      </button>
+
+      <!-- Animated content -->
+      <div
+        class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        :class="showHighlights ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+      >
+        <div class="overflow-hidden">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 p-4 bg-gradient-to-b from-primary/10 to-primary/5">
+            <!-- Classe Invites -->
+            <div v-if="!authStore.user?.is_teacher && divisionStore.invites.length > 0">
+              <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Invitations de classe</h4>
+              <div class="space-y-2">
+                <div v-for="invite in divisionStore.invites" :key="invite.id" class="flex items-center justify-between p-3 bg-surface dark:bg-gray-900 rounded-lg border border-secondary/20">
+                  <div>
+                    <p class="font-medium text-sm text-text-main dark:text-surface">{{ invite.division?.name }}</p>
+                    <p class="text-xs text-text-muted">Invitation à rejoindre la classe</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button @click="openInviteModal(invite.id)" class="px-2 py-1 rounded-lg bg-success hover:bg-success/80 text-white text-xs font-medium transition-colors">Accepter</button>
+                    <button @click="divisionStore.declineInvite(invite.id)" class="px-2 py-1 rounded-lg bg-error/20 hover:bg-error/30 text-error text-xs font-medium transition-colors">Refuser</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Active Jumps -->
-          <div v-if="!authStore.user?.is_teacher && activeJumps.length > 0">
-            <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Sauts actifs</h4>
-            <div class="space-y-2">
-              <router-link
-                v-for="jump in activeJumps"
-                :key="jump.id"
-                :to="{ name: 'JumpAttempt', params: { jumpId: jump.id } }"
-                class="group flex flex-col gap-1 p-3 rounded-lg bg-surface dark:bg-gray-900 border border-success/30 hover:border-success hover:shadow-md transition-all"
-              >
-                <div class="text-xs text-text-muted flex justify-end">{{ jump.division_name }}</div>
-                <p class="font-medium text-text-main dark:text-surface truncate">{{ jump.course?.title }}</p>
-                <p class="text-xs text-text-muted">{{ jump.nb_questions }} questions · {{ jump.time }} min</p>
-              </router-link>
+            <!-- Active Jumps -->
+            <div v-if="!authStore.user?.is_teacher && activeJumps.length > 0">
+              <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Sauts actifs</h4>
+              <div class="space-y-2">
+                <router-link
+                  v-for="jump in activeJumps"
+                  :key="jump.id"
+                  :to="{ name: 'JumpAttempt', params: { jumpId: jump.id } }"
+                  class="group flex flex-col gap-1 p-3 rounded-lg bg-surface dark:bg-gray-900 border border-success/30 hover:border-success hover:shadow-md transition-all"
+                >
+                  <div class="text-xs text-text-muted flex justify-end">{{ jump.division_name }}</div>
+                  <p class="font-medium text-text-main dark:text-surface truncate">{{ jump.course?.title }}</p>
+                  <p class="text-xs text-text-muted">{{ jump.nb_questions }} questions · {{ jump.time }} min</p>
+                </router-link>
+              </div>
             </div>
-          </div>
 
-          <!-- Active Sessions -->
-          <div v-if="activeSessions.length > 0">
-            <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Sessions actives</h4>
-            <div class="space-y-2">
-              <router-link
-                v-for="session in activeSessions"
-                :key="session.id"
-                :to="{ name: 'Session', params: { code: session.code } }"
-                class="group flex flex-col gap-1 p-3 rounded-lg bg-surface dark:bg-gray-900 border border-primary/30 hover:border-primary hover:shadow-md transition-all"
-              >
-                <div class="text-xs text-text-muted flex justify-end">Session ouverte</div>
-                <p class="font-medium text-text-main dark:text-surface truncate">Kangourou {{ session.division_name }}</p>
-              </router-link>
+            <!-- Active Sessions -->
+            <div v-if="activeSessions.length > 0">
+              <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Sessions actives</h4>
+              <div class="space-y-2">
+                <router-link
+                  v-for="session in activeSessions"
+                  :key="session.id"
+                  :to="{ name: 'Session', params: { code: session.code } }"
+                  class="group flex flex-col gap-1 p-3 rounded-lg bg-surface dark:bg-gray-900 border border-primary/30 hover:border-primary hover:shadow-md transition-all"
+                >
+                  <div class="text-xs text-text-muted flex justify-end">Session ouverte</div>
+                  <p class="font-medium text-text-main dark:text-surface truncate">Kangourou {{ session.division_name }}</p>
+                </router-link>
+              </div>
             </div>
-          </div>
 
-          <!-- Public Suggested Questions -->
-          <div v-if="!authStore.user?.is_teacher && publicSuggestedQuestions.length > 0">
-            <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1">
-              <Lightbulb class="w-3 h-3" />
-              Questions à revoir
-            </h4>
-            <div class="space-y-2">
-              <div
-                v-for="sq in publicSuggestedQuestions"
-                :key="sq.id"
-                class="flex items-center justify-between p-3 bg-surface dark:bg-gray-900 rounded-lg border border-warning/30 cursor-pointer hover:border-warning hover:shadow-md transition-all"
-                @click="openPublicQuestionOverlay(sq)"
-              >
-                <div class="flex items-center gap-1">
-                  <Star v-for="n in sq.level" :key="n" class="w-4 h-4 fill-primary text-warning" />
-                  Question niveau {{ sq.level }}
+            <!-- Public Suggested Questions -->
+            <div v-if="!authStore.user?.is_teacher && publicSuggestedQuestions.length > 0" :class="publicSuggestedQuestions.length > 3 ? 'lg:col-span-2' : ''">
+              <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1">
+                <Lightbulb class="w-3 h-3" />
+                Questions à revoir
+              </h4>
+              <div class="questions-grid">
+                <div
+                  v-for="sq in publicSuggestedQuestions"
+                  :key="sq.id"
+                  class="flex items-center justify-between p-3 bg-surface dark:bg-gray-900 rounded-lg border border-warning/30 cursor-pointer hover:border-warning hover:shadow-md transition-all"
+                  @click="openPublicQuestionOverlay(sq)"
+                >
+                  <div class="flex items-center gap-1">
+                    <Star v-for="n in sq.level" :key="n" class="w-4 h-4 fill-primary text-warning" />
+                    Question niveau {{ sq.level }}
+                  </div>
+                  <span class="text-xs text-text-muted truncate ml-2">{{ sq.course_title }}</span>
                 </div>
-                <span class="text-xs text-text-muted truncate ml-2">{{ sq.course_title }}</span>
               </div>
             </div>
           </div>
@@ -83,26 +101,7 @@
       </div>
     </div>
 
-    <!-- Toggle Button for Highlights -->
-    <div
-      v-if="authStore.isAuthenticated && ((!authStore.user?.is_teacher && (divisionStore.invites.length > 0 || activeJumps.length > 0 || publicSuggestedQuestions.length > 0)) || activeSessions.length > 0)"
-      class="fixed top-20 right-6 z-40"
-    >
-      <button
-        @click="showHighlights = !showHighlights"
-        :class="[
-          'px-3 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2',
-          showHighlights
-            ? 'bg-primary text-white shadow-lg'
-            : 'bg-primary/10 text-primary hover:bg-primary/20'
-        ]"
-      >
-        <span class="inline-flex items-center justify-center w-5 h-5 bg-white/20 rounded-full text-xs">{{ (!authStore.user?.is_teacher ? divisionStore.invites.length + activeJumps.length + publicSuggestedQuestions.length : 0) + activeSessions.length }}</span>
-        {{ showHighlights ? 'Masquer' : 'Ouvrir la poche' }}
-      </button>
-    </div>
-
-    <div class="flex items-center justify-center min-h-[calc(100vh-64px)]">
+    <div class="flex items-center justify-center flex-1">
       <div 
         class=" gap-8 max-w-3xl w-full justify-items-center"
         :class="authStore.isAuthenticated ? 'grid grid-cols-1 md:grid-cols-2' : 'grid grid-cols-1'"
@@ -275,7 +274,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { PlusCircle, LogIn, X, Star, Lightbulb } from 'lucide-vue-next';
+import { PlusCircle, LogIn, X, Star, Lightbulb, ChevronDown } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
@@ -427,6 +426,18 @@ onMounted(async () => {
           if (!alreadyExists) {
             div.active_jumps.push(e.jump);
           }
+        })
+        .listen('.JumpReopened', (e) => {
+          if (authStore.user?.is_teacher) { return; }
+          const hasNoAttempt = e.user_ids_without_attempt?.includes(authStore.user?.id);
+          if (!hasNoAttempt) { return; }
+          const div = divisionStore.divisions.find(d => d.id === division.id);
+          if (!div) { return; }
+          if (!div.active_jumps) { div.active_jumps = []; }
+          const alreadyExists = div.active_jumps.some(j => j.id === e.jump.id);
+          if (!alreadyExists) {
+            div.active_jumps.push(e.jump);
+          }
         });
     });
 
@@ -479,3 +490,13 @@ onUnmounted(() => {
   });
 });
 </script>
+
+<style>
+.questions-grid {
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.5rem;
+}
+</style>

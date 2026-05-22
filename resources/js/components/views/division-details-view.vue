@@ -957,7 +957,7 @@
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       @click.self="closeSuggestedQuestionsModal"
     >
-      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-2xl h-[90vh] flex flex-col">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-text-main dark:text-surface flex items-center gap-2">
             <Lightbulb class="w-5 h-5 text-primary" />
@@ -973,46 +973,62 @@
         <div v-else-if="!suggestedQuestions.length" class="py-8 text-center text-text-muted text-sm">
           Aucune question suggérée pour l'instant.
         </div>
-        <div v-else class="overflow-y-auto space-y-6">
-          <div v-for="level in [1, 2, 3]" :key="level">
-            <div v-if="suggestedQuestionsByLevel(level).length">
-              <div class="flex items-center gap-2 mb-2">
-                <Star v-for="n in level" :key="n" class="w-4 h-4 fill-warning text-warning" />
-                <span class="text-xs text-text-muted uppercase tracking-wide">Niveau {{ level }}</span>
-              </div>
-              <div class="space-y-2">
-                <div
-                  v-for="sq in suggestedQuestionsByLevel(level)"
-                  :key="sq.id"
-                  class="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/40 transition-colors"
+        <div v-else class="flex flex-col min-h-0 flex-1">
+          <!-- Tabs -->
+          <div class="flex border-b border-border mb-4">
+            <button
+              v-for="level in [1, 2, 3]"
+              :key="level"
+              @click="suggestedQuestionsTab = level"
+              class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px"
+              :class="suggestedQuestionsTab === level
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-muted hover:text-text-main'"
+            >
+              <Star v-for="n in level" :key="n" class="w-3.5 h-3.5 fill-warning text-warning" />
+              <span>Niveau {{ level }}</span>
+              <span class="ml-1 text-xs px-1.5 py-0.5 rounded-full"
+                :class="suggestedQuestionsTab === level ? 'bg-primary/10 text-primary' : 'bg-gray-100 dark:bg-gray-800 text-text-muted'"
+              >{{ suggestedQuestionsByLevel(level).length }}</span>
+            </button>
+          </div>
+          <!-- Tab content -->
+          <div class="overflow-y-auto space-y-2">
+            <div v-if="suggestedQuestionsByLevel(suggestedQuestionsTab).length === 0" class="py-8 text-center text-text-muted text-sm">
+              Aucune question pour ce niveau.
+            </div>
+            <div
+              v-for="sq in suggestedQuestionsByLevel(suggestedQuestionsTab)"
+              :key="sq.id"
+              class="rounded-lg border border-border hover:border-primary/40 transition-colors overflow-hidden"
+            >
+              <button
+                @click="openSuggestedQuestionOverlay(sq)"
+                class="w-full cursor-pointer group"
+              >
+                <img
+                  v-if="sq.question.image"
+                  :src="'/' + sq.question.image"
+                  class="w-full object-contain group-hover:opacity-80 transition-opacity"
+                  alt="Question"
+                />
+                <span v-else class="text-sm text-text-muted p-3 block">Question #{{ sq.question.id }}</span>
+              </button>
+              <div class="flex justify-end gap-1 px-2 py-1.5 border-t border-border">
+                <button
+                  @click="handleToggleSuggestedPublic(sq)"
+                  :class="['p-1.5 rounded-lg transition-colors cursor-pointer', sq.is_public ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-primary hover:bg-primary/10']"
+                  :title="sq.is_public ? 'Retirer de la vue élèves' : 'Rendre public'"
                 >
-                  <button
-                    @click="openSuggestedQuestionOverlay(sq)"
-                    class="flex-1 text-left cursor-pointer group"
-                  >
-                    <img
-                      v-if="sq.question.image"
-                      :src="'/' + sq.question.image"
-                      class="h-10 object-contain group-hover:opacity-80 transition-opacity"
-                      alt="Question"
-                    />
-                    <span v-else class="text-sm text-text-muted">Question #{{ sq.question.id }}</span>
-                  </button>
-                  <button
-                    @click="handleToggleSuggestedPublic(sq)"
-                    :class="['p-1.5 rounded-lg transition-colors cursor-pointer', sq.is_public ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-primary hover:bg-primary/10']"
-                    :title="sq.is_public ? 'Retirer de la vue élèves' : 'Rendre public'"
-                  >
-                    <Globe class="w-4 h-4" />
-                  </button>
-                  <button
-                    @click="handleDeleteSuggestedQuestion(sq)"
-                    class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
-                    title="Supprimer"
-                  >
-                    <Trash2 class="w-4 h-4" />
-                  </button>
-                </div>
+                  <Globe class="w-4 h-4" />
+                </button>
+                <button
+                  @click="handleDeleteSuggestedQuestion(sq)"
+                  class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                  title="Supprimer"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>
@@ -1085,16 +1101,6 @@
           class="max-h-64 object-contain"
           alt="Question"
         />
-        <div v-if="revealPublicAnswer" class="text-xl font-bold text-success">
-          Réponse : {{ selectedPublicQuestion.question.correct_answer }}
-        </div>
-        <button
-          v-if="!revealPublicAnswer"
-          @click="revealPublicAnswer = true"
-          class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium transition-colors cursor-pointer"
-        >
-          Révéler la réponse
-        </button>
       </div>
     </div>
 
@@ -1322,6 +1328,7 @@ const showSuggestedQuestionsModal = ref(false);
 const suggestedQuestionsCourseName = ref('');
 const suggestedQuestionsForCourse = ref(null);
 const suggestedQuestions = ref([]);
+const suggestedQuestionsTab = ref(1);
 const isLoadingSuggestedQuestions = ref(false);
 const showSuggestedQuestionOverlay = ref(false);
 const selectedSuggestedQuestion = ref(null);
@@ -1418,6 +1425,10 @@ onMounted(async () => {
       }
     })
     .listen('.JumpActivated', async (e) => {
+      await courseStore.fetchCourses(divisionId.value);
+      subscribeToActiveJump(e.jump.id);
+    })
+    .listen('.JumpReopened', async (e) => {
       await courseStore.fetchCourses(divisionId.value);
       subscribeToActiveJump(e.jump.id);
     });
@@ -1761,6 +1772,7 @@ async function openSuggestedQuestionsModal(course) {
   suggestedQuestionsForCourse.value = course;
   suggestedQuestionsCourseName.value = course.title;
   showSuggestedQuestionsModal.value = true;
+  suggestedQuestionsTab.value = 1;
   isLoadingSuggestedQuestions.value = true;
   suggestedQuestions.value = [];
   try {

@@ -2,13 +2,29 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import axios from 'axios';
 
+const JUMP_STORAGE_KEY = 'hubaroo_active_jump_attempt';
+
 export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
   const attempt = ref(null);
   const isLoading = ref(false);
   const error = ref(null);
+  const activeJumpRecovery = ref(null);
 
   const isInProgress = computed(() => attempt.value?.status === 'inProgress');
   const isFinished = computed(() => attempt.value?.status === 'finished');
+
+  function saveToLocalStorage(attemptId, jumpId) {
+    localStorage.setItem(JUMP_STORAGE_KEY, JSON.stringify({ attempt_id: attemptId, jump_id: jumpId }));
+  }
+
+  function getFromLocalStorage() {
+    const stored = localStorage.getItem(JUMP_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  }
+
+  function clearLocalStorage() {
+    localStorage.removeItem(JUMP_STORAGE_KEY);
+  }
 
   async function startAttempt(jumpId) {
     isLoading.value = true;
@@ -16,6 +32,9 @@ export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
     try {
       const response = await axios.post(`/api/jumps/${jumpId}/attempts`);
       attempt.value = response.data.attempt;
+      if (response.data.attempt?.status === 'inProgress') {
+        saveToLocalStorage(response.data.attempt.id, jumpId);
+      }
       return response.data;
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to start attempt';
@@ -65,6 +84,8 @@ export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
         termination,
       });
       attempt.value = response.data.attempt;
+      clearLocalStorage();
+      activeJumpRecovery.value = null;
       return response.data.attempt;
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to submit attempt';
@@ -85,16 +106,46 @@ export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
     }
   }
 
+  async function checkJumpRecovery() {
+    const stored = getFromLocalStorage();
+    if (!stored) {
+      activeJumpRecovery.value = null;
+      return;
+    }
+    try {
+      const response = await axios.get(`/api/jump-attempts/${stored.attempt_id}`);
+      const recovered = response.data.attempt;
+      if (recovered?.status === 'inProgress') {
+        activeJumpRecovery.value = stored;
+      } else {
+        clearLocalStorage();
+        activeJumpRecovery.value = null;
+      }
+    } catch {
+      clearLocalStorage();
+      activeJumpRecovery.value = null;
+    }
+  }
+
+  function dismissJumpRecovery() {
+    clearLocalStorage();
+    activeJumpRecovery.value = null;
+  }
+
   return {
     attempt,
     isLoading,
     error,
     isInProgress,
     isFinished,
+    activeJumpRecovery,
     startAttempt,
     fetchAttempt,
     updateAnswer,
     submitAttempt,
     createRejoinDemand,
+    checkJumpRecovery,
+    dismissJumpRecovery,
+    clearLocalStorage,
   };
 });

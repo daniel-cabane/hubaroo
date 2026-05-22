@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Events\JumpActivated;
+use App\Events\JumpReopened;
 use App\Models\Course;
 use App\Models\Jump;
+use App\Models\JumpAttempt;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -55,6 +57,9 @@ class JumpController extends Controller
         if ($request->has('status') && $request->input('status') === 'active' && $jump->status === 'draft') {
             $this->activateJump($jump, $jump->course);
             $data['status'] = 'active';
+        } elseif ($request->has('status') && $request->input('status') === 'active' && $jump->status === 'expired') {
+            $this->reopenJump($jump, $jump->course);
+            $data['status'] = 'active';
         } elseif ($request->has('status')) {
             $data['status'] = $request->input('status');
         }
@@ -91,5 +96,26 @@ class JumpController extends Controller
         $division = $course->division;
         $jump->load('course');
         broadcast(new JumpActivated($jump, $division));
+    }
+
+    private function reopenJump(Jump $jump, Course $course): void
+    {
+        $expiration = now()->addMinutes($jump->time + 15);
+        $jump->update([
+            'status' => 'active',
+            'expiration' => $expiration,
+        ]);
+
+        $division = $course->division;
+        $jump->load('course');
+
+        $studentIds = $division->students()->pluck('users.id');
+        $attemptUserIds = JumpAttempt::where('jump_id', $jump->id)
+            ->whereIn('user_id', $studentIds)
+            ->pluck('user_id');
+
+        $userIdsWithoutAttempt = $studentIds->diff($attemptUserIds)->values()->all();
+
+        broadcast(new JumpReopened($jump, $division, $userIdsWithoutAttempt));
     }
 }

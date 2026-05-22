@@ -125,6 +125,11 @@
                           class="w-full px-3 py-1.5 text-xs text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left flex items-center gap-2"
                         ><Clock class="w-3.5 h-3.5 shrink-0" /> Modifier l'expiration</button>
                         <button
+                          v-if="jump.status === 'expired'"
+                          @click.stop="reopenJump(jump); openMenuJumpId = null"
+                          class="w-full px-3 py-1.5 text-xs text-success hover:bg-success/10 transition-colors cursor-pointer text-left flex items-center gap-2"
+                        ><RotateCcw class="w-3.5 h-3.5 shrink-0" /> Réouvrir</button>
+                        <button
                           @click.stop="confirmDeleteJump(jump); openMenuJumpId = null"
                           class="w-full px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors cursor-pointer text-left flex items-center gap-2"
                         ><Trash2 class="w-3.5 h-3.5 shrink-0" /> Supprimer</button>
@@ -492,7 +497,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, Plus, X, Clock, Trash2, Eye } from 'lucide-vue-next';
+import { ChevronLeft, Plus, X, Clock, Trash2, Eye, RotateCcw } from 'lucide-vue-next';
 import { useCourseStore } from '@/stores/courseStore';
 
 const route = useRoute();
@@ -604,6 +609,16 @@ async function activateJump(jump) {
   try {
     await courseStore.updateJump(jump.id, { status: 'active' });
     await loadDetails();
+  } catch {
+    // error shown by store
+  }
+}
+
+async function reopenJump(jump) {
+  try {
+    await courseStore.updateJump(jump.id, { status: 'active' });
+    await loadDetails();
+    subscribeToActiveJumps();
   } catch {
     // error shown by store
   }
