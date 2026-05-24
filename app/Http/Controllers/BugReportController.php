@@ -6,6 +6,8 @@ use App\Http\Requests\StoreBugReportRequest;
 use App\Models\BugReport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class BugReportController extends Controller
 {
@@ -22,18 +24,23 @@ class BugReportController extends Controller
     {
         $user = $request->user();
 
-        $unsolvedCount = BugReport::where('user_id', $user->id)
-            ->whereIn('status', BugReport::unsolvedStatuses())
-            ->count();
+        $bugReport = DB::transaction(function () use ($user, $request): BugReport {
+            $unsolvedCount = BugReport::where('user_id', $user->id)
+                ->whereIn('status', BugReport::unsolvedStatuses())
+                ->lockForUpdate()
+                ->count();
 
-        if ($unsolvedCount >= 5) {
-            return response()->json(['message' => 'Vous avez atteint la limite de rapports de bugs non résolus.'], 422);
-        }
+            if ($unsolvedCount >= 5) {
+                throw ValidationException::withMessages([
+                    'bug_report' => ['Vous avez atteint la limite de rapports de bugs non résolus.'],
+                ]);
+            }
 
-        $bugReport = BugReport::create([
-            'user_id' => $user->id,
-            'comment' => $request->validated('comment'),
-        ]);
+            return BugReport::create([
+                'user_id' => $user->id,
+                'comment' => $request->validated('comment'),
+            ]);
+        });
 
         return response()->json(['bug_report' => $bugReport], 201);
     }

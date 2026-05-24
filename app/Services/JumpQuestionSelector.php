@@ -19,10 +19,18 @@ class JumpQuestionSelector
 
         $excludedQuestionIds = $this->getExcludedQuestionIds($jump, $student, $division);
 
-        $availableQuestions = Question::whereNotIn('id', $excludedQuestionIds)->get();
+        // Fetch only questions near the target difficulty range to avoid loading the full table (W9)
+        $maxTarget = min(2300, $mastery + 100 * $growth);
+        $minTarget = $mastery - 200;
+        $buffer = 500;
 
+        $availableQuestions = Question::whereNotIn('id', $excludedQuestionIds)
+            ->whereBetween('difficulty', [max(0, $minTarget - $buffer), $maxTarget + $buffer])
+            ->get();
+
+        // Fallback to all non-excluded questions if the range yields nothing
         if ($availableQuestions->isEmpty()) {
-            $availableQuestions = Question::all();
+            $availableQuestions = Question::whereNotIn('id', $excludedQuestionIds)->get();
         }
 
         $selected = [];
@@ -109,11 +117,15 @@ class JumpQuestionSelector
             ->values()
             ->toArray();
 
-        // Questions from Kangaroo sessions done by this class
-        $sessionQuestionIds = $division->kangourouSessions()
-            ->with('paper.questions:id')
-            ->get()
-            ->flatMap(fn ($session) => $session->paper?->questions?->pluck('id') ?? collect())
+        // Questions from Kangaroo sessions done by this division (direct DB query, avoids N+1 — W8)
+        $sessionQuestionIds = \DB::table('paper_question')
+            ->whereIn('paper_id', function ($q) use ($division): void {
+                $q->select('paper_id')
+                    ->from('kangourou_sessions')
+                    ->join('division_kangourou_session', 'kangourou_sessions.id', '=', 'division_kangourou_session.kangourou_session_id')
+                    ->where('division_kangourou_session.division_id', $division->id);
+            })
+            ->pluck('question_id')
             ->unique()
             ->values()
             ->toArray();

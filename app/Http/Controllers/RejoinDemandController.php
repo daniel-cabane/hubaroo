@@ -14,6 +14,10 @@ class RejoinDemandController extends Controller
 {
     public function store(Attempt $attempt): JsonResponse
     {
+        if ($attempt->termination === 'timeout') {
+            return response()->json(['message' => 'Vous ne pouvez pas reprendre une tentative expirée par le temps.'], 422);
+        }
+
         $session = $attempt->kangourouSession;
 
         if ($session->isExpired()) {

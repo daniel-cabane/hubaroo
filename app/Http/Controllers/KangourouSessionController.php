@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SessionOpenedForDivision;
 use App\Http\Requests\CreateKangourouSessionRequest;
 use App\Http\Requests\UpdateKangourouSessionRequest;
+use App\Http\Resources\QuestionResource;
 use App\Models\KangourouSession;
 use App\Models\Paper;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,15 +16,22 @@ class KangourouSessionController extends Controller
 {
     public function store(CreateKangourouSessionRequest $request): JsonResponse
     {
-        $session = KangourouSession::create([
-            'paper_id' => $request->validated('paper_id'),
-            'code' => KangourouSession::generateCode(),
-            'author_id' => $request->user()?->id,
-            'status' => $request->validated('status', 'draft'),
-            'privacy' => $request->validated('privacy', 'public'),
-            'expires_at' => now()->addMinutes(120),
-            'preferences' => $request->validated('preferences', KangourouSession::DEFAULT_PREFERENCES),
-        ]);
+        do {
+            try {
+                $session = KangourouSession::create([
+                    'paper_id' => $request->validated('paper_id'),
+                    'code' => KangourouSession::generateCode(),
+                    'author_id' => $request->user()?->id,
+                    'status' => $request->validated('status', 'draft'),
+                    'privacy' => $request->validated('privacy', 'public'),
+                    'expires_at' => now()->addMinutes(120),
+                    'preferences' => $request->validated('preferences', KangourouSession::DEFAULT_PREFERENCES),
+                ]);
+                break;
+            } catch (UniqueConstraintViolationException) {
+                // retry on rare code collision
+            }
+        } while (true);
 
         return response()->json([
             'message' => 'Session created successfully.',
@@ -56,12 +66,9 @@ class KangourouSessionController extends Controller
         }
 
         if ($shouldHideAnswers) {
-            $data['paper']['questions'] = collect($data['paper']['questions'])
-                ->map(function ($question) {
-                    unset($question['correct_answer']);
-
-                    return $question;
-                })
+            $data['paper']['questions'] = $session->paper->questions
+                ->map(fn ($question) => (new QuestionResource($question, false))->toArray($request))
+                ->values()
                 ->all();
         }
 
@@ -71,6 +78,11 @@ class KangourouSessionController extends Controller
     public function activate(KangourouSession $kangourouSession): JsonResponse
     {
         $kangourouSession->update(['status' => 'active']);
+        $kangourouSession->load(['paper', 'divisions']);
+
+        foreach ($kangourouSession->divisions as $division) {
+            broadcast(new SessionOpenedForDivision($division, $kangourouSession));
+        }
 
         return response()->json([
             'message' => 'Session activated.',
@@ -131,7 +143,14 @@ class KangourouSessionController extends Controller
     {
         $this->authorize('view', $kangourouSession);
 
-        $kangourouSession->update(['code' => KangourouSession::generateCode()]);
+        do {
+            try {
+                $kangourouSession->update(['code' => KangourouSession::generateCode()]);
+                break;
+            } catch (UniqueConstraintViolationException) {
+                // retry on rare code collision
+            }
+        } while (true);
 
         return response()->json([
             'message' => 'Session code changed.',

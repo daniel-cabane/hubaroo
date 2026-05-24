@@ -12,6 +12,7 @@ use App\Models\DivisionInvite;
 use App\Models\KangourouSession;
 use App\Models\User;
 use App\Services\ClassNameFormatter;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -71,13 +72,20 @@ class DivisionController extends Controller
 
     public function store(CreateDivisionRequest $request): JsonResponse
     {
-        $division = Division::create([
-            'teacher_id' => $request->user()->id,
-            'name' => $request->validated('name'),
-            'code' => Division::generateCode(),
-            'accepting_students' => true,
-            'archived' => false,
-        ]);
+        do {
+            try {
+                $division = Division::create([
+                    'teacher_id' => $request->user()->id,
+                    'name' => $request->validated('name'),
+                    'code' => Division::generateCode(),
+                    'accepting_students' => true,
+                    'archived' => false,
+                ]);
+                break;
+            } catch (UniqueConstraintViolationException) {
+                // retry on rare code collision
+            }
+        } while (true);
 
         return response()->json([
             'message' => 'Division created successfully.',
@@ -109,7 +117,14 @@ class DivisionController extends Controller
     {
         $this->authorize('update', $division);
 
-        $division->update(['code' => Division::generateCode()]);
+        do {
+            try {
+                $division->update(['code' => Division::generateCode()]);
+                break;
+            } catch (UniqueConstraintViolationException) {
+                // retry on rare code collision
+            }
+        } while (true);
 
         return response()->json([
             'message' => 'Code changed.',
@@ -253,9 +268,7 @@ class DivisionController extends Controller
 
     public function openForDivision(KangourouSession $session, Division $division, Request $request): JsonResponse
     {
-        if ($session->author_id !== $request->user()->id || $division->teacher_id !== $request->user()->id) {
-            return response()->json(['message' => 'Unauthorized.'], 403);
-        }
+        $this->authorize('manageForDivision', [$session, $division]);
 
         $session->divisions()->syncWithoutDetaching([$division->id]);
 

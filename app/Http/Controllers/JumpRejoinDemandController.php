@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\JumpAttemptUpdated;
 use App\Events\JumpRejoinDemandCreated;
 use App\Events\JumpRejoinDemandResolved;
+use App\Models\Jump;
 use App\Models\JumpAttempt;
 use App\Models\JumpRejoinDemand;
 use Illuminate\Http\JsonResponse;
@@ -107,7 +108,7 @@ class JumpRejoinDemandController extends Controller
                     'answered_count' => $answeredCount,
                     'jump' => [
                         'id' => $attempt->jump->id,
-                        'rank' => $attempt->jump->rank,
+                        'rank' => Jump::where('course_id', $attempt->jump->course_id)->where('id', '<=', $attempt->jump->id)->count(),
                         'course' => ['title' => $attempt->jump->course->title],
                     ],
                 ],

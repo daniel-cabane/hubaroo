@@ -18,7 +18,7 @@ class Jump extends Model
     /**
      * @var list<string>
      */
-    protected $appends = ['rank'];
+    protected $appends = [];
 
     /**
      * @var list<string>

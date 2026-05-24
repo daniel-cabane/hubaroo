@@ -408,9 +408,11 @@ onMounted(async () => {
           const div = divisionStore.divisions.find(d => d.id === division.id);
           if (!div) { return; }
           if (!div.kangourou_sessions) { div.kangourou_sessions = []; }
-          const alreadyExists = div.kangourou_sessions.some(s => s.id === e.session.id);
-          if (!alreadyExists) {
+          const existingIndex = div.kangourou_sessions.findIndex(s => s.id === e.session.id);
+          if (existingIndex === -1) {
             div.kangourou_sessions.push(e.session);
+          } else {
+            div.kangourou_sessions[existingIndex] = e.session;
           }
         })
         .listen('.SessionClosedForDivision', (e) => {

@@ -20,7 +20,7 @@ class CourseController extends Controller
         $query = $division->courses();
 
         if ($isTeacher) {
-            $query->with(['jumps' => fn ($q) => $q->withCount('attempts')])->withCount('jumps');
+            $query->with(['jumps' => fn ($q) => $q->withCount('attempts')->orderBy('id')])->withCount('jumps');
         } else {
             $query->where('archived', false)->with([
                 'jumps' => function ($q) use ($user) {
@@ -31,7 +31,16 @@ class CourseController extends Controller
             ]);
         }
 
-        return response()->json(['courses' => $query->latest()->get()]);
+        $courses = $query->latest()->get();
+
+        // Compute rank for each jump based on ordered array position (avoids N+1 — W10)
+        $courses->each(function ($course): void {
+            $course->jumps->values()->each(function ($jump, int $index): void {
+                $jump->rank = $index + 1;
+            });
+        });
+
+        return response()->json(['courses' => $courses]);
     }
 
     public function store(Division $division, Request $request): JsonResponse
@@ -87,7 +96,12 @@ class CourseController extends Controller
         $this->authorize('update', $course->division);
 
         $division = $course->division->load('students');
-        $jumps = $course->jumps()->with('attempts.user')->latest()->get();
+        $jumps = $course->jumps()->with('attempts.user')->orderBy('id')->get();
+
+        // Compute rank based on ordered array position (avoids N+1 — W10)
+        $jumps->values()->each(function ($jump, int $index): void {
+            $jump->rank = $index + 1;
+        });
 
         // Enrich each attempt's question_list with the question image
         $allQuestionIds = $jumps->flatMap(

@@ -6,10 +6,13 @@ use App\Events\JumpExpired;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
 use App\Models\Question;
+use App\Models\User;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
-class ExpireJumps
+class ExpireJumps implements ShouldQueue
 {
     use Queueable;
 
@@ -97,43 +100,51 @@ class ExpireJumps
      */
     private function updateMasteryAndDifficulty(JumpAttempt $attempt, Collection $questions): void
     {
-        $user = $attempt->user;
+        $userId = $attempt->user_id;
 
-        if (! $user) {
+        if (! $userId) {
             return;
         }
 
-        $userMastery = $user->mastery ?? 0;
+        DB::transaction(function () use ($userId, $attempt, $questions): void {
+            $user = User::lockForUpdate()->find($userId);
 
-        foreach ($attempt->question_list ?? [] as $item) {
-            $given = $item['answer'] ?? null;
-
-            if ($given === null) {
-                continue;
+            if (! $user) {
+                return;
             }
 
-            $question = $questions->get($item['id']);
+            $userMastery = $user->mastery ?? 0;
 
-            if (! $question) {
-                continue;
+            foreach ($attempt->question_list ?? [] as $item) {
+                $given = $item['answer'] ?? null;
+
+                if ($given === null) {
+                    continue;
+                }
+
+                $question = $questions->get($item['id']);
+
+                if (! $question) {
+                    continue;
+                }
+
+                $isCorrect = $item['status'] === 'correct';
+                $questionDifficulty = $question->difficulty ?? 0;
+                $difference = $userMastery - $questionDifficulty;
+
+                if ($difference < 0 && $isCorrect) {
+                    $userMastery += (int) ceil(-$difference * 0.1);
+                    $question->difficulty = $questionDifficulty - (int) ceil(-$difference * 0.01);
+                    $question->save();
+                } elseif ($difference > 0 && ! $isCorrect) {
+                    $userMastery -= (int) ceil($difference * 0.1);
+                    $question->difficulty = $questionDifficulty + (int) ceil($difference * 0.01);
+                    $question->save();
+                }
             }
 
-            $isCorrect = $item['status'] === 'correct';
-            $questionDifficulty = $question->difficulty ?? 0;
-            $difference = $userMastery - $questionDifficulty;
-
-            if ($difference < 0 && $isCorrect) {
-                $userMastery += (int) ceil(-$difference * 0.1);
-                $question->difficulty = $questionDifficulty - (int) ceil(-$difference * 0.01);
-                $question->save();
-            } elseif ($difference > 0 && ! $isCorrect) {
-                $userMastery -= (int) ceil($difference * 0.1);
-                $question->difficulty = $questionDifficulty + (int) ceil($difference * 0.01);
-                $question->save();
-            }
-        }
-
-        $user->mastery = $userMastery;
-        $user->save();
+            $user->mastery = $userMastery;
+            $user->save();
+        });
     }
 }

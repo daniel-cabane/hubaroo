@@ -30,7 +30,7 @@ test('student registration sets mastery based on birth year', function () {
 
     $user = User::where('email', 'student@example.com')->firstOrFail();
     $expectedAge = (int) date('Y') - 2010;
-    $expectedMastery = min($expectedAge - 8, 1) * 150;
+    $expectedMastery = max($expectedAge - 8, 1) * 150;
 
     expect($user->mastery)->toBe($expectedMastery);
 });

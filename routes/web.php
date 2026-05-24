@@ -23,11 +23,11 @@ Route::get('/', function () {
 
 // API Authentication Routes
 Route::middleware(['web'])->group(function () {
-    Route::post('/register', [AuthController::class, 'register'])->name('register');
-    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/register', [AuthController::class, 'register'])->name('register')->middleware('throttle:30,1');
+    Route::post('/login', [AuthController::class, 'login'])->name('login')->middleware('throttle:30,1');
     Route::get('/check', [AuthController::class, 'check'])->name('auth.check');
-    Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword'])->name('password.email');
-    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.update');
+    Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword'])->name('password.email')->middleware('throttle:10,1');
+    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.update')->middleware('throttle:10,1');
 
     // Google OAuth
     Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('auth.google.redirect');
@@ -46,11 +46,11 @@ Route::get('/api/papers', [KangourouSessionController::class, 'papers'])->name('
 Route::get('/api/papers/{paper}', [PaperController::class, 'show'])->name('papers.show');
 Route::get('/api/kangourou-sessions/{code}', [KangourouSessionController::class, 'show'])->name('kangourou-sessions.show');
 
-Route::post('/api/kangourou-sessions/{code}/attempts', [AttemptController::class, 'store'])->name('attempts.store');
-Route::get('/api/attempts/{attempt}', [AttemptController::class, 'show'])->name('attempts.show');
-Route::patch('/api/attempts/{attempt}/answer', [AttemptController::class, 'updateAnswer'])->name('attempts.updateAnswer');
-Route::post('/api/attempts/{attempt}/submit', [AttemptController::class, 'submit'])->name('attempts.submit');
-Route::get('/api/attempts/recover/{code}', [AttemptController::class, 'recover'])->name('attempts.recover');
+Route::post('/api/kangourou-sessions/{code}/attempts', [AttemptController::class, 'store'])->name('attempts.store')->middleware('throttle:300,1');
+Route::get('/api/attempts/{attempt}', [AttemptController::class, 'show'])->name('attempts.show')->middleware('throttle:300,1');
+Route::patch('/api/attempts/{attempt}/answer', [AttemptController::class, 'updateAnswer'])->name('attempts.updateAnswer')->middleware('throttle:300,1');
+Route::post('/api/attempts/{attempt}/submit', [AttemptController::class, 'submit'])->name('attempts.submit')->middleware('throttle:300,1');
+Route::get('/api/attempts/recover/{code}', [AttemptController::class, 'recover'])->name('attempts.recover')->middleware('throttle:60,1');
 
 // Rejoin demand (guests allowed to create)
 Route::post('/api/attempts/{attempt}/rejoin-demand', [RejoinDemandController::class, 'store'])->name('rejoin-demands.store');

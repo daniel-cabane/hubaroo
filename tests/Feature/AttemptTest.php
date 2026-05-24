@@ -413,3 +413,115 @@ test('student in a different division cannot join a private session', function (
 
     $response->assertForbidden();
 });
+
+// --- Ownership checks (C1 & C2) ---
+
+test('authenticated user cannot update another users attempt answer', function () {
+    $owner = User::factory()->create();
+    $intruder = User::factory()->create();
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($intruder)->patchJson("/api/attempts/{$attempt->id}/answer", [
+        'question_index' => 0,
+        'answer' => 'B',
+    ]);
+
+    $response->assertForbidden();
+});
+
+test('authenticated user cannot submit another users attempt', function () {
+    $owner = User::factory()->create();
+    $intruder = User::factory()->create();
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($intruder)->postJson("/api/attempts/{$attempt->id}/submit");
+
+    $response->assertForbidden();
+});
+
+test('authenticated user can update their own attempt answer', function () {
+    $user = User::factory()->create();
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => $user->id,
+    ]);
+
+    $response = $this->actingAs($user)->patchJson("/api/attempts/{$attempt->id}/answer", [
+        'question_index' => 0,
+        'answer' => 'C',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('attempt.answers.0.answer'))->toBe('C');
+});
+
+test('authenticated user can submit their own attempt', function () {
+    $user = User::factory()->create();
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => $user->id,
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/api/attempts/{$attempt->id}/submit");
+
+    $response->assertOk();
+    expect($response->json('attempt.status'))->toBe('finished');
+});
+
+test('authenticated user cannot view another users attempt', function () {
+    $owner = User::factory()->create();
+    $intruder = User::factory()->create();
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($intruder)->getJson("/api/attempts/{$attempt->id}");
+
+    $response->assertForbidden();
+});
+
+test('session author can view any attempt in their session', function () {
+    $author = User::factory()->create();
+    $student = User::factory()->create();
+
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'author_id' => $author->id,
+    ]);
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $session->id,
+        'user_id' => $student->id,
+    ]);
+
+    $response = $this->actingAs($author)->getJson("/api/attempts/{$attempt->id}");
+
+    $response->assertOk();
+    expect($response->json('attempt.id'))->toBe($attempt->id);
+});
+
+test('guest can still update and submit their own attempt', function () {
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => null,
+    ]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/answer", [
+        'question_index' => 0,
+        'answer' => 'A',
+    ])->assertOk();
+
+    $this->postJson("/api/attempts/{$attempt->id}/submit")->assertOk();
+});

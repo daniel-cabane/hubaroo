@@ -17,7 +17,7 @@ test('redirect to google redirects the user', function () {
     $response->assertRedirect();
 });
 
-test('new google user is created with student role and logged in', function () {
+test('new google user is created and logged in', function () {
     Socialite::fake('google', (new SocialiteUser)->map([
         'id' => 'google-123',
         'name' => 'Jane Doe',
@@ -32,7 +32,7 @@ test('new google user is created with student role and logged in', function () {
         'email' => 'jane@example.com',
         'google_id' => 'google-123',
     ]);
-    expect(User::query()->where('email', 'jane@example.com')->first()->hasRole('Student'))->toBeTrue();
+    // Role assignment for Google OAuth users is handled client-side in App.vue (C4 — boss decision)
 });
 
 test('existing google user is logged in without creating a new account', function () {

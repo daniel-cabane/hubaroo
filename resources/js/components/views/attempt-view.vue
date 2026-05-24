@@ -7,9 +7,9 @@
     >
       <div class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-error bg-error/5">
         <AlertTriangle class="w-5 h-5 text-error flex-shrink-0" />
-        <p class="text-md font-medium text-error">Session en cours - Ne pas quitter cette page</p>
+        <p class="text-md font-medium text-error">Ne pas quitter cette page</p>
       </div>
-      <div class="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-text-muted truncate max-w-xs text-center">
+      <div class="absolute left-1/2 -translate-x-1/2 text-4xl font-semibold text-secondary truncate max-w-xs text-center">
         {{ attemptStore.attempt?.name }}
       </div>
       <button
@@ -266,11 +266,13 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
+import { useAuthStore } from '@/stores/authStore';
 
 const route = useRoute();
 const router = useRouter();
 const sessionStore = useKangourouSessionStore();
 const attemptStore = useAttemptStore();
+const authStore = useAuthStore();
 
 const currentIndex = ref(0);
 const slideDirection = ref('slide-left');
@@ -695,8 +697,8 @@ onMounted(async () => {
         window.addEventListener('focus', handleFocus);
       }
 
-      if (session.value?.id) {
-        window.Echo.channel(`session.${session.value.id}`)
+      if (session.value?.id && authStore.isAuthenticated) {
+        window.Echo.private(`session.${session.value.id}`)
           .listen('.SessionExpired', () => {
             clearInterval(timerInterval);
             timerInterval = null;
@@ -704,8 +706,8 @@ onMounted(async () => {
           });
       }
 
-      if (attemptStore.attempt?.id) {
-        window.Echo.channel(`attempt.${attemptStore.attempt.id}`)
+      if (attemptStore.attempt?.id && authStore.isAuthenticated) {
+        window.Echo.private(`attempt.${attemptStore.attempt.id}`)
           .listen('.AttemptNameUpdated', (event) => {
             attemptStore.attempt.name = event.name;
           });

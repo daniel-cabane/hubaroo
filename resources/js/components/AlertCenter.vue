@@ -167,19 +167,21 @@
             <div>
               <p class="text-sm font-semibold text-text-main">{{ demand.attempt.name || 'Invité' }}</p>
               <p class="text-xs text-text-muted">{{ demand.attempt.session.paper_title }}</p>
-              <p class="text-xs text-text-muted font-mono">{{ demand.attempt.session.code }}</p>
             </div>
-            <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(demand.created_at) }}</span>
+            <span class="text-right whitespace-nowrap">
+              <p class="text-sm font-semibold text-text-main">{{ formatDate(demand.created_at) }}</p>
+              <p class="text-xs text-text-muted font-mono">{{ demand.attempt.session.code }}</p>
+            </span>
           </div>
 
           <!-- Attempt stats -->
           <div class="grid grid-cols-2 gap-2 text-xs text-text-muted bg-gray-50 dark:bg-gray-800 rounded-lg p-2">
             <div>
-              <span class="font-medium">Questions répondues :</span>
+              <span class="font-medium">Questions traitées :</span>
               {{ demand.attempt.answered_count }} / 26
             </div>
             <div>
-              <span class="font-medium">Terminaison :</span>
+              <span class="font-medium">Clôture :</span>
               {{ formatTermination(demand.attempt.termination) }}
             </div>
             <div>

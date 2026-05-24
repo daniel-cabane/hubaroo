@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Division;
 use App\Models\KangourouSession;
 use App\Models\User;
 
@@ -61,5 +62,14 @@ class KangourouSessionPolicy
     public function forceDelete(User $user, KangourouSession $kangourouSession): bool
     {
         return false;
+    }
+
+    /**
+     * Determine whether the user can open/close the session for a given division.
+     * Requires the user to own both the session and the division.
+     */
+    public function manageForDivision(User $user, KangourouSession $kangourouSession, Division $division): bool
+    {
+        return $kangourouSession->author_id === $user->id && $division->teacher_id === $user->id;
     }
 }

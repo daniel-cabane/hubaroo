@@ -18,6 +18,10 @@ class ExpireKangourouSessions implements ShouldQueue
     {
         $sessions = KangourouSession::where('status', 'active')
             ->where('expires_at', '<=', now())
+            ->with([
+                'paper.questions' => fn ($q) => $q->orderByPivot('order'),
+                'divisions.students',
+            ])
             ->get();
 
         foreach ($sessions as $session) {
@@ -38,15 +42,23 @@ class ExpireKangourouSessions implements ShouldQueue
 
     private function computeAnalysis(KangourouSession $session): void
     {
-        $questions = $session->paper->questions()->orderByPivot('order')->get();
+        // Use eager-loaded questions if available (ordered from the load in handle())
+        $questions = $session->paper->relationLoaded('questions')
+            ? $session->paper->questions
+            : $session->paper->questions()->orderByPivot('order')->get();
 
-        $session->divisions->each(function (Division $division) use ($session, $questions): void {
-            $studentIds = $division->students()->pluck('users.id');
+        // Load all finished attempts for this session once (avoids N+1 per division — W11)
+        $allFinishedAttempts = Attempt::where('kangourou_session_id', $session->id)
+            ->where('status', 'finished')
+            ->get();
 
-            $attempts = Attempt::where('kangourou_session_id', $session->id)
-                ->whereIn('user_id', $studentIds)
-                ->where('status', 'finished')
-                ->get();
+        $session->divisions->each(function (Division $division) use ($session, $questions, $allFinishedAttempts): void {
+            // Use eager-loaded students if available
+            $studentIds = $division->relationLoaded('students')
+                ? $division->students->pluck('id')
+                : $division->students()->pluck('users.id');
+
+            $attempts = $allFinishedAttempts->whereIn('user_id', $studentIds->toArray())->values();
 
             if ($attempts->isEmpty()) {
                 return;

@@ -10,6 +10,7 @@ use App\Models\Attempt;
 use App\Models\KangourouSession;
 use App\Models\User;
 use App\Services\GradingService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -67,15 +68,22 @@ class AttemptController extends Controller
 
         $attemptName = $this->resolveAttemptName($request->user(), $session, $request->input('name'));
 
-        $attempt = Attempt::create([
-            'kangourou_session_id' => $session->id,
-            'user_id' => $userId,
-            'name' => $attemptName,
-            'code' => Attempt::generateCode(),
-            'answers' => Attempt::defaultAnswers(),
-            'status' => 'inProgress',
-            'termination' => 'none',
-        ]);
+        do {
+            try {
+                $attempt = Attempt::create([
+                    'kangourou_session_id' => $session->id,
+                    'user_id' => $userId,
+                    'name' => $attemptName,
+                    'code' => Attempt::generateCode(),
+                    'answers' => Attempt::defaultAnswers(),
+                    'status' => 'inProgress',
+                    'termination' => 'none',
+                ]);
+                break;
+            } catch (UniqueConstraintViolationException) {
+                // retry on rare code collision
+            }
+        } while (true);
 
         return response()->json([
             'message' => 'Attempt created.',
@@ -108,8 +116,16 @@ class AttemptController extends Controller
         return $user->name;
     }
 
-    public function show(Attempt $attempt): JsonResponse
+    public function show(Attempt $attempt, Request $request): JsonResponse
     {
+        $user = $request->user();
+        if ($user && $attempt->user_id !== null && $attempt->user_id !== $user->id) {
+            $session = $attempt->kangourouSession;
+            if ($session->author_id !== $user->id) {
+                return response()->json(['message' => 'Forbidden.'], 403);
+            }
+        }
+
         $attempt->load('kangourouSession.paper');
 
         return response()->json(['attempt' => $this->maskCorrectionIfNeeded($attempt)]);
@@ -117,6 +133,11 @@ class AttemptController extends Controller
 
     public function updateAnswer(UpdateAnswerRequest $request, Attempt $attempt): JsonResponse
     {
+        $user = $request->user();
+        if ($user && $attempt->user_id !== null && $attempt->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
         if ($attempt->status === 'finished') {
             return response()->json(['message' => 'This attempt has already been submitted.'], 403);
         }
@@ -149,6 +170,11 @@ class AttemptController extends Controller
 
     public function submit(Attempt $attempt, Request $request): JsonResponse
     {
+        $user = $request->user();
+        if ($user && $attempt->user_id !== null && $attempt->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
         if ($attempt->status === 'finished') {
             return response()->json(['message' => 'This attempt has already been submitted.'], 403);
         }
@@ -192,6 +218,7 @@ class AttemptController extends Controller
             ->attempts()
             ->with('kangourouSession.paper')
             ->latest()
+            ->limit(50)
             ->get();
 
         return response()->json(['attempts' => $attempts]);

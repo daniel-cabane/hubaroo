@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Models\Attempt;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 
 class UpdateMasteryAndDifficulty implements ShouldQueue
 {
@@ -15,9 +17,9 @@ class UpdateMasteryAndDifficulty implements ShouldQueue
     public function handle(): void
     {
         $attempt = $this->attempt->load('kangourouSession.paper.questions', 'user');
-        $user = $attempt->user;
+        $userId = $attempt->user_id;
 
-        if (! $user) {
+        if (! $userId) {
             return;
         }
 
@@ -25,29 +27,39 @@ class UpdateMasteryAndDifficulty implements ShouldQueue
         $questions = $session->paper->questions()->orderByPivot('order')->get();
         $answers = $attempt->answers;
 
-        foreach ($questions as $index => $question) {
-            $userAnswer = $answers[$index]['answer'] ?? null;
+        DB::transaction(function () use ($userId, $questions, $answers): void {
+            $user = User::lockForUpdate()->find($userId);
 
-            if ($userAnswer === null) {
-                continue;
+            if (! $user) {
+                return;
             }
 
-            $isCorrect = strtoupper($userAnswer) === strtoupper($question->correct_answer);
             $userMastery = $user->mastery ?? 0;
-            $questionDifficulty = $question->difficulty ?? 0;
-            $difference = $userMastery - $questionDifficulty;
 
-            if ($difference < 0 && $isCorrect) {
-                $user->mastery = $userMastery + (int) ceil(-$difference * 0.1);
-                $question->difficulty = $questionDifficulty - (int) ceil(-$difference * 0.01);
-                $question->save();
-            } elseif ($difference > 0 && ! $isCorrect) {
-                $user->mastery = $userMastery - (int) ceil($difference * 0.1);
-                $question->difficulty = $questionDifficulty + (int) ceil($difference * 0.01);
-                $question->save();
+            foreach ($questions as $index => $question) {
+                $userAnswer = $answers[$index]['answer'] ?? null;
+
+                if ($userAnswer === null) {
+                    continue;
+                }
+
+                $isCorrect = strtoupper($userAnswer) === strtoupper($question->correct_answer);
+                $questionDifficulty = $question->difficulty ?? 0;
+                $difference = $userMastery - $questionDifficulty;
+
+                if ($difference < 0 && $isCorrect) {
+                    $userMastery += (int) ceil(-$difference * 0.1);
+                    $question->difficulty = $questionDifficulty - (int) ceil(-$difference * 0.01);
+                    $question->save();
+                } elseif ($difference > 0 && ! $isCorrect) {
+                    $userMastery -= (int) ceil($difference * 0.1);
+                    $question->difficulty = $questionDifficulty + (int) ceil($difference * 0.01);
+                    $question->save();
+                }
             }
-        }
 
-        $user->save();
+            $user->mastery = $userMastery;
+            $user->save();
+        });
     }
 }

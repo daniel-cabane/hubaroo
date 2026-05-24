@@ -14,7 +14,15 @@ class DivisionPolicy
 
     public function view(User $user, Division $division): bool
     {
-        return $division->teacher_id === $user->id || $division->students()->where('user_id', $user->id)->exists();
+        if ($division->teacher_id === $user->id) {
+            return true;
+        }
+
+        if ($division->relationLoaded('students')) {
+            return $division->students->contains('id', $user->id);
+        }
+
+        return $division->students()->where('user_id', $user->id)->exists();
     }
 
     public function create(User $user): bool

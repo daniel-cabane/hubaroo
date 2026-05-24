@@ -39,8 +39,19 @@ test('creating a second rejoin demand returns the existing one', function () {
     expect(RejoinDemand::count())->toBe(1);
 });
 
-test('cannot create a rejoin demand for a finished attempt', function () {
+test('can create a rejoin demand for a finished attempt (blurred or submitted)', function () {
     $attempt = Attempt::factory()->finished()->create(['kangourou_session_id' => $this->session->id]);
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/rejoin-demand");
+
+    $response->assertCreated();
+});
+
+test('cannot create a rejoin demand for a timed-out attempt', function () {
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $this->session->id,
+        'termination' => 'timeout',
+    ]);
 
     $response = $this->postJson("/api/attempts/{$attempt->id}/rejoin-demand");
 

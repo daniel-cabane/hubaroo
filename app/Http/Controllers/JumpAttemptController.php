@@ -69,7 +69,11 @@ class JumpAttemptController extends Controller
 
         $attempt = $jumpAttempt->load(['jump.course.division', 'user:id,name,email']);
 
-        $shouldHideCorrectAnswers = ! $attempt->jump->isExpired();
+        // Compute rank once (avoids N+1 from $appends — W10)
+        $jump = $attempt->jump;
+        $jump->rank = Jump::where('course_id', $jump->course_id)->where('id', '<=', $jump->id)->count();
+
+        $shouldHideCorrectAnswers = ! $jump->isExpired();
 
         $questionIds = collect($attempt->question_list)->pluck('id');
         $questions = Question::whereIn('id', $questionIds)->get()->keyBy('id');
@@ -193,6 +197,16 @@ class JumpAttemptController extends Controller
             ->with('jump.course.division')
             ->orderByDesc('id')
             ->get();
+
+        // Compute rank for each jump (avoids N+1 from $appends — W10)
+        // Group by course so we can count once per course
+        $jumpsByCourse = $attempts->pluck('jump')->filter()->groupBy('course_id');
+        $jumpsByCourse->each(function ($jumps): void {
+            $courseId = $jumps->first()->course_id;
+            $orderedIds = Jump::where('course_id', $courseId)->orderBy('id')->pluck('id');
+            $rankMap = $orderedIds->values()->mapWithKeys(fn ($id, $index) => [$id => $index + 1]);
+            $jumps->each(fn ($jump) => $jump->rank = $rankMap->get($jump->id));
+        });
 
         return response()->json(['attempts' => $attempts]);
     }

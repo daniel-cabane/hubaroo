@@ -1415,13 +1415,14 @@ onMounted(async () => {
       }
 
       const session = e.session;
-      const alreadyExists = (divisionStore.division.kangourou_sessions ?? []).some(s => s.id === session.id);
-
-      if (!alreadyExists) {
-        if (!divisionStore.division.kangourou_sessions) {
-          divisionStore.division.kangourou_sessions = [];
-        }
+      if (!divisionStore.division.kangourou_sessions) {
+        divisionStore.division.kangourou_sessions = [];
+      }
+      const existingIndex = divisionStore.division.kangourou_sessions.findIndex(s => s.id === session.id);
+      if (existingIndex === -1) {
         divisionStore.division.kangourou_sessions.push(session);
+      } else {
+        divisionStore.division.kangourou_sessions[existingIndex] = session;
       }
     })
     .listen('.JumpActivated', async (e) => {
