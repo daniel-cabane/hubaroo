@@ -197,11 +197,17 @@ export const useAttemptStore = defineStore('attempt', () => {
     }
     try {
       const recovered = await recoverAttempt(stored.attempt_code);
-      if (recovered.status === 'inProgress' && recovered.kangourou_session?.status === 'active') {
+      const sessionActive = recovered.kangourou_session?.status === 'active';
+      if (recovered.status === 'inProgress' && sessionActive) {
         activeRecovery.value = stored;
       } else {
-        clearLocalStorage();
         activeRecovery.value = null;
+        if (!sessionActive) {
+          // Session is over — clear the stored attempt; no rejoin is possible.
+          clearLocalStorage();
+        }
+        // If the session is still active but the attempt is finished, keep localStorage
+        // so session-view can present the rejoin form instead of a blank name prompt.
       }
     } catch {
       clearLocalStorage();

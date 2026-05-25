@@ -33,20 +33,40 @@
       </div>
 
       <!-- Delayed correction notice -->
-      <div v-if="!correctionAvailable" class="mb-8 p-4 bg-info/10 border border-info/30 rounded-lg text-center space-y-3">
-        <p class="text-sm text-text-main dark:text-surface">La correction sera disponible à la fin de la session.</p>
+      <div v-if="!correctionAvailable" class="mb-8 bg-surface dark:bg-gray-900 border border-border rounded-xl p-6 text-center space-y-4">
+        <Clock class="w-12 h-12 text-text-muted mx-auto" />
+        <p class="text-6xl text-text-main">Session terminée</p>
+        <p class="text-lg font-medium text-text-main dark:text-surface">La correction sera disponible à la fin de la session.</p>
         <p v-if="terminationLabel" class="text-sm font-medium" :class="attempt.termination === 'submitted' ? 'text-success' : 'text-warning'">{{ terminationLabel }}</p>
-        <div v-if="rejoinApproved" class="text-sm text-success font-medium">Demande acceptée ! Consultez le centre d'alertes (🔔) pour rejoindre.</div>
-        <div v-else-if="rejoinDenied" class="text-sm text-error font-medium">Votre demande de reprise a été refusée.</div>
-        <div v-else-if="pendingDemandId" class="text-sm text-text-muted italic">Demande de reprise envoyée, en attente de validation...</div>
-        <button
-          v-else-if="attempt.termination !== 'timeout'"
-          @click="requestRejoin"
-          :disabled="isRequestingRejoin"
-          class="px-4 py-2 rounded-lg bg-info hover:bg-info/80 text-white text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          {{ isRequestingRejoin ? 'Envoi...' : 'Demander à reprendre' }}
-        </button>
+        <div class="flex justify-center pt-2">
+          <router-link
+            to="/"
+            class="my-8 px-8 py-3 rounded-lg bg-primary hover:bg-primary-hover text-surface text-base text-xl font-semibold cursor-pointer transition-colors"
+          >
+            Retour à l'accueil
+          </router-link>
+        </div>
+        <div v-if="attempt.termination !== 'timeout'" class="pt-10">
+          <div v-if="rejoinApproved" class="text-success font-medium">
+            Demande acceptée ! Consultez le centre d'alertes (🔔) pour rejoindre.
+          </div>
+          <div v-else-if="rejoinDenied" class="text-error font-medium">
+            Votre demande de reprise a été refusée.
+          </div>
+          <div v-else-if="pendingDemandId" class="text-text-muted italic">
+            Demande de reprise envoyée, en attente de validation...
+          </div>
+          <div v-else>
+            <p class="text-sm text-text-muted mb-3">Avez-vous quitté par erreur ?</p>
+            <button
+              @click="requestRejoin"
+              :disabled="isRequestingRejoin"
+              class="px-6 py-2 rounded-lg border border-info text-info hover:bg-info/10 font-medium cursor-pointer transition-colors disabled:opacity-50"
+            >
+              {{ isRequestingRejoin ? 'Envoi...' : 'Demander à reprendre' }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Question Review -->
@@ -89,7 +109,7 @@
       </div>
 
       <!-- Back button -->
-      <div class="mt-8 text-center">
+      <div class="mt-8 text-center" v-if="correctionAvailable">
         <router-link
           to="/"
           class="inline-block px-6 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors"
@@ -104,6 +124,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import { Clock } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';

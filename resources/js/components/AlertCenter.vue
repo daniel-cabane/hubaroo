@@ -28,11 +28,10 @@
           :key="'s-' + sd.id"
           class="px-4 py-3 border-b border-border space-y-2"
         >
-          <div class="flex items-center justify-between gap-2">
+          <div class="flex items-start justify-between gap-2">
             <div>
               <p class="text-sm font-semibold text-text-main">Demande de reprise</p>
-              <p v-if="sd.sessionTitle" class="text-xs text-text-muted">{{ sd.sessionTitle }}</p>
-              <p class="text-xs text-text-muted font-mono">{{ sd.sessionCode }}</p>
+              <p class="text-md text-text-muted font-mono">{{ sd.sessionCode }}</p>
             </div>
             <span
               v-if="sd.status === 'pending'"
@@ -50,7 +49,7 @@
           <div v-if="sd.status === 'approved'" class="flex gap-2">
             <router-link
               :to="{ name: 'Attempt', params: { code: sd.sessionCode, attemptId: sd.attemptId } }"
-              @click="isOpen = false; demandStore.removeStudentDemand(sd.id)"
+              @click="sessionStorage.setItem(`attempt_owner:${sd.attemptId}`, '1'); isOpen = false; demandStore.removeStudentDemand(sd.id)"
               class="flex-1 text-center px-3 py-1.5 text-xs font-medium rounded-lg bg-success text-white hover:bg-success/80 transition-colors"
             >
               Rejoindre

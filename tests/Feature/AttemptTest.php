@@ -372,6 +372,25 @@ test('authenticated user cannot create multiple attempts for the same session', 
     ]);
 });
 
+test('guest cannot create multiple attempts for the same session with the same name', function () {
+    $response1 = $this->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
+        'name' => 'Alice',
+    ]);
+
+    $response1->assertCreated();
+    $firstAttemptId = $response1->json('attempt.id');
+
+    $response2 = $this->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
+        'name' => 'Alice',
+    ]);
+
+    $response2->assertStatus(409);
+    $response2->assertJson([
+        'requires_rejoin' => true,
+        'attempt' => ['id' => $firstAttemptId],
+    ]);
+});
+
 test('guest cannot join a private session', function () {
     $session = KangourouSession::factory()->private()->create(['paper_id' => $this->paper->id]);
 

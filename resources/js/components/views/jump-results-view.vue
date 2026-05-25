@@ -27,13 +27,22 @@
 
         <p v-if="terminationLabel" class="text-sm font-medium" :class="jumpAttemptStore.attempt.termination === 'submitted' ? 'text-success' : 'text-warning'">{{ terminationLabel }}</p>
 
-        <div v-if="jumpAttemptStore.attempt.status === 'finished' && !isJumpExpired && jumpAttemptStore.attempt.termination !== 'timeout'" class="pt-4">
+        <div v-if="jumpAttemptStore.attempt.jump?.course?.division_id" class="flex justify-center pt-2">
+          <router-link
+            :to="{ name: 'DivisionDetails', params: { id: jumpAttemptStore.attempt.jump.course.division_id } }"
+            class="px-8 py-3 rounded-lg bg-primary hover:bg-primary-hover text-xl text-surface text-base font-semibold cursor-pointer transition-colors"
+          >
+            Retour à la classe
+          </router-link>
+        </div>
+
+        <div v-if="jumpAttemptStore.attempt.status === 'finished' && !isJumpExpired && jumpAttemptStore.attempt.termination !== 'timeout'" class="pt-10">
           <div v-if="!rejoinDemandSent">
             <p class="text-sm text-text-muted mb-3">Avez-vous quitté par erreur ?</p>
             <button
               @click="handleRejoinRequest"
               :disabled="jumpAttemptStore.isLoading"
-              class="px-6 py-2 rounded-lg bg-info hover:bg-info-hover text-surface font-medium cursor-pointer transition-colors disabled:opacity-50"
+              class="px-6 py-2 rounded-lg border border-info text-info hover:bg-info/10 font-medium cursor-pointer transition-colors disabled:opacity-50"
             >
               Demander à reprendre
             </button>

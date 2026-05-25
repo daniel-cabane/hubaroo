@@ -267,12 +267,14 @@ import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';
 
 const route = useRoute();
 const router = useRouter();
 const sessionStore = useKangourouSessionStore();
 const attemptStore = useAttemptStore();
 const authStore = useAuthStore();
+const rejoinDemandStore = useRejoinDemandStore();
 
 const currentIndex = ref(0);
 const slideDirection = ref('slide-left');
@@ -622,6 +624,11 @@ function handleBeforeUnload(e) {
   submitBeacon();
 }
 
+function handlePageHide() {
+  if (!isInProgress.value) return;
+  submitBeacon();
+}
+
 onBeforeRouteLeave(async () => {
   if (!isInProgress.value || isSubmitting.value) {
     return true;
@@ -660,6 +667,20 @@ function handleFocus() {
 onMounted(async () => {
   const { code, attemptId } = route.params;
 
+  // Clean up any rejoin demand for this attempt now that the student is joining.
+  const pendingDemand = rejoinDemandStore.studentDemands.find(d => String(d.attemptId) === String(attemptId));
+  if (pendingDemand) {
+    rejoinDemandStore.removeStudentDemand(pendingDemand.id);
+  }
+
+  // Block re-entry from a different tab before fetching the attempt.
+  // Must run first so isInProgress is still false and onBeforeRouteLeave
+  // won't show the "do you want to leave?" dialog on the redirect.
+  if (!sessionStorage.getItem(`attempt_owner:${attemptId}`)) {
+    router.replace({ name: 'Session', params: { code } });
+    return;
+  }
+
   try {
     await sessionStore.fetchSession(code);
     await attemptStore.fetchAttempt(attemptId);
@@ -679,6 +700,7 @@ onMounted(async () => {
 
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
 
     if (isInProgress.value) {
       const preferences = session.value?.preferences || {};
@@ -723,6 +745,7 @@ onUnmounted(() => {
   if (blurInterval) clearInterval(blurInterval);
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  window.removeEventListener('pagehide', handlePageHide);
   window.removeEventListener('blur', handleBlur);
   window.removeEventListener('focus', handleFocus);
   if (session.value?.id) {

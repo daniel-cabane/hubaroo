@@ -10,7 +10,7 @@
         </h1>
         <nav class="flex space-x-4 items-center">
           <!-- Active attempt banner -->
-          <div
+          <!-- <div
             v-if="attemptStore.activeRecovery || jumpAttemptStore.activeJumpRecovery"
             class="flex items-center gap-2 bg-surface/20 rounded-lg px-3 py-1"
           >
@@ -40,7 +40,7 @@
                 </button>
               </div>
             </div>
-          </div>
+          </div> -->
 
           <!-- Alert Center (for session authors and students) -->
           <AlertCenter v-if="!isAttemptView" />

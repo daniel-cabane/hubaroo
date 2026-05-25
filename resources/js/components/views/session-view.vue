@@ -49,15 +49,25 @@
         </div>
       </div>
 
-      <p class="text-sm text-text-muted">Demandez à l'enseignant l'autorisation de reprendre votre tentative.</p>
-
-      <button
-        @click="requestRejoin"
-        :disabled="isRequestingRejoin"
-        class="w-full bg-primary hover:bg-primary-hover text-surface font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
-      >
-        {{ isRequestingRejoin ? 'Envoi en cours...' : 'Demander à reprendre' }}
-      </button>
+      <template v-if="existingAttempt.status === 'inProgress'">
+        <p class="text-sm text-text-muted">L'enseignant a approuvé votre reprise. Vous pouvez rejoindre directement.</p>
+        <button
+          @click="directRejoin"
+          class="w-full bg-primary hover:bg-primary-hover text-surface font-medium py-2 px-4 rounded-lg transition-colors"
+        >
+          Rejoindre
+        </button>
+      </template>
+      <template v-else>
+        <p class="text-sm text-text-muted">Demandez à l'enseignant l'autorisation de reprendre votre tentative.</p>
+        <button
+          @click="requestRejoin"
+          :disabled="isRequestingRejoin"
+          class="w-full bg-primary hover:bg-primary-hover text-surface font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {{ isRequestingRejoin ? 'Envoi en cours...' : 'Demander à reprendre' }}
+        </button>
+      </template>
     </div>
 
     <div v-else-if="session">
@@ -158,6 +168,7 @@ async function startAttempt() {
     const code = route.params.code;
     const name = authStore.isAuthenticated ? null : studentName.value.trim();
     const attempt = await attemptStore.createAttempt(code, name);
+    sessionStorage.setItem(`attempt_owner:${attempt.id}`, '1');
     router.replace({
       name: 'Attempt',
       params: { code, attemptId: attempt.id },
@@ -191,6 +202,19 @@ async function requestRejoin() {
   }
 }
 
+function directRejoin() {
+  const attemptId = existingAttempt.value.id;
+  sessionStorage.setItem(`attempt_owner:${attemptId}`, '1');
+  const demand = rejoinDemandStore.studentDemands.find(d => String(d.attemptId) === String(attemptId));
+  if (demand) {
+    rejoinDemandStore.removeStudentDemand(demand.id);
+  }
+  router.replace({
+    name: 'Attempt',
+    params: { code: route.params.code, attemptId },
+  });
+}
+
 // React to store updates for the pending demand
 watch(() => rejoinDemandStore.studentDemands, (demands) => {
   if (!pendingDemandId.value) return;
@@ -198,6 +222,8 @@ watch(() => rejoinDemandStore.studentDemands, (demands) => {
   if (!demand || demand.status === 'pending') return;
 
   if (demand.status === 'approved') {
+    sessionStorage.setItem(`attempt_owner:${demand.attemptId}`, '1');
+    rejoinDemandStore.removeStudentDemand(demand.id);
     router.replace({
       name: 'Attempt',
       params: { code: route.params.code, attemptId: demand.attemptId },
@@ -222,17 +248,7 @@ onMounted(async () => {
           // Existing attempt for this session: load its details for the rejoin form
           try {
             const attemptData = await attemptStore.fetchAttempt(stored.attempt_id);
-            if (attemptData.status === 'inProgress') {
-              existingAttempt.value = attemptData;
-            } else {
-              // Attempt is finished, allow starting fresh
-              attemptStore.clearLocalStorage();
-              if (authStore.isAuthenticated) {
-                await startAttempt();
-              } else {
-                showNamePrompt.value = true;
-              }
-            }
+            existingAttempt.value = attemptData;
           } catch {
             // Attempt not found, clear and let them start fresh
             attemptStore.clearLocalStorage();

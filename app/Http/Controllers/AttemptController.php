@@ -50,11 +50,24 @@ class AttemptController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        // Check if authenticated user already has an attempt for this session
+        // Check if the user already has an attempt for this session
         $userId = $request->user()?->id;
         if ($userId) {
             $existingAttempt = Attempt::where('kangourou_session_id', $session->id)
                 ->where('user_id', $userId)
+                ->first();
+
+            if ($existingAttempt) {
+                return response()->json([
+                    'message' => 'You already have an attempt for this session.',
+                    'requires_rejoin' => true,
+                    'attempt' => $existingAttempt,
+                ], 409);
+            }
+        } elseif ($guestName = $request->input('name')) {
+            $existingAttempt = Attempt::where('kangourou_session_id', $session->id)
+                ->whereNull('user_id')
+                ->where('name', $guestName)
                 ->first();
 
             if ($existingAttempt) {
@@ -181,7 +194,7 @@ class AttemptController extends Controller
 
         $request->validate([
             'timer' => ['nullable', 'integer', 'min:0'],
-            'termination' => ['nullable', 'in:submitted,blurred,timeout'],
+            'termination' => ['nullable', 'in:submitted,blurred,timeout,abandoned'],
         ]);
 
         $attempt->update([
