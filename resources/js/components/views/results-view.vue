@@ -34,7 +34,7 @@
 
       <!-- Delayed correction notice -->
       <div v-if="!correctionAvailable" class="mb-8 bg-surface dark:bg-gray-900 border border-border rounded-xl p-6 text-center space-y-4">
-        <Clock class="w-12 h-12 text-text-muted mx-auto" />
+        <LaptopMinimalCheck class="w-12 h-12 text-text-muted mx-auto" />
         <p class="text-6xl text-text-main">Session terminée</p>
         <p class="text-lg font-medium text-text-main dark:text-surface">La correction sera disponible à la fin de la session.</p>
         <p v-if="terminationLabel" class="text-sm font-medium" :class="attempt.termination === 'submitted' ? 'text-success' : 'text-warning'">{{ terminationLabel }}</p>
@@ -124,7 +124,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { Clock } from 'lucide-vue-next';
+import { LaptopMinimalCheck } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';

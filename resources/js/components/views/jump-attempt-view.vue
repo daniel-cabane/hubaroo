@@ -463,7 +463,7 @@ function submitBeacon() {
       'Content-Type': 'application/json',
       'X-XSRF-TOKEN': csrfToken,
     },
-    body: JSON.stringify({ timer: remainingSeconds.value, termination: 'abandoned' }),
+    body: JSON.stringify({ timer: remainingSeconds.value, termination: 'blurred' }),
   });
 }
 
@@ -471,6 +471,11 @@ function handleBeforeUnload(e) {
   if (!isInProgress.value) return;
   e.preventDefault();
   e.returnValue = '';
+  submitBeacon();
+}
+
+function handlePageHide() {
+  if (!isInProgress.value) return;
   submitBeacon();
 }
 
@@ -558,14 +563,36 @@ onMounted(async () => {
     return;
   }
 
+  let isAppActive = true;
+
+  function updateAppState() {
+    // The app is truly active ONLY if it is visible AND has user focus
+    const currentlyActive = document.visibilityState === 'visible' && document.hasFocus();
+
+    // Only run your logic if the state actually changed
+    if (currentlyActive !== isAppActive) {
+      isAppActive = currentlyActive;
+      
+      if (isAppActive) {
+        handleFocus();
+      } else {
+        handleBlur();
+      }
+    }
+  }
+
   if (isInProgress.value) {
     const jump = jumpAttemptStore.attempt?.jump;
     const extraTimeSeconds = jumpAttemptStore.attempt?.extra_time ?? 0;
     startCountdown(jump?.time ?? 15, extraTimeSeconds);
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pagehide', handlePageHide);
+    document.addEventListener('visibilitychange', updateAppState);
+    window.addEventListener('focus', updateAppState);
+    window.addEventListener('blur', updateAppState);
+    // window.addEventListener('blur', handleBlur);
+    // window.addEventListener('focus', handleFocus);
 
     window.Echo.channel(`jump.${route.params.jumpId}`)
       .listen('.JumpExpired', () => {
@@ -576,6 +603,7 @@ onMounted(async () => {
         showBlurAlarm.value = false;
         window.removeEventListener('keydown', handleKeydown);
         window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.removeEventListener('pagehide', handlePageHide);
         window.removeEventListener('blur', handleBlur);
         window.removeEventListener('focus', handleFocus);
         router.replace({
@@ -591,9 +619,11 @@ onUnmounted(() => {
   if (blurInterval) clearInterval(blurInterval);
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  window.removeEventListener('pagehide', handlePageHide);
   window.removeEventListener('blur', handleBlur);
   window.removeEventListener('focus', handleFocus);
   window.Echo.leave(`jump.${route.params.jumpId}`);
+
 });
 </script>
 

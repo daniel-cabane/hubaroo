@@ -14,14 +14,14 @@
 
       <h1 class="text-2xl font-bold text-text-main dark:text-surface mb-1">
         {{ jumpAttemptStore.attempt.jump?.course?.title }}
+        <span class="text-text-muted">- Saut {{ jumpAttemptStore.attempt.jump?.rank }}</span>
       </h1>
-      <p class="text-text-muted mb-6">
-        Saut {{ jumpAttemptStore.attempt.jump?.rank }}
-      </p>
 
       <!-- Awaiting expiry -->
       <div v-if="!isJumpExpired" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-6 text-center space-y-4">
-        <Clock class="w-12 h-12 text-text-muted mx-auto" />
+        <LaptopMinimalCheck class="w-12 h-12 text-text-muted mx-auto" />
+        <p class="text-6xl text-text-main">Atterrissage !</p>
+        <p class="text-sm text-text-muted">Saut terminé</p>
         <p class="text-lg font-medium text-text-main dark:text-surface">Résultats disponibles après expiration</p>
         <p class="text-sm text-text-muted">Expiration {{ formatRelativeDate(jumpAttemptStore.attempt.jump?.expiration) }}</p>
 
@@ -130,7 +130,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, Clock } from 'lucide-vue-next';
+import { ChevronLeft, LaptopMinimalCheck } from 'lucide-vue-next';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 

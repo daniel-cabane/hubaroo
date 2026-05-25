@@ -86,7 +86,7 @@ function mapSessionAttempt(ga) {
     id: ga.id,
     type: 'session',
     title: 'Session Kangourou',
-    subtitle: ga.created_at ? new Date(ga.created_at).toLocaleDateString() : '',
+    subtitle: ga.kangourou_session.code,
     status: ga.status,
     score: (ga.score !== null && ga.kangourou_session?.status === 'expired') ? ga.score : null,
     updatedAt: new Date(ga.updated_at ?? Date.now()),
