@@ -71,7 +71,7 @@
           <table class="w-full text-sm">
             <thead class="bg-gray-50 dark:bg-gray-800 border-b border-border">
               <tr>
-                <th class="px-4 py-3 text-left font-semibold text-text-main dark:text-surface">
+                <th class="px-4 py-3 text-left font-semibold text-text-main dark:text-surface sticky left-0 z-10 bg-gray-50 dark:bg-gray-800 min-w-[250px]">
                   <button @click="setSort('name')" class="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer">
                     Élève
                     <span class="text-xs opacity-50">{{ sortKey === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
@@ -140,8 +140,8 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-border">
-              <tr v-for="student in filteredSortedStudents" :key="student.id" class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                <td class="px-4 py-3 font-medium text-text-main dark:text-surface">
+              <tr v-for="student in filteredSortedStudents" :key="student.id" class="group hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <td class="px-4 py-3 font-medium text-text-main dark:text-surface sticky left-0 z-10 bg-surface dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-800 transition-colors">
                   {{ student.pivot?.class_name ?? student.name }}
                 </td>
                 <td class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">
