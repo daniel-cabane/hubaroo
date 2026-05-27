@@ -47,7 +47,7 @@ class JumpRejoinDemandController extends Controller
 
         $extraTime = $request->integer('extra_time', 0);
         $attempt = $jumpRejoinDemand->jumpAttempt;
-        $newExtraTime = max(0, $attempt->extra_time + $extraTime);
+        $newExtraTime = $attempt->extra_time + $extraTime;
 
         $attempt->update([
             'status' => 'inProgress',

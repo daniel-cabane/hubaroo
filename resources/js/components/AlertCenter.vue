@@ -91,6 +91,25 @@
             </div>
             <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(jd.created_at) }}</span>
           </div>
+          <!-- Ajuster le temps -->
+          <div class="space-y-1">
+            <p class="text-xs font-medium text-text-muted">Ajuster le temps</p>
+            <div class="flex items-center gap-3">
+              <input
+                :value="jumpExtraTimes[jd.id] ?? 0"
+                @input="jumpExtraTimes[jd.id] = Number($event.target.value)"
+                type="range"
+                min="-10"
+                max="10"
+                step="1"
+                class="flex-1 accent-primary"
+              />
+              <span class="text-xs font-medium text-text-main w-16 text-right">
+                {{ (jumpExtraTimes[jd.id] ?? 0) > 0 ? '+' : '' }}{{ jumpExtraTimes[jd.id] ?? 0 }} min
+              </span>
+            </div>
+          </div>
+
           <div class="flex gap-2">
             <button
               @click="approveJumpDemand(jd)"
@@ -99,7 +118,7 @@
               Accepter
             </button>
             <button
-              @click="jumpDemandStore.rejectDemand(jd.id)"
+              @click="jumpDemandStore.rejectDemand(jd.id); delete jumpExtraTimes[jd.id]"
               class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
             >
               Refuser
@@ -193,18 +212,24 @@
             </div>
           </div>
 
-          <!-- Time adjustment -->
-          <!-- <div class="flex items-center gap-2">
-            <label class="text-xs text-text-muted whitespace-nowrap">Temps ajouté (s) :</label>
-            <input
-              v-model.number="extraTimes[demand.id]"
-              type="number"
-              min="-3600"
-              max="3600"
-              step="60"
-              class="w-24 px-2 py-1 text-xs border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-          </div> -->
+          <!-- Ajuster le temps -->
+          <div class="space-y-1">
+            <p class="text-xs font-medium text-text-muted">Ajuster le temps</p>
+            <div class="flex items-center gap-3">
+              <input
+                :value="extraTimes[demand.id] ?? 0"
+                @input="extraTimes[demand.id] = Number($event.target.value)"
+                type="range"
+                min="-20"
+                max="20"
+                step="1"
+                class="flex-1 accent-primary"
+              />
+              <span class="text-xs font-medium text-text-main w-16 text-right">
+                {{ (extraTimes[demand.id] ?? 0) > 0 ? '+' : '' }}{{ extraTimes[demand.id] ?? 0 }} min
+              </span>
+            </div>
+          </div>
 
           <!-- Actions -->
           <div class="flex gap-2">
@@ -240,6 +265,7 @@ const authStore = useAuthStore();
 const isOpen = ref(false);
 const container = ref(null);
 const extraTimes = reactive({});
+const jumpExtraTimes = reactive({});
 
 const totalCount = computed(() =>
   demandStore.demands.length +
@@ -292,7 +318,7 @@ function formatTimer(timerSeconds, preferences) {
 }
 
 async function approve(demand) {
-  const extra = extraTimes[demand.id] || 0;
+  const extra = (extraTimes[demand.id] ?? 0) * 60;
   await demandStore.approveDemand(demand.id, extra);
   delete extraTimes[demand.id];
 }
@@ -303,7 +329,9 @@ async function reject(demand) {
 }
 
 async function approveJumpDemand(demand) {
-  await jumpDemandStore.approveDemand(demand.id);
+  const extra = (jumpExtraTimes[demand.id] ?? 0) * 60;
+  await jumpDemandStore.approveDemand(demand.id, extra);
+  delete jumpExtraTimes[demand.id];
 }
 
 function listenForStudentJumpDemand(demand) {

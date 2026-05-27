@@ -725,6 +725,14 @@ onMounted(async () => {
             clearInterval(timerInterval);
             timerInterval = null;
             autoSubmit('timeout');
+          })
+          .listen('.AttemptUpdated', (event) => {
+            if (String(event.attempt?.id) !== String(attemptStore.attempt?.id)) return;
+            attemptStore.attempt.extra_time = event.attempt.extra_time;
+            clearInterval(timerInterval);
+            timerInterval = null;
+            const timeLimitMinutes = session.value?.preferences?.time_limit ?? 50;
+            startCountdown(timeLimitMinutes);
           });
       }
 

@@ -50,7 +50,7 @@ class RejoinDemandController extends Controller
         $extraTime = $request->integer('extra_time', 0);
         $attempt = $rejoinDemand->attempt;
 
-        $newExtraTime = max(0, $attempt->extra_time + $extraTime);
+        $newExtraTime = $attempt->extra_time + $extraTime;
         $attempt->update([
             'status' => 'inProgress',
             'termination' => 'none',
