@@ -13,16 +13,6 @@
     <!-- Year and Level selects -->
     <div class="flex flex-wrap gap-4 mb-6">
       <div class="flex-1 min-w-[140px]">
-        <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Année</label>
-        <select
-          v-model="selectedYear"
-          class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
-        >
-          <option value="" disabled>Choisir une année</option>
-          <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
-        </select>
-      </div>
-      <div class="flex-1 min-w-[140px]">
         <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Niveau</label>
         <select
           v-model="selectedLevel"
@@ -32,14 +22,33 @@
           <option v-for="level in availableLevels" :key="level.value" :value="level.value">{{ level.label }}</option>
         </select>
       </div>
-      <div class="flex items-end">
+      <div class="flex-1 min-w-[140px]">
+        <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Année</label>
+        <div class="flex items-center gap-1">
+          <select
+          v-model="selectedYear"
+          class="flex-1 px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+          <option value="" disabled>Choisir une année</option>
+          <option v-for="year in availableYears" :key="year" :value="year">{{ year }}</option>
+        </select>
         <button
-          @click="loadPaper"
-          :disabled="!matchedPaper || paperStore.isLoading"
-          class="px-5 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface font-medium transition-colors disabled:opacity-50"
+          type="button"
+          @click="stepYear(-1)"
+          :disabled="!selectedYear || availableYears.indexOf(Number(selectedYear)) >= availableYears.length - 1"
+          class="w-8 h-9 flex items-center justify-center rounded-lg border border-border dark:border-border/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
         >
-          Voir
+          <ChevronLeft class="w-4 h-4" />
         </button>
+          <button
+            type="button"
+            @click="stepYear(1)"
+            :disabled="!selectedYear || availableYears.indexOf(Number(selectedYear)) <= 0"
+            class="w-8 h-9 flex items-center justify-center rounded-lg border border-border dark:border-border/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
+          >
+            <ChevronRight class="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
 
@@ -47,11 +56,12 @@
       Aucun sujet disponible pour cette combinaison.
     </p>
 
-    <!-- Loading -->
-    <div v-if="paperStore.isLoading" class="text-text-muted">Chargement...</div>
-
     <!-- Paper content -->
-    <div v-else-if="paperStore.currentPaper && paperStore.currentPaper.questions">
+    <div
+      v-if="paperStore.currentPaper && paperStore.currentPaper.questions"
+      :class="{ 'opacity-50 pointer-events-none': paperStore.isLoading }"
+      class="transition-opacity duration-150"
+    >
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-xl font-semibold text-text-main dark:text-surface">
           {{ paperStore.currentPaper.title }}
@@ -86,7 +96,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronLeft } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { usePaperStore } from '@/stores/paperStore';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -127,12 +137,28 @@ const matchedPaper = computed(() => {
   );
 });
 
+function stepYear(direction) {
+  const index = availableYears.value.indexOf(Number(selectedYear.value));
+  const newIndex = index - direction;
+  if (newIndex >= 0 && newIndex < availableYears.value.length) {
+    selectedYear.value = availableYears.value[newIndex];
+  }
+}
+
 async function loadPaper() {
   if (!matchedPaper.value) {
     return;
   }
   await paperStore.fetchPaper(matchedPaper.value.id);
 }
+
+watch(matchedPaper, (paper) => {
+  if (paper) {
+    loadPaper();
+  } else {
+    paperStore.currentPaper = null;
+  }
+});
 
 onMounted(async () => {
   await paperStore.fetchPapers();

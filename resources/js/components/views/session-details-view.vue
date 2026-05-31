@@ -112,12 +112,23 @@
               <label class="block text-sm font-medium text-text-main dark:text-surface/80">Confidentialité</label>
               <select
                 v-model="editForm.privacy"
-                :disabled="session.status !== 'draft'"
+                :disabled="session.status !== 'draft' || isSavingPrivacy"
+                @change="autoSavePrivacy"
                 class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="public">Public</option>
-                <option value="private">Privé</option>
+                <option value="public">Publique - Ouverte à toutes/tous en utilisant le code</option>
+                <option value="private">Privée - Réservée à vos classes sur activation</option>
               </select>
+              <div class="flex items-center gap-1 h-4">
+                <template v-if="privacySaveStatus === 'saving'">
+                  <Loader2 class="w-3 h-3 animate-spin text-text-muted" />
+                  <span class="text-xs text-text-muted">Enregistrement...</span>
+                </template>
+                <template v-else-if="privacySaveStatus === 'saved'">
+                  <Check class="w-3 h-3 text-success" />
+                  <span class="text-xs text-success">Enregistré</span>
+                </template>
+              </div>
             </div>
 
             <!-- Class Access (private sessions only) -->
@@ -135,7 +146,11 @@
                 :key="division.id"
                 class="flex items-center justify-between"
               >
-                <span class="text-sm text-text-main dark:text-surface">{{ division.name }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-text-main dark:text-surface">{{ division.name }}</span>
+                  <Loader2 v-if="isTogglingDivision === division.id" class="w-3 h-3 animate-spin text-text-muted" />
+                  <Check v-else-if="divisionSavedId === division.id" class="w-3 h-3 text-success" />
+                </div>
                 <button
                   type="button"
                   @click="toggleDivision(division)"
@@ -540,7 +555,7 @@
 
         <div class="flex flex-col items-center gap-4">
           <div class="flex h-20 w-20 items-center justify-center rounded-full bg-secondary/10 text-secondary">
-            <LogIn class="h-10 w-10" />
+            <TvMinimalPlay class="h-10 w-10" />
           </div>
           <h2 class="text-2xl font-bold text-text-main dark:text-surface">Rejoindre une session</h2>
         </div>
@@ -554,7 +569,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronLeft, RefreshCw, Clock, Play, LogIn, X, Fullscreen } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, Clock, Play, TvMinimalPlay, X, Fullscreen, Loader2, Check } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import AttemptsTable from '@/components/AttemptsTable.vue';
@@ -593,6 +608,9 @@ const deleteConfirmed = ref(false);
 const linkedDivisionIds = ref([]);
 const isTogglingDivision = ref(null);
 const isSaving = ref(false);
+const isSavingPrivacy = ref(false);
+const privacySaveStatus = ref(null); // null | 'saving' | 'saved'
+const divisionSavedId = ref(null);
 
 const editForm = reactive({
   privacy: 'public',
@@ -665,6 +683,26 @@ async function refreshSession() {
   const sessionId = route.params.id;
   session.value = await sessionStore.fetchSessionDetails(sessionId);
   initializeForm();
+}
+
+async function autoSavePrivacy() {
+  try {
+    isSavingPrivacy.value = true;
+    privacySaveStatus.value = 'saving';
+    await sessionStore.updateSession(session.value.id, {
+      privacy: editForm.privacy,
+      preferences: editForm.preferences,
+    });
+    const sessionId = route.params.id;
+    session.value = await sessionStore.fetchSessionDetails(sessionId);
+    privacySaveStatus.value = 'saved';
+    setTimeout(() => { privacySaveStatus.value = null; }, 2000);
+  } catch (err) {
+    error.value = err.message || 'Failed to save privacy';
+    privacySaveStatus.value = null;
+  } finally {
+    isSavingPrivacy.value = false;
+  }
 }
 
 async function saveChanges() {
@@ -859,6 +897,8 @@ async function toggleDivision(division) {
       await divisionStore.openSessionForDivision(session.value.id, division.id);
       linkedDivisionIds.value = [...linkedDivisionIds.value, division.id];
     }
+    divisionSavedId.value = division.id;
+    setTimeout(() => { divisionSavedId.value = null; }, 2000);
   } catch {
     // error handled by store
   } finally {

@@ -6,6 +6,7 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
   const session = ref(null);
   const papers = ref([]);
   const mySessions = ref([]);
+  const mySessionsMeta = ref(null);
   const isLoading = ref(false);
   const error = ref(null);
 
@@ -74,11 +75,12 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     }
   }
 
-  async function fetchMySessions() {
+  async function fetchMySessions(page = 1) {
     isLoading.value = true;
     try {
-      const response = await axios.get('/api/my/kangourou-sessions');
+      const response = await axios.get('/api/my/kangourou-sessions', { params: { page } });
       mySessions.value = response.data.sessions;
+      mySessionsMeta.value = response.data.meta;
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch sessions';
       throw err;
@@ -189,6 +191,7 @@ export const useKangourouSessionStore = defineStore('kangourouSession', () => {
     session,
     papers,
     mySessions,
+    mySessionsMeta,
     isLoading,
     error,
     fetchPapers,

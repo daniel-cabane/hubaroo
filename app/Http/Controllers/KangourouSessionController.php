@@ -119,13 +119,22 @@ class KangourouSessionController extends Controller
 
     public function myIndex(Request $request): JsonResponse
     {
-        $sessions = $request->user()
+        $paginator = $request->user()
             ->kangourouSessions()
-            ->with('paper')
+            ->with(['paper', 'divisions'])
+            ->withCount('attempts')
             ->latest()
-            ->get();
+            ->paginate(15);
 
-        return response()->json(['sessions' => $sessions]);
+        return response()->json([
+            'sessions' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     public function details(Request $request, KangourouSession $kangourouSession): JsonResponse

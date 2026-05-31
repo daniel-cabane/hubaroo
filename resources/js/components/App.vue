@@ -8,39 +8,59 @@
           </router-link>
           <img v-else :src="logoSrc" alt="Hubaroo" class="h-12 opacity-40" />
         </h1>
-        <nav class="flex space-x-4 items-center">
-          <!-- Active attempt banner -->
-          <!-- <div
-            v-if="attemptStore.activeRecovery || jumpAttemptStore.activeJumpRecovery"
-            class="flex items-center gap-2 bg-surface/20 rounded-lg px-3 py-1"
-          >
-            <span class="text-sm font-medium text-surface/70">Tentative en cours</span>
-            <button
-              @click="resumeStoredAttempt"
-              class="text-md font-bold cursor-pointer bg-surface/20 hover:bg-surface/30 rounded px-2 py-0.5 transition-colors"
-            >
-              Reprendre
-            </button>
-            <div class="relative" ref="bannerMenuContainer">
-              <button
-                @click.stop="showBannerMenu = !showBannerMenu"
-                class="w-6 h-6 rounded flex items-center justify-center hover:bg-surface/30 transition-colors cursor-pointer"
-              >
-                <ChevronDown class="w-4 h-4 text-surface/70" />
-              </button>
-              <div
-                v-if="showBannerMenu"
-                class="absolute right-0 mt-1 w-32 bg-surface dark:bg-gray-900 rounded-lg shadow-xl border border-border py-1 z-50"
+        <nav class="flex items-center gap-1">
+          <!-- Main nav buttons for authenticated users -->
+          <template v-if="authStore.isAuthenticated && !isAttemptView">
+            <!-- Teacher nav -->
+            <template v-if="authStore.user?.is_teacher">
+              <router-link
+                v-for="link in teacherNavLinks"
+                :key="link.to"
+                :to="link.to"
+                custom
+                v-slot="{ navigate, isActive, isExactActive }"
               >
                 <button
-                  @click="dismissAttempt"
-                  class="w-full text-left px-3 py-1.5 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  @click="navigate"
+                  class="relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-surface/70 hover:text-surface hover:bg-surface/10 transition-colors"
+                  :class="{ 'text-surface': isActive || isExactActive }"
                 >
-                  Ignorer
+                  <component :is="link.icon" class="w-5 h-5 shrink-0" />
+                  <span class="text-[10px] font-medium leading-none whitespace-nowrap">{{ link.label }}</span>
+                  <span
+                    class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60%] h-0.5 rounded-full bg-surface transition-opacity"
+                    :class="isActive || isExactActive ? 'opacity-100' : 'opacity-0'"
+                  />
                 </button>
-              </div>
-            </div>
-          </div> -->
+              </router-link>
+            </template>
+
+            <!-- Student nav -->
+            <template v-if="authStore.user?.is_student">
+              <router-link
+                v-for="link in studentNavLinks"
+                :key="link.to"
+                :to="link.to"
+                custom
+                v-slot="{ navigate, isActive, isExactActive }"
+              >
+                <button
+                  @click="navigate"
+                  class="relative flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-surface/70 hover:text-surface hover:bg-surface/10 transition-colors"
+                  :class="{ 'text-surface': isActive || isExactActive }"
+                >
+                  <component :is="link.icon" class="w-5 h-5 shrink-0" />
+                  <span class="text-[10px] font-medium leading-none whitespace-nowrap">{{ link.label }}</span>
+                  <span
+                    class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[60%] h-0.5 rounded-full bg-surface transition-opacity"
+                    :class="isActive || isExactActive ? 'opacity-100' : 'opacity-0'"
+                  />
+                </button>
+              </router-link>
+            </template>
+
+            <div class="w-px h-8 bg-surface/20 mx-1" />
+          </template>
 
           <!-- Alert Center (for session authors and students) -->
           <AlertCenter v-if="!isAttemptView" />
@@ -49,10 +69,10 @@
           <div v-if="!isAttemptView" class="relative" ref="menuContainer">
             <button
               @click="showAccountMenu = !showAccountMenu"
-              class="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer hover:bg-surface/20 transition-colors"
-              :class="!authStore.isAuthenticated ? 'bg-surface/30' : ''"
+              class="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer hover:bg-surface/30 transition-colors"
+              :class="!authStore.isAuthenticated ? 'bg-surface/50' : ''"
             >
-              <User v-if="!authStore.isAuthenticated" class="w-5 h-5" />
+              <LogIn v-if="!authStore.isAuthenticated" class="w-5 h-5 text-primary" />
               <CircleUserRound v-else class="w-9 h-9" />
             </button>
 
@@ -69,6 +89,7 @@
                   <p class="text-xs text-text-muted truncate">{{ authStore.user?.email }}</p>
                 </button>
                 <router-link
+                  v-if="!authStore.user?.is_teacher"
                   to="/my/sessions"
                   @click="showAccountMenu = false"
                   class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -77,28 +98,13 @@
                   Mes sessions
                 </router-link>
                 <router-link
+                  v-if="!authStore.user?.is_student"
                   to="/my/attempts"
                   @click="showAccountMenu = false"
                   class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <ClipboardList class="w-4 h-4 shrink-0 text-text-muted" />
                   Mes tentatives
-                </router-link>
-                <router-link
-                  to="/my/divisions"
-                  @click="showAccountMenu = false"
-                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <GraduationCap class="w-4 h-4 shrink-0 text-text-muted" />
-                  Mes classes
-                </router-link>
-                <router-link
-                  to="/papers"
-                  @click="showAccountMenu = false"
-                  class="flex items-center gap-3 px-4 py-2 text-sm text-text-main hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <BookOpen class="w-4 h-4 shrink-0 text-text-muted" />
-                  Voir un sujet
                 </router-link>
                 <router-link
                   v-if="authStore.user?.is_admin"
@@ -304,7 +310,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { CircleUserRound, ChevronDown, User, Layers, ClipboardList, GraduationCap, BookOpen, ShieldCheck, Bug, LogOut, LogIn, UserPlus } from 'lucide-vue-next';
+import { CircleUserRound, Layers, ClipboardList, GraduationCap, BookOpen, ShieldCheck, Bug, LogOut, LogIn, UserPlus } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useAttemptStore } from '@/stores/attemptStore';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
@@ -333,6 +339,17 @@ const bannerMenuContainer = ref(null);
 
 const isAttemptView = computed(() => route.name === 'Attempt' || route.name === 'JumpAttempt');
 const logoSrc = '/logo%20dark.png';
+
+const teacherNavLinks = [
+  { to: '/my/sessions', label: 'Mes sessions', icon: Layers },
+  { to: '/my/divisions', label: 'Mes classes', icon: GraduationCap },
+  { to: '/papers', label: 'Voir un sujet', icon: BookOpen },
+];
+
+const studentNavLinks = [
+  { to: '/my/attempts', label: 'Mes tentatives', icon: ClipboardList },
+  { to: '/my/divisions', label: 'Mes classes', icon: GraduationCap },
+];
 
 function handleClickOutside(e) {
   if (menuContainer.value && !menuContainer.value.contains(e.target)) {

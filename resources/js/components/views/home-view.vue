@@ -143,7 +143,7 @@
         class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-secondary/20 bg-surface p-10 shadow-sm transition-all hover:border-secondary hover:shadow-lg hover:-translate-y-1"
       >
         <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary transition-colors group-hover:bg-primary group-hover:text-white">
-          <LogIn class="h-8 w-8" />
+          <TvMinimalPlay class="h-8 w-8" />
         </div>
         <h2 class="text-xl font-bold text-text-main">Rejoindre une session</h2>
         <p class="text-sm text-text-muted text-center">Entrez un code de session pour rejoindre une session Kangourou existante.</p>
@@ -292,7 +292,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { PlusCircle, LogIn, X, Star, Lightbulb, ChevronDown } from 'lucide-vue-next';
+import { PlusCircle, X, Star, Lightbulb, ChevronDown, TvMinimalPlay } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useAttemptStore } from '@/stores/attemptStore';

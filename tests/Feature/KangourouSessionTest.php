@@ -178,6 +178,41 @@ test('authenticated user can fetch their sessions', function () {
 
     $response->assertOk();
     expect(count($response->json('sessions')))->toBe(3);
+    expect($response->json('meta.total'))->toBe(3);
+    expect($response->json('meta.current_page'))->toBe(1);
+    expect($response->json('meta.last_page'))->toBe(1);
+});
+
+test('my sessions are paginated', function () {
+    $user = User::factory()->create();
+    KangourouSession::factory()->count(20)->create([
+        'paper_id' => $this->paper->id,
+        'author_id' => $user->id,
+    ]);
+
+    $responsePage1 = $this->actingAs($user)->getJson('/api/my/kangourou-sessions?page=1');
+    $responsePage2 = $this->actingAs($user)->getJson('/api/my/kangourou-sessions?page=2');
+
+    $responsePage1->assertOk();
+    expect(count($responsePage1->json('sessions')))->toBe(15);
+    expect($responsePage1->json('meta.total'))->toBe(20);
+    expect($responsePage1->json('meta.last_page'))->toBe(2);
+
+    $responsePage2->assertOk();
+    expect(count($responsePage2->json('sessions')))->toBe(5);
+});
+
+test('my sessions include attempts count and divisions', function () {
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'author_id' => $user->id,
+    ]);
+
+    $response = $this->actingAs($user)->getJson('/api/my/kangourou-sessions');
+
+    $response->assertOk();
+    expect($response->json('sessions.0'))->toHaveKeys(['attempts_count', 'divisions']);
 });
 
 test('guest cannot fetch session history', function () {
