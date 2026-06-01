@@ -21,33 +21,76 @@
     <!-- Teacher View -->
     <template v-else-if="isTeacher && divisionStore.division">
       <!-- Header -->
-      <div class="flex items-start justify-between mb-6">
-        <div>
-          <h2 class="text-2xl font-bold text-text-main dark:text-surface">{{ divisionStore.division.name }}</h2>
-          <p class="text-text-muted text-sm mt-1">{{ divisionStore.division.students_count }} élève{{ divisionStore.division.students_count !== 1 ? 's' : '' }}</p>
+      <div class="flex items-center justify-between mb-6 gap-3">
+        <div class="flex items-center gap-3">
+        <div class="relative mt-0.5">
+          <button
+            @click.stop="showHeaderMenu = !showHeaderMenu"
+            class="p-1.5 rounded-lg border border-border text-text-muted bg-surface dark:bg-gray-900 hover:text-text-main hover:border-primary hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer shadow-sm"
+          >
+            <MoreVertical class="w-5 h-5" />
+          </button>
+          <div v-if="showHeaderMenu" class="fixed inset-0 z-10" @click="showHeaderMenu = false" />
+          <div
+            v-if="showHeaderMenu"
+            class="absolute left-0 top-full mt-1 z-20 bg-surface dark:bg-gray-900 border border-border rounded-xl shadow-lg py-1 min-w-44"
+          >
+            <button
+              @click="openEditDivisionModal"
+              class="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main dark:text-surface hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+            >
+              <Pencil class="w-4 h-4" />
+              Modifier
+            </button>
+            <div class="h-px bg-border my-1" />
+            <button
+              v-if="!divisionStore.division.archived"
+              @click="showArchiveConfirm = true; showHeaderMenu = false"
+              class="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-muted hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+            >
+              <Archive class="w-4 h-4" />
+              Archiver
+            </button>
+            <button
+              v-else
+              @click="showUnarchiveConfirm = true; showHeaderMenu = false"
+              class="w-full flex items-center gap-2 px-4 py-2 text-sm text-success hover:bg-success/10 transition-colors cursor-pointer"
+            >
+              <ArchiveRestore class="w-4 h-4" />
+              Activer
+            </button>
+            <button
+              v-if="divisionStore.division.archived"
+              @click="showDeleteConfirm = true; showHeaderMenu = false"
+              class="w-full flex items-center gap-2 px-4 py-2 text-sm text-error hover:bg-error/10 transition-colors cursor-pointer"
+            >
+              <Trash2 class="w-4 h-4" />
+              Supprimer
+            </button>
+          </div>
         </div>
-        <div class="flex gap-2">
-          <button
-            v-if="!divisionStore.division.archived"
-            @click="showArchiveConfirm = true"
-            class="px-3 py-1.5 text-sm border border-border text-text-muted rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-          >
-            Archiver
-          </button>
-          <button
-            v-else
-            @click="showUnarchiveConfirm = true"
-            class="px-3 py-1.5 text-sm border border-success text-success rounded-lg hover:bg-success/10 transition-colors cursor-pointer"
-          >
-            Activer
-          </button>
-          <button
-            v-if="divisionStore.division.archived"
-            @click="showDeleteConfirm = true"
-            class="px-3 py-1.5 text-sm bg-error/10 text-error border border-error/30 rounded-lg hover:bg-error/20 transition-colors cursor-pointer"
-          >
-            Supprimer
-          </button>
+        <div>
+          <h2 class="text-4xl font-bold text-text-main dark:text-surface">{{ divisionStore.division.name }}</h2>
+          <!-- <p class="text-text-muted text-sm mt-1">{{ divisionStore.division.students_count }} élève{{ divisionStore.division.students_count !== 1 ? 's' : '' }}</p> -->
+        </div>
+        </div>
+        <!-- Class code -->
+        <div class="flex flex-col items-end gap-0.5">
+          <div class="flex items-center gap-2">
+            <span
+              class="font-mono font-bold text-3xl transition-colors"
+              :class="divisionStore.division.accepting_students ? 'text-text-main dark:text-surface' : 'text-text-muted/50'"
+            >{{ divisionStore.division.code }}</span>
+            <button
+              v-if="divisionStore.division.accepting_students"
+              @click="showJoinInfoModal = true"
+              title="Afficher le code de classe"
+              class="text-text-muted hover:text-primary cursor-pointer transition-colors"
+            >
+              <Fullscreen class="w-5 h-5" />
+            </button>
+          </div>
+          <p v-if="!divisionStore.division.accepting_students" class="text-xs text-text-muted">Inscriptions fermées</p>
         </div>
       </div>
 
@@ -692,6 +735,58 @@
       </div>
     </div>
 
+    <!-- Edit Division Modal -->
+    <div
+      v-if="showEditDivisionModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="showEditDivisionModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-sm">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Modifier la classe</h3>
+        <form @submit.prevent="handleEditDivisionSave" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Nom</label>
+            <input
+              v-model="editName"
+              type="text"
+              required
+              class="w-full px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Code d'invitation</label>
+            <div class="flex items-center gap-2">
+              <span class="flex-1 font-mono font-bold text-2xl text-text-main dark:text-surface">{{ divisionStore.division?.code }}</span>
+              <button
+                type="button"
+                @click="showChangeCodeConfirm = true; showEditDivisionModal = false"
+                :disabled="divisionStore.division?.archived"
+                title="Générer un nouveau code"
+                class="p-2 text-text-muted hover:text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RefreshCw class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div v-if="divisionStore.error" class="bg-error/10 border border-error/30 text-error px-3 py-2 rounded-lg text-sm">
+            {{ divisionStore.error }}
+          </div>
+          <div class="flex justify-end gap-2">
+            <button type="button" @click="showEditDivisionModal = false" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors cursor-pointer">
+              Annuler
+            </button>
+            <button
+              type="submit"
+              :disabled="divisionStore.isLoading"
+              class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              Enregistrer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Archive Confirmation Modal -->
     <div
       v-if="showArchiveConfirm"
@@ -884,13 +979,13 @@
           <X class="w-6 h-6" />
         </button>
 
-        <p class="text-5xl font-semibold text-text-muted tracking-wide">hubaroo.online</p>
+        <p class="text-5xl font-semibold text-text-muted tracking-wide mb-8">hubaroo.online</p>
 
         <div class="flex items-center gap-4 w-full">
           <img
-            :src="'/mes classes.png'"
+            :src="'/mes classes loc.png'"
             alt="Page Mes classes"
-            class="flex-1 max-h-[350px] object-contain"
+            class="flex-1 max-w-[400px] object-contain"
           />
           <ChevronRight class="w-8 h-8 text-text-muted shrink-0" />
           <div class="px-4 py-2 rounded-lg bg-primary text-surface font-medium text-lg shrink-0">
@@ -1111,7 +1206,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
-import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, BookOpen, Lightbulb, Star, Trash2, Globe } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, BookOpen, Lightbulb, Star, Trash2, Globe, MoreVertical, Archive, ArchiveRestore } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
@@ -1132,6 +1227,23 @@ const jumpRejoinDemandStore = useJumpRejoinDemandStore();
 
 const showNewCourseModal = ref(false);
 const newCourseTitle = ref('');
+
+// Header dropdown menu
+const showHeaderMenu = ref(false);
+const showEditDivisionModal = ref(false);
+
+function openEditDivisionModal() {
+  editName.value = divisionStore.division?.name ?? '';
+  showHeaderMenu.value = false;
+  showEditDivisionModal.value = true;
+}
+
+async function handleEditDivisionSave() {
+  await divisionStore.updateDivision(divisionId.value, { name: editName.value });
+  if (!divisionStore.error) {
+    showEditDivisionModal.value = false;
+  }
+}
 
 // Student course tabs & graph
 const activeCourseId = ref(null);

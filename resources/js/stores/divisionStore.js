@@ -95,7 +95,9 @@ export const useDivisionStore = defineStore('division', () => {
     error.value = null;
     try {
       const response = await axios.patch(`/api/divisions/${id}/change-code`);
-      division.value = response.data.division;
+      if (division.value) {
+        division.value.code = response.data.division.code;
+      }
       return response.data.division;
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to change code';

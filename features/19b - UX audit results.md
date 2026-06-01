@@ -74,6 +74,7 @@
 ---
 
 #### [MEDIUM FRICTION] T5 — Code refresh button sits unsafely next to the displayed code
+>>> IGNORED
 
 **Screen / Flow:** Session details header — session code in large monospace text, with a small RefreshCw icon immediately to its right, no gap, no confirmation.
 
@@ -84,6 +85,7 @@
 ---
 
 #### [MEDIUM FRICTION] T6 — No high-level dashboard or "now" view for teachers
+>>> IGNORED
 
 **Screen / Flow:** Home page after login — shows "Dans la poche" section with course shortcut cards, plus "Créer" and "Rejoindre" action tiles.
 
