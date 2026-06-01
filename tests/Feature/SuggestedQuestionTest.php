@@ -111,3 +111,36 @@ test('non-teacher cannot delete a suggested question', function () {
     $response->assertForbidden();
     expect(SuggestedQuestion::find($sq->id))->not->toBeNull();
 });
+
+// --- Student: random ---
+
+test('student can fetch a random question using their mastery', function () {
+    \App\Models\Question::factory()->count(5)->create(['difficulty' => 600]);
+
+    $this->student->update(['mastery' => 500]);
+
+    $response = $this->actingAs($this->student)
+        ->getJson('/api/random-question');
+
+    $response->assertOk()
+        ->assertJsonStructure(['question' => ['id', 'image', 'correct_answer', 'difficulty'], 'reference']);
+
+    expect($response->json('reference'))->toBe(500);
+});
+
+test('student can fetch a random question with a custom reference', function () {
+    \App\Models\Question::factory()->count(5)->create(['difficulty' => 900]);
+
+    $response = $this->actingAs($this->student)
+        ->getJson('/api/random-question?reference=800');
+
+    $response->assertOk();
+    expect($response->json('reference'))->toBe(800);
+    expect($response->json('question.difficulty'))->toBeGreaterThanOrEqual(800);
+});
+
+test('unauthenticated user cannot fetch a random question', function () {
+    $response = $this->getJson('/api/random-question');
+
+    $response->assertUnauthorized();
+});

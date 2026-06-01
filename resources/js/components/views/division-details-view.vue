@@ -519,17 +519,18 @@
           <Lightbulb class="w-4 h-4 text-primary" />
           Questions à revoir
         </h3>
-        <div class="space-y-3">
-          <div v-for="sq in publicSuggestedQuestions" :key="sq.id">
-            <div class="flex items-center justify-between cursor-pointer group" @click="openPublicQuestionOverlay(sq)">
-              <div class="flex items-center gap-2">
-                <div class="flex gap-0.5">
-                  <Star v-for="n in sq.level" :key="n" class="w-3.5 h-3.5 fill-warning text-warning" />
-                </div>
-                <span class="text-xs text-text-muted">{{ sq.course_title }}</span>
-              </div>
-              <Eye class="w-4 h-4 text-text-muted group-hover:text-primary transition-colors" />
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div
+            v-for="(sq, index) in publicSuggestedQuestions"
+            :key="sq.id"
+            class="group flex items-center justify-between gap-2 p-3 rounded-xl border border-warning/30 bg-warning/5 hover:border-warning hover:shadow-md cursor-pointer transition-all"
+            @click="openPublicQuestionOverlay(sq)"
+          >
+            <div class="flex items-center gap-0.5">
+              <span class="mr-1">Question</span>
+              <Star v-for="n in sq.level" :key="n" class="w-5 h-5 fill-warning text-warning" />
             </div>
+            <span class="text-xs text-text-muted leading-snug">{{ sq.course_title }}</span>
           </div>
         </div>
       </div>

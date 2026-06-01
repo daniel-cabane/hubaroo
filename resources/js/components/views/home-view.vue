@@ -106,9 +106,22 @@
         class=" gap-8 max-w-3xl w-full justify-items-center"
         :class="authStore.isAuthenticated ? 'grid grid-cols-1 md:grid-cols-2' : 'grid grid-cols-1'"
       >
-      <!-- Create Session -->
+      <!-- Random Question (students) -->
+      <button
+        v-if="authStore.isAuthenticated && !authStore.user?.is_teacher"
+        @click="openRandomQuestionModal"
+        class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-primary/20 bg-surface p-10 shadow-sm transition-all hover:border-primary hover:shadow-lg hover:-translate-y-1 cursor-pointer"
+      >
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+          <CircleQuestionMark class="h-8 w-8" />
+        </div>
+        <h2 class="text-xl font-bold text-text-main">Répondre à une question</h2>
+        <p class="text-sm text-text-muted text-center">Répondez à une problème aléatoire adaptée à votre niveau.</p>
+      </button>
+
+      <!-- Create Session (teachers) -->
       <router-link
-        v-if="authStore.isAuthenticated"
+        v-if="authStore.isAuthenticated && authStore.user?.is_teacher"
         to="/kangourou/create"
         class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-primary/20 bg-surface p-10 shadow-sm transition-all hover:border-primary hover:shadow-lg hover:-translate-y-1"
       >
@@ -116,7 +129,7 @@
           <PlusCircle class="h-8 w-8" />
         </div>
         <h2 class="text-xl font-bold text-text-main">Créer une session</h2>
-        <p class="text-sm text-text-muted text-center">Choisissez un sujet et lancez une nouvelle session Kangourou pour {{ authStore.user?.is_teacher ? 'vos élèves' : 'vous et vos amis' }}.</p>
+        <p class="text-sm text-text-muted text-center">Choisissez un sujet et lancez une nouvelle session Kangourou pour vos élèves.</p>
       </router-link>
 
       <!-- Join Session -->
@@ -124,7 +137,7 @@
         to="/kangourou/join"
         class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-secondary/20 bg-surface p-10 shadow-sm transition-all hover:border-secondary hover:shadow-lg hover:-translate-y-1"
       >
-        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-secondary transition-colors group-hover:bg-primary group-hover:text-white">
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
           <TvMinimalPlay class="h-8 w-8" />
         </div>
         <h2 class="text-xl font-bold text-text-main">Rejoindre une session</h2>
@@ -218,6 +231,128 @@
     </div>
   </div>
 
+  <!-- Random Question Modal -->
+  <div
+    v-if="showRandomQuestionModal"
+    class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+    @click.self="closeRandomQuestionModal"
+  >
+    <div class="bg-surface dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-[80vw] mx-4 flex flex-col gap-5">
+      <!-- Header -->
+      <div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h3 class="text-lg font-bold text-text-main dark:text-surface">
+              {{ randomQuestion?.isSuggested ? 'Question à revoir' : 'Question aléatoire' }}
+            </h3>
+            <template v-if="randomQuestion?.isSuggested && randomQuestion.level">
+              <Star v-for="n in randomQuestion.level" :key="n" class="w-4 h-4 fill-warning text-warning" />
+            </template>
+          </div>
+          <button @click="closeRandomQuestionModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <!-- Question display -->
+        <div class="flex flex-col items-center gap-4 min-h-32">
+          <div v-if="randomQuestionLoading" class="flex items-center justify-center w-full h-32 text-text-muted text-sm">
+            Chargement...
+          </div>
+          <template v-else-if="randomQuestion">
+            <img
+              v-if="randomQuestion.image"
+              :src="'/' + randomQuestion.image"
+              class="max-h-64 object-contain"
+              alt="Question"
+            />
+            <p v-else class="text-text-muted text-sm">Aucune image pour cette question.</p>
+
+            <!-- Reveal answer (only for non-suggested questions) -->
+            <div v-if="!randomQuestion.isSuggested" class="w-full">
+              <div v-if="showRandomAnswer" class="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-success/10 border border-success/30 cursor-pointer" @click="showRandomAnswer = false">
+                <span class="text-sm font-semibold text-success">Réponse : {{ randomQuestion.correct_answer }}</span>
+              </div>
+              <button
+                @click="showRandomAnswer = true"
+                class="w-full px-4 py-3 rounded-lg border border-border text-sm text-text-muted hover:text-text-main hover:border-primary transition-colors cursor-pointer"
+                v-else
+              >
+                Révéler la réponse
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <!-- Divider -->
+        <div class="border-t border-border mt-8"></div>
+      </div>
+
+      <!-- Choose another question section -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-bold text-text-main dark:text-surface">Choisir une autre question</h3>
+          <div class="flex items-center gap-2 text-sm font-medium text-text-main dark:text-surface">
+            <Lightbulb class="w-4 h-4 text-warning" />
+            Parmi les questions à revoir
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="prioritizeSuggested"
+              :disabled="publicSuggestedQuestions.length === 0"
+              @click="togglePrioritizeSuggested"
+              class="relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none"
+              :class="prioritizeSuggested ? 'bg-warning' : 'bg-gray-300 dark:bg-gray-600'"
+            >
+              <span
+                class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform duration-200"
+                :class="prioritizeSuggested ? 'translate-x-5' : 'translate-x-0'"
+              />
+            </button>
+          </div>
+        </div>
+
+        <!-- Navigation buttons: single button when prioritizing, 3 buttons otherwise -->
+        <div v-if="prioritizeSuggested" class="w-full">
+          <button
+            @click="fetchNextSuggestedQuestion"
+            :disabled="randomQuestionLoading || publicSuggestedQuestions.length === 0"
+            class="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-pointer text-sm font-medium text-primary"
+          >
+          Question suivante
+          <ArrowBigRightDash class="w-4 h-4" />
+          </button>
+        </div>
+        <div v-else class="grid grid-cols-3 gap-2">
+          <button
+            @click="fetchRandomQuestion(-200)"
+            :disabled="randomQuestionLoading"
+            class="flex justify-center items-center gap-1 px-3 py-2 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 cursor-pointer text-sm"
+          >
+            <ArrowDownRight class="w-4 h-4 rotate-0 text-text-muted" />
+            Plus facile
+          </button>
+          <button
+            @click="fetchRandomQuestion(0)"
+            :disabled="randomQuestionLoading"
+            class="flex justify-center items-center gap-1 px-3 py-2 rounded-lg border border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors disabled:opacity-50 cursor-pointer text-sm font-medium text-primary"
+          >
+          Même niveau
+          <ArrowRight class="w-4 h-4" />
+          </button>
+          <button
+            @click="fetchRandomQuestion(200)"
+            :disabled="randomQuestionLoading"
+            class="flex justify-center items-center gap-1 px-3 py-2 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 cursor-pointer text-sm"
+          >
+          Plus difficile
+          <ArrowUpRight class="w-4 h-4 text-text-muted" />
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Claim Attempts Modal -->
   <div
     v-if="showClaimModal && claimableAttempts.length > 0"
@@ -274,7 +409,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { PlusCircle, X, Star, Lightbulb, ChevronDown, TvMinimalPlay } from 'lucide-vue-next';
+import { PlusCircle, X, Star, Lightbulb, ChevronDown, TvMinimalPlay, Shuffle, ArrowBigRightDash, ArrowDownRight, ArrowUpRight, ArrowRight, CircleQuestionMark } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
@@ -297,6 +432,14 @@ const selectedPublicQuestion = ref(null);
 const publicSuggestedQuestions = ref([]);
 const selectedClaimIds = ref([]);
 const isClaiming = ref(false);
+
+// Random Question Modal
+const showRandomQuestionModal = ref(false);
+const randomQuestion = ref(null);
+const randomQuestionReference = ref(0);
+const randomQuestionLoading = ref(false);
+const showRandomAnswer = ref(false);
+const prioritizeSuggested = ref(false);
 
 const claimableAttempts = computed(() => {
   return attemptStore.guestAttempts.filter(a => !a.user_id);
@@ -482,6 +625,78 @@ function openPublicQuestionOverlay(sq) {
 function closePublicQuestionOverlay() {
   showPublicQuestionOverlay.value = false;
   selectedPublicQuestion.value = null;
+}
+
+async function openRandomQuestionModal() {
+  showRandomQuestionModal.value = true;
+  prioritizeSuggested.value = publicSuggestedQuestions.value.length > 0;
+  randomQuestionReference.value = 0;
+  await fetchRandomQuestion(0);
+}
+
+function closeRandomQuestionModal() {
+  showRandomQuestionModal.value = false;
+  randomQuestion.value = null;
+  showRandomAnswer.value = false;
+}
+
+function togglePrioritizeSuggested() {
+  if (publicSuggestedQuestions.value.length === 0) { return; }
+  prioritizeSuggested.value = !prioritizeSuggested.value;
+}
+
+async function fetchNextSuggestedQuestion() {
+  showRandomAnswer.value = false;
+  randomQuestionLoading.value = true;
+
+  try {
+    const pool = publicSuggestedQuestions.value;
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    randomQuestion.value = {
+      image: picked.question.image,
+      correct_answer: picked.question.correct_answer,
+      isSuggested: true,
+      level: picked.level,
+    };
+  } catch {
+    // handled silently
+  } finally {
+    randomQuestionLoading.value = false;
+  }
+}
+
+async function fetchRandomQuestion(referenceAdjustment) {
+  showRandomAnswer.value = false;
+  randomQuestionLoading.value = true;
+
+  try {
+    if (prioritizeSuggested.value && publicSuggestedQuestions.value.length > 0) {
+      const pool = publicSuggestedQuestions.value;
+      const picked = pool[Math.floor(Math.random() * pool.length)];
+      randomQuestion.value = {
+        image: picked.question.image,
+        correct_answer: picked.question.correct_answer,
+        isSuggested: true,
+        level: picked.level,
+      };
+    } else {
+      randomQuestionReference.value += referenceAdjustment;
+      const params = randomQuestionReference.value !== 0
+        ? { reference: randomQuestionReference.value }
+        : {};
+      const res = await axios.get('/api/random-question', { params });
+      randomQuestionReference.value = res.data.reference;
+      randomQuestion.value = {
+        image: res.data.question.image,
+        correct_answer: res.data.question.correct_answer,
+        isSuggested: false,
+      };
+    }
+  } catch {
+    // handled silently
+  } finally {
+    randomQuestionLoading.value = false;
+  }
 }
 
 onUnmounted(() => {

@@ -136,6 +136,7 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/api/suggested-questions/{suggestedQuestion}/toggle-public', [SuggestedQuestionController::class, 'togglePublic'])->name('suggested-questions.togglePublic');
     Route::delete('/api/suggested-questions/{suggestedQuestion}', [SuggestedQuestionController::class, 'destroy'])->name('suggested-questions.destroy');
     Route::get('/api/divisions/{division}/public-suggested-questions', [SuggestedQuestionController::class, 'publicForDivision'])->name('suggested-questions.publicForDivision');
+    Route::get('/api/random-question', [SuggestedQuestionController::class, 'random'])->name('random-question');
 });
 
 Route::fallback(function () {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Course;
 use App\Models\Division;
+use App\Models\Question;
 use App\Models\SuggestedQuestion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,5 +79,37 @@ class SuggestedQuestionController extends Controller
         $suggestedQuestion->delete();
 
         return response()->json(['message' => 'Deleted.']);
+    }
+
+    public function random(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $reference = $request->has('reference')
+            ? $request->integer('reference')
+            : ($user->mastery ?? 500);
+
+        $questions = Question::where('difficulty', '>=', $reference)
+            ->orderBy('difficulty')
+            ->limit(20)
+            ->get();
+
+        if ($questions->isEmpty()) {
+            $questions = Question::orderBy('difficulty', 'desc')
+                ->limit(20)
+                ->get();
+        }
+
+        $question = $questions->random();
+
+        return response()->json([
+            'question' => [
+                'id' => $question->id,
+                'image' => $question->image,
+                'correct_answer' => $question->correct_answer,
+                'difficulty' => $question->difficulty,
+            ],
+            'reference' => $reference,
+        ]);
     }
 }
