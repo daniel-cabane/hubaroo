@@ -87,7 +87,7 @@
               title="Afficher le code de classe"
               class="text-text-muted hover:text-primary cursor-pointer transition-colors"
             >
-              <Fullscreen class="w-5 h-5" />
+              <Fullscreen class="w-8 h-8" />
             </button>
           </div>
           <p v-if="!divisionStore.division.accepting_students" class="text-xs text-text-muted">Inscriptions fermées</p>
@@ -98,81 +98,95 @@
         <p class="text-sm text-warning font-medium">Cette classe est archivée. Cliquez sur "Activer" pour la rendre active.</p>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Left column: settings -->
-        <div class="space-y-4">
-          <!-- Settings card -->
-          <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4 space-y-4">
-            <h3 class="font-semibold text-text-main dark:text-surface">Paramètres</h3>
+      <!-- Tabs -->
+      <div class="flex border-b border-border mb-6">
+        <button
+          v-for="tab in [{ id: 'eleves', label: 'Élèves' }, { id: 'sessions', label: 'Sessions' }, { id: 'parcours', label: 'Parcours' }]"
+          :key="tab.id"
+          @click="switchTab(tab.id)"
+          class="px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors cursor-pointer"
+          :class="activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text-main'"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
 
-            <!-- Name -->
-            <div>
-              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Nom</label>
-              <div class="flex gap-2">
-                <input
-                  v-model="editName"
-                  type="text"
-                  :disabled="divisionStore.division.archived"
-                  class="flex-1 px-3 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <button
-                  @click="handleRename"
-                  :disabled="editName === divisionStore.division.name || divisionStore.division.archived"
-                  class="px-3 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm disabled:opacity-40 transition-colors cursor-pointer"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-        </div>
-        <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
-            <!-- Code -->
-            <div>
-              <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Code d'invitation</label>
-              <div class="flex gap-2 items-center mb-3">
-                <span class="flex-1 font-mono font-bold text-3xl text-text-main dark:text-surface">{{ divisionStore.division.code }}</span>
-                <button
-                  @click="showJoinInfoModal = true"
-                  title="Afficher le code de classe"
-                  class="text-text-muted hover:text-primary cursor-pointer transition-colors"
-                >
-                  <Fullscreen class="w-5 h-5" />
-                </button>
-                <button
-                  @click="showChangeCodeConfirm = true"
-                  :disabled="divisionStore.division.archived"
-                  title="Générer un nouveau code"
-                  class="text-text-muted hover:text-primary cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <RefreshCw class="w-5 h-5" />
-                </button>
-              </div>
-            </div>
+      <!-- Tab panels -->
+      <Transition :name="tabSlideDirection" mode="out-in">
 
-            <!-- Accepting students -->
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-text-main dark:text-surface/80">Ouvert aux inscriptions</span>
-              <button
-                @click="handleToggleAccepting"
-                :disabled="divisionStore.division.archived"
-                :class="[
-                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
-                  divisionStore.division.accepting_students ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600'
-                ]"
-              >
-                <span
-                  :class="[
-                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow',
-                    divisionStore.division.accepting_students ? 'translate-x-6' : 'translate-x-1'
-                  ]"
-                />
-              </button>
-            </div>
+      <!-- Élèves tab -->
+      <div v-if="activeTab === 'eleves'" key="eleves" class="flex gap-6 items-start">
+        <!-- Left: student list -->
+        <div class="flex-1 min-w-0 bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3 gap-3">
+            <h3 class="font-semibold text-text-main dark:text-surface">Élèves ({{ divisionStore.division.students?.length ?? 0 }})</h3>
+            <input
+              v-model="divisionStudentSearch"
+              type="text"
+              placeholder="Rechercher..."
+              class="px-3 py-1.5 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary w-44"
+            />
           </div>
+          <ul v-if="divisionFilteredStudents.length" class="divide-y divide-border">
+            <li
+              v-for="(student, index) in divisionFilteredStudents"
+              :key="student.id"
+              class="flex items-center justify-between px-2 py-2 rounded-lg transition-colors hover:bg-primary/5"
+              :class="index % 2 === 0 ? '' : 'bg-gray-50 dark:bg-gray-800/50'"
+            >
+              <div>
+                <p class="text-sm font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name ?? student.name }}</p>
+                <p class="text-xs text-text-muted">{{ student.email }}</p>
+              </div>
+              <div class="flex items-center gap-1">
+                <button
+                  @click="openEditClassNameModal(student)"
+                  :disabled="divisionStore.division.archived"
+                  class="text-text-muted hover:text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Modifier le nom de classe"
+                >
+                  <Pencil class="w-4 h-4" />
+                </button>
+                <button
+                  @click="() => { studentIdToRemove = student.id; showRemoveStudentConfirm = true; }"
+                  :disabled="divisionStore.division.archived"
+                  class="text-text-muted hover:text-error transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Retirer l'élève"
+                >
+                  <X class="w-4 h-4" />
+                </button>
+              </div>
+            </li>
+          </ul>
+          <p v-else class="text-sm text-text-muted">{{ divisionStudentSearch ? 'Aucun résultat.' : 'Aucun élève.' }}</p>
+        </div>
+
+        <!-- Right: toggle + invite -->
+        <div class="w-80 shrink-0 space-y-4">
+          <!-- Accepting students toggle -->
+          <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4 flex items-center justify-between">
+            <span class="text-sm font-medium text-text-main dark:text-surface/80">Ouvert aux inscriptions</span>
+            <button
+              @click="handleToggleAccepting"
+              :disabled="divisionStore.division.archived"
+              :class="[
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
+                divisionStore.division.accepting_students ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600'
+              ]"
+            >
+              <span
+                :class="[
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow',
+                  divisionStore.division.accepting_students ? 'translate-x-6' : 'translate-x-1'
+                ]"
+              />
+            </button>
+          </div>
+
           <!-- Invite form -->
           <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
             <h3 class="font-semibold text-text-main dark:text-surface mb-3">Inviter par email</h3>
-            <form @submit.prevent="handleInvite" class="flex gap-2">
+            <form @submit.prevent="handleInvite" class="flex flex-col gap-2">
               <input
                 v-model="inviteEmail"
                 type="email"
@@ -184,188 +198,312 @@
               <button
                 type="submit"
                 :disabled="divisionStore.isLoading || divisionStore.division.archived"
-                class="px-3 py-2 bg-primary cursor-pointer hover:bg-primary-hover text-surface rounded-lg text-sm disabled:opacity-50 transition-colors"
+                class="w-full px-3 py-2 bg-primary cursor-pointer hover:bg-primary-hover text-surface rounded-lg text-sm disabled:opacity-50 transition-colors"
               >
                 Inviter
               </button>
             </form>
             <div v-if="inviteSuccess" class="mt-2 text-sm text-success">Invitation envoyée !</div>
             <div v-if="divisionStore.error" class="mt-2 text-sm text-error">{{ divisionStore.error }}</div>
-
-            <!-- Pending invites list -->
             <div v-if="pendingInvites.length" class="mt-3 space-y-1">
               <p class="text-xs text-text-muted font-medium uppercase tracking-wide">En attente</p>
-              <div
-                v-for="invite in pendingInvites"
-                :key="invite.id"
-                class="flex items-center justify-between text-sm"
-              >
+              <div v-for="invite in pendingInvites" :key="invite.id" class="flex items-center justify-between text-sm">
                 <span class="text-text-muted">{{ invite.email }}</span>
                 <span class="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded-full">En attente</span>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Middle column: students + invites -->
-        <div v-if="!divisionStore.division.archived" class="space-y-4">
-          <!-- Students -->
-          <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
-            <h3 class="font-semibold text-text-main dark:text-surface mb-3">Élèves ({{ divisionStore.division.students?.length ?? 0 }})</h3>
-            <ul v-if="divisionStore.division.students?.length" class="space-y-2">
-              <li
-                v-for="student in divisionStore.division.students"
-                :key="student.id"
-                class="flex items-center justify-between py-1"
-              >
-                <div>
-                  <p class="text-sm font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name ?? student.name }}</p>
-                  <p class="text-xs text-text-muted">{{ student.email }}</p>
-                </div>
-                <div class="flex items-center gap-1">
-                  <button
-                    @click="openEditClassNameModal(student)"
-                    :disabled="divisionStore.division.archived"
-                    class="text-text-muted hover:text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Modifier le nom de classe"
-                  >
-                    <Pencil class="w-4 h-4" />
-                  </button>
-                  <button
-                    @click="() => { studentIdToRemove = student.id; showRemoveStudentConfirm = true; }"
-                    :disabled="divisionStore.division.archived"
-                    class="text-text-muted hover:text-error transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Retirer l'élève"
-                  >
-                    <X class="w-4 h-4" />
-                  </button>
-                </div>
-              </li>
-            </ul>
-            <p v-else class="text-sm text-text-muted">Aucun élève.</p>
-          </div>
-
-          
-        </div>
-
-        <!-- Right column: sessions -->
-        <div v-if="!divisionStore.division.archived" class="space-y-4">
-        <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
-          <h3 class="font-semibold text-text-main dark:text-surface">Sessions Actives</h3>
-          <p class="text-sm text-text-muted mb-3">Ouvrir ou fermer vos sessions pour cette classe.</p>
-          <div v-if="teacherSessions.length === 0" class="text-sm text-text-muted">
-            Aucune session active.
-          </div>
-          <ul v-else class="space-y-3">
-            <li
+      <!-- Sessions tab -->
+      <div v-else-if="activeTab === 'sessions'" key="sessions">
+        <!-- Active sessions -->
+        <div v-if="teacherSessions.length" class="mb-8">
+          <h3 class="font-semibold text-text-main dark:text-surface mb-3">Sessions actives</h3>
+          <div class="flex gap-4 overflow-x-auto pb-2">
+            <div
               v-for="session in teacherSessions"
               :key="session.id"
-              class="flex items-center justify-between"
+              class="min-w-[280px] max-w-[320px] bg-surface dark:bg-gray-900 border border-border rounded-xl p-4 shrink-0"
             >
-              <div>
-                <p class="text-sm font-medium text-text-main dark:text-surface">{{ session.paper?.title }}</p>
-                <p class="text-xs text-text-muted">{{ session.code }}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <button
-                  @click="openActiveSessionModal(session)"
-                  class="text-text-muted hover:text-primary transition-colors cursor-pointer"
-                  title="Voir les tentatives"
-                >
-                  <Eye class="w-6 h-6" />
-                </button>
-                <button
-                  @click="handleToggleSession(session)"
-                  :class="[
-                  'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
-                    isSessionOpen(session.id) ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600'
-                  ]"
-                >
-                  <span
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-text-main dark:text-surface">{{ session.paper?.title }}</p>
+                  <p class="text-xs text-text-muted mt-0.5">{{ session.code }}</p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    @click="openActiveSessionModal(session)"
+                    class="text-text-muted hover:text-primary transition-colors cursor-pointer"
+                    title="Voir les tentatives"
+                  >
+                    <Eye class="w-5 h-5" />
+                  </button>
+                  <button
+                    @click="handleToggleSession(session)"
                     :class="[
-                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow',
-                      isSessionOpen(session.id) ? 'translate-x-6' : 'translate-x-1'
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
+                      isSessionOpen(session.id) ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600'
                     ]"
-                  />
-                </button>
+                  >
+                    <span
+                      :class="[
+                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow',
+                        isSessionOpen(session.id) ? 'translate-x-6' : 'translate-x-1'
+                      ]"
+                    />
+                  </button>
+                </div>
               </div>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Courses (Parcours) -->
-        <div class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
-          <div class="flex items-center justify-between mb-3">
-            <h3 class="font-semibold text-text-main dark:text-surface">Parcours</h3>
-            <button
-              @click="showNewCourseModal = true"
-              class="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary text-surface rounded-lg hover:bg-primary-hover transition-colors cursor-pointer"
-            >
-              <Plus class="w-4 h-4" />
-              Nouveau
-            </button>
+            </div>
           </div>
-          <div v-if="!courseStore.courses.length" class="text-sm text-text-muted">Aucun parcours.</div>
-          <ul v-else class="space-y-2">
-            <li
-              v-for="course in courseStore.courses"
-              :key="course.id"
-              class="flex items-center justify-between py-1"
-            >
-              <router-link
-                :to="{ name: 'CourseDetails', params: { id: divisionId, courseId: course.id } }"
-                class="text-sm font-medium text-primary hover:underline"
-              >
-                {{ course.title }}
-              </router-link>
-              <div class="flex items-center gap-2">
-                <span v-if="course.archived" class="text-xs bg-gray-200 dark:bg-gray-700 text-text-muted px-2 py-0.5 rounded-full">Archivé</span>
-                <span class="text-xs text-text-muted">{{ course.jumps_count ?? 0 }} saut{{ (course.jumps_count ?? 0) !== 1 ? 's' : '' }}</span>
-                <button
-                  @click="openSuggestedQuestionsModal(course)"
-                  class="text-text-muted hover:text-primary transition-colors cursor-pointer"
-                  title="Questions suggérées"
-                >
-                  <Lightbulb class="w-4 h-4" />
-                </button>
-              </div>
-            </li>
-          </ul>
         </div>
 
-        <!-- Expired Sessions with Attempts -->
-        <div v-if="expiredSessionsWithAttempts.length > 0" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-4">
-          <h3 class="font-semibold text-text-main dark:text-surface">Sessions expirées</h3>
-          <p class="text-sm text-text-muted mb-3">Sessions terminées avec des tentatives d'élèves.</p>
-          <ul class="space-y-3">
-            <li
+        <!-- Expired sessions with inline analysis -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-text-main dark:text-surface">Sessions expirées</h3>
+            <div v-if="expiredSessionsWithAttempts.length > 1" class="flex items-center gap-1">
+              <button
+                @click="expiredCarouselRef?.scrollBy({ left: -320, behavior: 'smooth' })"
+                class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-primary hover:text-white transition-colors cursor-pointer"
+              ><ChevronLeft class="w-5 h-5" /></button>
+              <button
+                @click="expiredCarouselRef?.scrollBy({ left: 320, behavior: 'smooth' })"
+                class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-text-main dark:text-surface hover:bg-primary hover:text-white transition-colors cursor-pointer"
+              ><ChevronRight class="w-5 h-5" /></button>
+            </div>
+          </div>
+          <div v-if="!expiredSessionsWithAttempts.length" class="text-sm text-text-muted">Aucune session expirée.</div>
+          <div v-else ref="expiredCarouselRef" class="flex gap-4 overflow-x-auto pb-2 items-start [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
               v-for="session in expiredSessionsWithAttempts"
               :key="session.id"
-              class="flex items-center gap-1"
+              class="min-w-[280px] max-w-[360px] bg-surface dark:bg-gray-900 border border-border rounded-xl p-4 shrink-0"
             >
-              <button
-                @click="openExpiredSessionModal(session)"
-                class="flex-1 flex items-center cursor-pointer justify-between group hover:bg-gray-50 dark:hover:bg-gray-800 -mx-2 px-2 py-1 rounded-lg transition-colors text-left"
-              >
-                <div>
-                  <p class="text-sm font-medium text-text-main dark:text-surface group-hover:text-primary transition-colors">{{ session.paper?.title }}</p>
-                  <p class="text-xs text-text-muted">{{ session.attempts_count }} tentative{{ session.attempts_count > 1 ? 's' : '' }}</p>
+              <!-- Session header -->
+              <div class="mb-3">
+                <p class="font-medium text-text-main dark:text-surface">{{ session.paper?.title }}</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ session.attempts_count }} tentative{{ session.attempts_count > 1 ? 's' : '' }} · {{ formatExpiredTime(session.expires_at) }}</p>
+                <button
+                  @click="openExpiredSessionModal(session)"
+                  class="mt-2 w-full px-3 py-1.5 text-sm border border-border rounded-lg text-text-muted hover:text-primary hover:border-primary transition-colors cursor-pointer"
+                >
+                  Voir les performances
+                </button>
+              </div>
+
+              <!-- Inline analysis -->
+              <template v-if="session.pivot?.analysis">
+                <div v-if="sessionQuestionsLoading[session.id]" class="text-xs text-text-muted py-2">Chargement...</div>
+                <div v-else-if="getSessionAnalysisData(session).length">
+                  <p class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Analyse des questions</p>
+                  <div class="space-y-1.5">
+                    <div
+                      v-for="(item, index) in getSessionAnalysisData(session)"
+                      :key="item.question_id"
+                      class="flex items-center gap-2"
+                    >
+                      <span class="text-xs text-text-muted w-5 text-right shrink-0">{{ index + 1 }}</span>
+                      <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 min-w-0">
+                        <div
+                          class="h-1.5 rounded-full transition-all"
+                          :class="successRatioBarClass(item.success_ratio)"
+                          :style="{ width: `${Math.round(item.success_ratio * 100)}%` }"
+                        />
+                      </div>
+                      <span class="text-xs font-semibold tabular-nums w-9 text-right shrink-0" :class="successRatioTextClass(item.success_ratio)">
+                        {{ Math.round(item.success_ratio * 100) }}%
+                      </span>
+                      <button
+                        @click="openSessionQuestionOverlay(item, session)"
+                        class="text-text-muted hover:text-primary transition-colors cursor-pointer shrink-0"
+                        title="Voir la question"
+                      >
+                        <Eye class="w-5 h-5" />
+                      </button>
+                      <button
+                        @click="toggleReviewedForSession(item.question_id, session)"
+                        class="shrink-0 w-5 flex items-center justify-center"
+                        :title="item.reviewed ? 'Marquer comme non revue' : 'Marquer comme revue'"
+                      >
+                        <CheckCircle2 v-if="item.reviewed" class="w-5 h-5 text-success" />
+                        <span v-else class="w-5 h-5 rounded-full border border-gray-300 dark:border-gray-600 block" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <span class="text-xs bg-gray-100 dark:bg-gray-800 text-text-muted px-2 py-0.5 rounded-full">{{ formatExpiredTime(session.expires_at) }}</span>
-              </button>
-              <button
-                v-if="session.pivot?.analysis"
-                @click="openAnalysisModal(session)"
-                class="text-text-muted hover:text-primary transition-colors cursor-pointer shrink-0 p-1"
-                title="Questions à revoir"
-              >
-                <BookOpen class="w-5 h-5" />
-              </button>
-            </li>
-          </ul>
-        </div>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
+
+      <!-- Parcours tab -->
+      <div v-else key="parcours" @click="courseOpenMenuJumpId = null">
+        <div v-if="!courseStore.courses.length" class="text-sm text-text-muted">Aucun parcours. Créez-en un !</div>
+        <template v-else>
+          <!-- Course select + action buttons -->
+          <div class="flex items-center gap-3 mb-6 flex-wrap">
+            <select
+              v-model="selectedCourseId"
+              class="flex-1 min-w-[200px] px-4 py-2.5 text-base font-medium border border-border rounded-xl dark:bg-gray-900 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary bg-surface cursor-pointer"
+            >
+              <option v-for="course in courseStore.courses" :key="course.id" :value="course.id">
+                {{ course.title }}{{ course.archived ? ' (Archivé)' : '' }}
+              </option>
+            </select>
+            <button
+              @click.stop="showNewJumpModal = true"
+              :disabled="!selectedCourseId"
+              class="flex items-center gap-1 px-3 py-2.5 text-sm bg-primary text-surface rounded-xl hover:bg-primary-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Plus class="w-4 h-4" />
+              Nouveau saut
+            </button>
+            <button
+              @click.stop="selectedCourseId && openSuggestedQuestionsModal(courseStore.courses.find(c => c.id === selectedCourseId))"
+              :disabled="!selectedCourseId"
+              class="flex items-center gap-1 px-3 py-2.5 text-sm border border-border text-text-muted rounded-xl hover:text-primary hover:border-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Lightbulb class="w-4 h-4" />
+              Questions suggérées
+            </button>
+            <button
+              @click.stop="showNewCourseModal = true"
+              class="flex items-center gap-1 px-3 py-2.5 text-sm border border-border text-text-muted rounded-xl hover:text-primary hover:border-primary transition-colors cursor-pointer"
+            >
+              <Plus class="w-4 h-4" />
+              Nouveau parcours
+            </button>
+          </div>
+
+          <!-- Course details table -->
+          <div v-if="courseStore.isLoading && !selectedCourseData" class="text-sm text-text-muted">Chargement...</div>
+          <div v-else-if="selectedCourseData" class="bg-surface dark:bg-gray-900 border border-border rounded-xl overflow-hidden">
+            <div v-if="!selectedCourseData.jumps?.length" class="p-8 text-center text-text-muted">
+              Aucun saut pour ce parcours. Créez le premier !
+            </div>
+            <template v-else>
+              <div class="px-4 py-3 border-b border-border">
+                <input
+                  v-model="courseStudentSearch"
+                  type="text"
+                  placeholder="Rechercher un élève..."
+                  class="w-full max-w-xs px-3 py-1.5 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead class="bg-gray-50 dark:bg-gray-800 border-b border-border">
+                    <tr>
+                      <th class="px-4 py-3 text-left font-semibold text-text-main dark:text-surface sticky left-0 z-10 bg-gray-50 dark:bg-gray-800 min-w-[250px]">
+                        <button @click="setCourseSort('name')" class="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer">
+                          Élève
+                          <span class="text-xs opacity-50">{{ courseSortKey === 'name' ? (courseSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                        </button>
+                      </th>
+                      <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">
+                        <button @click="setCourseSort('total')" class="flex items-center justify-center gap-1 hover:text-primary transition-colors cursor-pointer w-full">
+                          Total
+                          <span class="text-xs opacity-50">{{ courseSortKey === 'total' ? (courseSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                        </button>
+                      </th>
+                      <th
+                        v-for="jump in courseJumpsSorted"
+                        :key="jump.id"
+                        class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface min-w-[120px]"
+                      >
+                        <div class="flex flex-col items-center gap-1">
+                          <div class="flex items-center gap-1">
+                            <button @click="setCourseSort(jump.id)" class="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer">
+                              Saut {{ jumpNumber(jump) }}
+                              <span class="text-xs opacity-50">{{ courseSortKey === jump.id ? (courseSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                            </button>
+                            <div class="relative flex items-center">
+                              <button
+                                @click.stop="courseOpenMenuJumpId = courseOpenMenuJumpId === jump.id ? null : jump.id"
+                                class="p-0.5 rounded text-text-muted hover:text-primary hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                              ><MoreVertical class="w-4 h-4" /></button>
+                              <div
+                                v-if="courseOpenMenuJumpId === jump.id"
+                                class="absolute top-full mt-1 left-1/2 -translate-x-1/2 z-20 bg-surface dark:bg-gray-800 border border-border rounded-lg shadow-lg py-1 min-w-[160px] text-left"
+                              >
+                                <button
+                                  @click.stop="openJumpObservation(jump); courseOpenMenuJumpId = null"
+                                  class="w-full px-3 py-1.5 text-xs text-text-main dark:text-surface hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer text-left flex items-center gap-2"
+                                ><Eye class="w-3.5 h-3.5 shrink-0" /> Voir les détails</button>
+                                <button
+                                  v-if="jump.status === 'draft'"
+                                  @click.stop="activateJump(jump); courseOpenMenuJumpId = null"
+                                  class="w-full px-3 py-1.5 text-xs text-success hover:bg-success/10 transition-colors cursor-pointer text-left"
+                                >Activer</button>
+                                <button
+                                  v-if="jump.status === 'active'"
+                                  @click.stop="openEditExpiryModal(jump); courseOpenMenuJumpId = null"
+                                  class="w-full px-3 py-1.5 text-xs text-primary hover:bg-primary/10 transition-colors cursor-pointer text-left flex items-center gap-2"
+                                ><Clock class="w-3.5 h-3.5 shrink-0" /> Modifier l'expiration</button>
+                                <button
+                                  v-if="jump.status === 'expired'"
+                                  @click.stop="reopenJump(jump); courseOpenMenuJumpId = null"
+                                  class="w-full px-3 py-1.5 text-xs text-success hover:bg-success/10 transition-colors cursor-pointer text-left flex items-center gap-2"
+                                ><RotateCcw class="w-3.5 h-3.5 shrink-0" /> Réouvrir</button>
+                                <button
+                                  @click.stop="confirmDeleteJump(jump); courseOpenMenuJumpId = null"
+                                  class="w-full px-3 py-1.5 text-xs text-error hover:bg-error/10 transition-colors cursor-pointer text-left flex items-center gap-2"
+                                ><Trash2 class="w-3.5 h-3.5 shrink-0" /> Supprimer</button>
+                              </div>
+                            </div>
+                          </div>
+                          <span class="text-xs text-text-muted font-normal">{{ formatJumpDate(jump.created_at) }}</span>
+                          <span
+                            class="text-xs px-2 py-0.5 rounded-full"
+                            :class="{
+                              'bg-warning/15 text-warning': jump.status === 'draft',
+                              'bg-success/15 text-success': jump.status === 'active',
+                              'bg-primary/15 text-primary': jump.status === 'expiring',
+                              'bg-text-muted/15 text-text-muted': jump.status === 'expired',
+                            }"
+                          >{{ jumpStatusLabel(jump.status) }}</span>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-border">
+                    <tr v-for="student in courseFilteredSortedStudents" :key="student.id" class="group hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <td class="px-4 py-3 font-medium text-text-main dark:text-surface sticky left-0 z-10 bg-surface dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-800 transition-colors">
+                        {{ student.pivot?.class_name ?? student.name }}
+                      </td>
+                      <td class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">
+                        {{ courseStudentTotal(student) }}
+                      </td>
+                      <td
+                        v-for="jump in courseJumpsSorted"
+                        :key="jump.id"
+                        class="px-4 py-3 text-center"
+                      >
+                        <button
+                          v-if="getAttempt(jump, student)"
+                          @click="openCourseAttemptDetail(jump, student)"
+                          class="font-semibold cursor-pointer hover:underline"
+                          :class="jump.status === 'expired' ? 'text-primary' : 'text-text-muted'"
+                        >
+                          {{ jump.status === 'expired' ? getAttempt(jump, student).score : '—' }}
+                        </button>
+                        <span v-else class="text-text-muted text-xs">—</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+
+      </Transition>
+
     </template>
 
     <!-- Student View -->
@@ -593,16 +731,29 @@
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
       @click.self="closeExpiredSessionModal"
     >
-      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
-        <div class="flex items-center justify-between p-4 border-b border-border">
-          <h3 class="text-lg font-semibold text-text-main dark:text-surface">{{ expiredSessionDetail?.paper?.title }}</h3>
-          <button @click="closeExpiredSessionModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-7xl h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-border gap-4">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface shrink-0">{{ expiredSessionDetail?.paper?.title }}</h3>
+          <div class="relative flex-1 max-w-xs">
+            <input
+              v-model="sessionStudentSearch"
+              type="text"
+              placeholder="Rechercher un élève…"
+              class="w-full px-3 py-1.5 pr-8 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              v-if="sessionStudentSearch"
+              @click="sessionStudentSearch = ''"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main transition-colors cursor-pointer"
+            ><X class="w-3.5 h-3.5" /></button>
+          </div>
+          <button @click="closeExpiredSessionModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer shrink-0">
             <X class="w-5 h-5" />
           </button>
         </div>
         <div class="p-4 overflow-y-auto flex-1">
           <DivisionAttemptsTable
-            :students="divisionStore.division?.students ?? []"
+            :students="sessionFilteredStudents"
             :attempts="expiredSessionDetail?.attempts ?? []"
             :loading="isLoadingExpiredSession"
             @delete="openDeleteAttemptModal($event, 'expired')"
@@ -617,16 +768,29 @@
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
       @click.self="closeActiveSessionModal"
     >
-      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
-        <div class="flex items-center justify-between p-4 border-b border-border">
-          <h3 class="text-lg font-semibold text-text-main dark:text-surface">{{ activeSessionDetail?.paper?.title }}</h3>
-          <button @click="closeActiveSessionModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-7xl h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b border-border gap-4">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface shrink-0">{{ activeSessionDetail?.paper?.title }}</h3>
+          <div class="relative flex-1 max-w-xs">
+            <input
+              v-model="sessionStudentSearch"
+              type="text"
+              placeholder="Rechercher un élève…"
+              class="w-full px-3 py-1.5 pr-8 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              v-if="sessionStudentSearch"
+              @click="sessionStudentSearch = ''"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main transition-colors cursor-pointer"
+            ><X class="w-3.5 h-3.5" /></button>
+          </div>
+          <button @click="closeActiveSessionModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer shrink-0">
             <X class="w-5 h-5" />
           </button>
         </div>
         <div class="p-4 overflow-y-auto flex-1">
           <DivisionAttemptsTable
-            :students="divisionStore.division?.students ?? []"
+            :students="sessionFilteredStudents"
             :attempts="activeSessionDetail?.attempts ?? []"
             :loading="isLoadingActiveSession"
             @delete="openDeleteAttemptModal($event, 'active')"
@@ -635,62 +799,152 @@
       </div>
     </div>
 
-    <!-- Analysis Modal (Questions à revoir) -->
+    <!-- New Jump Modal -->
     <div
-      v-if="showAnalysisModal"
+      v-if="showNewJumpModal"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
-      @click.self="closeAnalysisModal"
+      @click.self="showNewJumpModal = false"
     >
-      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm p-6">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Nouveau saut</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Durée (minutes)</label>
+            <input v-model.number="newJump.time" type="number" min="1" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Nombre de questions</label>
+            <input v-model.number="newJump.nb_questions" type="number" min="1" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Progression (sauts)</label>
+            <input v-model.number="newJump.growth" type="number" min="0" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm" />
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-text-main dark:text-surface/80">Questions automatiques</span>
+            <button
+              @click="newJump.autoQuestions = !newJump.autoQuestions"
+              :class="['relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer', newJump.autoQuestions ? 'bg-success' : 'bg-gray-300 dark:bg-gray-600']"
+            >
+              <span :class="['inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow', newJump.autoQuestions ? 'translate-x-6' : 'translate-x-1']" />
+            </button>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Statut</label>
+            <select v-model="newJump.status" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm cursor-pointer">
+              <option value="draft">Brouillon</option>
+              <option value="active">Actif</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button @click="showNewJumpModal = false" class="px-4 py-2 text-sm text-text-muted border border-border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">Annuler</button>
+          <button @click="handleCreateJump" class="px-4 py-2 text-sm bg-primary text-surface rounded-lg hover:bg-primary-hover transition-colors cursor-pointer">Créer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Expiry Modal -->
+    <div
+      v-if="showEditExpiryModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      @click.self="showEditExpiryModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm p-6">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Modifier l'expiration</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Date d'expiration</label>
+            <input v-model="editExpiryValue" type="datetime-local" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm" />
+          </div>
+          <button @click="handleExpireNow" class="w-full px-4 py-2 text-sm text-error border border-error/40 rounded-lg hover:bg-error/10 transition-colors cursor-pointer">Expirer maintenant</button>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button @click="showEditExpiryModal = false" class="px-4 py-2 text-sm text-text-muted border border-border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">Annuler</button>
+          <button @click="handleSaveExpiry" class="px-4 py-2 text-sm bg-primary text-surface rounded-lg hover:bg-primary-hover transition-colors cursor-pointer">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Jump Confirm -->
+    <div
+      v-if="showDeleteJumpConfirm"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      @click.self="showDeleteJumpConfirm = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-sm p-6">
+        <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-2">Supprimer ce saut ?</h3>
+        <p class="text-sm text-text-muted mb-5">Cette action est irréversible. Toutes les tentatives associées seront supprimées.</p>
+        <div class="flex justify-end gap-2">
+          <button @click="showDeleteJumpConfirm = false" class="px-4 py-2 text-sm text-text-muted border border-border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer">Annuler</button>
+          <button @click="handleDeleteJump" class="px-4 py-2 text-sm bg-error text-surface rounded-lg hover:bg-error/80 transition-colors cursor-pointer">Supprimer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Jump Observation Modal -->
+    <div
+      v-if="showJumpObservationModal && observingJumpData"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      @click.self="closeJumpObservation"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between p-4 border-b border-border">
-          <h3 class="text-lg font-semibold text-text-main dark:text-surface">Questions à revoir — {{ analysisModalSession?.paper?.title }}</h3>
-          <button @click="closeAnalysisModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
-            <X class="w-5 h-5" />
-          </button>
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface">
+            Saut {{ jumpNumber(observingJumpData) }} — {{ observingJumpData.status === 'active' || observingJumpData.status === 'expiring' ? 'En cours' : 'Terminé' }}
+          </h3>
+          <button @click="closeJumpObservation" class="text-text-muted hover:text-text-main transition-colors cursor-pointer"><X class="w-5 h-5" /></button>
         </div>
         <div class="p-4 overflow-y-auto flex-1">
-          <div v-if="isLoadingAnalysis" class="text-sm text-text-muted text-center py-8">Chargement...</div>
-          <template v-else>
-            <div class="grid grid-cols-[auto_auto_auto_auto] gap-x-3 gap-y-2 items-center">
-              <span class="text-xs font-medium text-text-muted uppercase tracking-wide text-center">Q.</span>
-              <span class="text-xs font-medium text-text-muted uppercase tracking-wide text-center">Réussite</span>
-              <span class="text-xs font-medium text-text-muted uppercase tracking-wide text-center">Revue</span>
-              <span></span>
-              <template v-for="(item, index) in currentAnalysisData" :key="item.question_id">
-                <span class="text-sm font-medium text-text-main dark:text-surface text-center">{{ index + 1 }}</span>
-                <div class="flex items-center gap-2">
-                  <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 max-w-32">
-                    <div
-                      class="h-2 rounded-full transition-all"
-                      :class="successRatioBarClass(item.success_ratio)"
-                      :style="{ width: `${Math.round(item.success_ratio * 100)}%` }"
-                    />
-                  </div>
-                  <span class="text-sm font-semibold tabular-nums" :class="successRatioTextClass(item.success_ratio)">
-                    {{ Math.round(item.success_ratio * 100) }}%
-                  </span>
-                </div>
-                <button
-                  @click="toggleReviewed(item.question_id)"
-                  :class="[
-                    'px-2 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer',
-                    item.reviewed
-                      ? 'bg-success/20 text-success hover:bg-success/30'
-                      : 'bg-gray-100 dark:bg-gray-800 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-700',
-                  ]"
-                >
-                  {{ item.reviewed ? 'Oui' : 'Non' }}
-                </button>
-                <button
-                  @click="openQuestionOverlay(item)"
-                  class="text-text-muted hover:text-primary transition-colors cursor-pointer"
-                  title="Voir la question"
-                >
-                  <Eye class="w-4 h-4" />
-                </button>
-              </template>
-            </div>
-          </template>
+          <div v-if="!selectedCourseData?.students?.length" class="text-sm text-text-muted text-center py-8">Aucun élève.</div>
+          <ul v-else class="space-y-2">
+            <li
+              v-for="student in selectedCourseData.students"
+              :key="student.id"
+              class="flex items-center justify-between py-1.5 border-b border-border last:border-0"
+            >
+              <span class="text-sm font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name ?? student.name }}</span>
+              <div class="text-sm">
+                <template v-if="getAttempt(observingJumpData, student)">
+                  <span v-if="observingJumpData.status === 'expired'" class="font-semibold text-primary">{{ getAttempt(observingJumpData, student).score }}</span>
+                  <span v-else class="text-success font-medium">En cours</span>
+                </template>
+                <span v-else class="text-text-muted">—</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Course Attempt Detail Modal -->
+    <div
+      v-if="showCourseAttemptDetailModal && selectedCourseAttemptDetail"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+      @click.self="showCourseAttemptDetailModal = false"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-md p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface">Détail de la tentative</h3>
+          <button @click="showCourseAttemptDetailModal = false" class="text-text-muted hover:text-text-main cursor-pointer"><X class="w-5 h-5" /></button>
+        </div>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-text-muted">Élève</span>
+            <span class="font-medium text-text-main dark:text-surface">{{ selectedCourseAttemptDetail.student?.pivot?.class_name ?? selectedCourseAttemptDetail.student?.name }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-text-muted">Saut</span>
+            <span class="font-medium text-text-main dark:text-surface">Saut {{ jumpNumber(selectedCourseAttemptDetail.jump) }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-text-muted">Score</span>
+            <span class="font-semibold text-primary text-lg">{{ selectedCourseAttemptDetail.attempt?.score }}</span>
+          </div>
+          <div v-if="selectedCourseAttemptDetail.attempt?.completed_at" class="flex justify-between">
+            <span class="text-text-muted">Complété le</span>
+            <span class="font-medium text-text-main dark:text-surface">{{ formatJumpDate(selectedCourseAttemptDetail.attempt.completed_at) }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1206,7 +1460,6 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
-import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, BookOpen, Lightbulb, Star, Trash2, Globe, MoreVertical, Archive, ArchiveRestore } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
@@ -1214,7 +1467,7 @@ import { useCourseStore } from '@/stores/courseStore';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 import DivisionAttemptsTable from '@/components/DivisionAttemptsTable.vue';
-import { Plus } from 'lucide-vue-next';
+import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, Lightbulb, Star, Trash2, Globe, MoreVertical, Archive, ArchiveRestore, Plus, Clock, RotateCcw, CheckCircle2 } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
@@ -1427,13 +1680,70 @@ const selectedAttemptContext = ref(null);
 const deleteAttemptConfirmed = ref(false);
 const isDeletingAttempt = ref(false);
 
-const showAnalysisModal = ref(false);
 const analysisModalSession = ref(null);
-const analysisQuestions = ref([]);
-const isLoadingAnalysis = ref(false);
 const selectedAnalysisQuestion = ref(null);
 const showQuestionOverlay = ref(false);
 const revealAnswer = ref(false);
+
+// Tab state
+const tabs = ['eleves', 'sessions', 'parcours'];
+const activeTab = ref('eleves');
+const tabSlideDirection = ref('tab-slide-left');
+function switchTab(id) {
+  tabSlideDirection.value = tabs.indexOf(id) > tabs.indexOf(activeTab.value) ? 'tab-slide-left' : 'tab-slide-right';
+  activeTab.value = id;
+}
+const expiredCarouselRef = ref(null);
+
+// Session inline analysis
+const sessionQuestionsCache = ref({});
+const sessionQuestionsLoading = ref({});
+
+// Parcours tab - selected course details
+const selectedCourseId = ref(null);
+const selectedCourseData = ref(null);
+const courseStudentSearch = ref('');
+const divisionStudentSearch = ref('');
+const sessionStudentSearch = ref('');
+
+const sessionFilteredStudents = computed(() => {
+  const students = divisionStore.division?.students ?? [];
+  const q = sessionStudentSearch.value.trim().toLowerCase();
+  return q
+    ? students.filter(s => (s.pivot?.class_name ?? s.name).toLowerCase().includes(q))
+    : students;
+});
+
+const divisionFilteredStudents = computed(() => {
+  const students = divisionStore.division?.students ?? [];
+  const q = divisionStudentSearch.value.trim().toLowerCase();
+  const filtered = q
+    ? students.filter(s => (s.pivot?.class_name ?? s.name).toLowerCase().includes(q))
+    : students;
+  return [...filtered].sort((a, b) => {
+    const nameA = (a.pivot?.class_name ?? a.name).toLowerCase();
+    const nameB = (b.pivot?.class_name ?? b.name).toLowerCase();
+    const lastA = nameA.split(' ').pop();
+    const lastB = nameB.split(' ').pop();
+    return lastA.localeCompare(lastB);
+  });
+});
+const courseSortKey = ref('name');
+const courseSortDir = ref('asc');
+const courseOpenMenuJumpId = ref(null);
+
+// Jump management (Parcours tab)
+const showNewJumpModal = ref(false);
+const newJump = ref({ time: 15, nb_questions: 7, growth: 3, status: 'active', autoQuestions: true });
+const showEditExpiryModal = ref(false);
+const editingJump = ref(null);
+const editExpiryValue = ref('');
+const showDeleteJumpConfirm = ref(false);
+const deletingJump = ref(null);
+const showJumpObservationModal = ref(false);
+const observingJumpData = ref(null);
+const showCourseAttemptDetailModal = ref(false);
+const selectedCourseAttemptDetail = ref(null);
 
 // Suggested Questions (teacher)
 const showSuggestedQuestionsModal = ref(false);
@@ -1450,12 +1760,6 @@ const revealSuggestedAnswer = ref(false);
 const publicSuggestedQuestions = ref([]);
 const showPublicQuestionOverlay = ref(false);
 const selectedPublicQuestion = ref(null);
-const revealPublicAnswer = ref(false);
-
-const selectedAttemptSessionDetail = computed(() =>
-  selectedAttemptContext.value === 'active' ? activeSessionDetail.value : expiredSessionDetail.value
-);
-
 const pendingInvites = computed(() =>
   (divisionStore.division?.invites ?? []).filter(i => i.status === 'pending')
 );
@@ -1465,7 +1769,9 @@ const teacherSessions = computed(() =>
 );
 
 const expiredSessionsWithAttempts = computed(() =>
-  (divisionStore.division?.kangourou_sessions ?? []).filter(s => s.status === 'expired' && s.attempts_count > 0)
+  (divisionStore.division?.kangourou_sessions ?? [])
+    .filter(s => s.status === 'expired' && s.attempts_count > 0)
+    .sort((a, b) => new Date(b.expires_at) - new Date(a.expires_at))
 );
 
 const openSessionIds = computed(() =>
@@ -1503,6 +1809,30 @@ onMounted(async () => {
     }
   }
   await courseStore.fetchCourses(divisionId.value);
+
+  // Init selectedCourseId to the course with the latest jump
+  if (isTeacher.value && courseStore.courses.length) {
+    let bestCourseId = courseStore.courses[0].id;
+    let bestJumpId = -1;
+    for (const course of courseStore.courses) {
+      for (const jump of course.jumps ?? []) {
+        if (jump.id > bestJumpId) {
+          bestJumpId = jump.id;
+          bestCourseId = course.id;
+        }
+      }
+    }
+    selectedCourseId.value = bestCourseId;
+  }
+
+  // Pre-load session questions for expired sessions with analysis
+  if (isTeacher.value && divisionStore.division) {
+    const sessionsWithAnalysis = (divisionStore.division.kangourou_sessions ?? [])
+      .filter(s => s.status === 'expired' && s.pivot?.analysis);
+    for (const session of sessionsWithAnalysis) {
+      loadSessionQuestions(session);
+    }
+  }
 
   window.Echo.private(`division.${divisionId.value}`)
     .listen('.StudentJoinedDivision', (e) => {
@@ -1564,6 +1894,15 @@ onUnmounted(() => {
   if (activeSessionChannelId.value !== null) {
     window.Echo.leave(`session.${activeSessionChannelId.value}`);
   }
+  if (courseExpiringPollTimer) {
+    clearInterval(courseExpiringPollTimer);
+  }
+  if (courseObservedJumpChannelId) {
+    window.Echo.leaveChannel(`private-jump.${courseObservedJumpChannelId}`);
+  }
+  for (const jumpId of courseSubscribedJumpIds) {
+    window.Echo.leave(`jump.${jumpId}`);
+  }
 });
 
 function jumpDetailNumber(jump) {
@@ -1589,10 +1928,6 @@ async function openJumpDetail(jump) {
   } finally {
     jumpDetailLoading.value = false;
   }
-}
-
-async function handleRename() {
-  await divisionStore.updateDivision(divisionId.value, { name: editName.value });
 }
 
 async function handleChangeCode() {
@@ -1663,6 +1998,7 @@ async function handleInvite() {
 }
 
 async function openExpiredSessionModal(session) {
+  sessionStudentSearch.value = '';
   showExpiredSessionModal.value = true;
   isLoadingExpiredSession.value = true;
   expiredSessionDetail.value = null;
@@ -1702,6 +2038,7 @@ function closeExpiredSessionModal() {
 }
 
 async function openActiveSessionModal(session) {
+  sessionStudentSearch.value = '';
   showActiveSessionModal.value = true;
   isLoadingActiveSession.value = true;
   activeSessionDetail.value = null;
@@ -1792,18 +2129,6 @@ async function handleToggleSession(session) {
   await divisionStore.fetchDivision(divisionId.value);
 }
 
-const currentAnalysisData = computed(() => {
-  if (!analysisModalSession.value || !analysisQuestions.value.length) { return []; }
-  const analysis = analysisModalSession.value.pivot?.analysis ?? [];
-  return analysisQuestions.value.map((question, index) => ({
-    ...question,
-    question_id: question.id,
-    questionNumber: index + 1,
-    success_ratio: analysis[index]?.success_ratio ?? 0,
-    reviewed: analysis[index]?.reviewed ?? false,
-  }));
-});
-
 function successRatioBarClass(ratio) {
   if (ratio >= 0.7) { return 'bg-success'; }
   if (ratio >= 0.4) { return 'bg-warning'; }
@@ -1814,27 +2139,6 @@ function successRatioTextClass(ratio) {
   if (ratio >= 0.7) { return 'text-success'; }
   if (ratio >= 0.4) { return 'text-warning'; }
   return 'text-error';
-}
-
-async function openAnalysisModal(session) {
-  analysisModalSession.value = session;
-  showAnalysisModal.value = true;
-  isLoadingAnalysis.value = true;
-  analysisQuestions.value = [];
-  try {
-    const res = await axios.get(`/api/kangourou-sessions/${session.code}`);
-    analysisQuestions.value = res.data.session?.paper?.questions ?? [];
-  } catch {
-    // handled silently
-  } finally {
-    isLoadingAnalysis.value = false;
-  }
-}
-
-function closeAnalysisModal() {
-  showAnalysisModal.value = false;
-  analysisModalSession.value = null;
-  analysisQuestions.value = [];
 }
 
 async function toggleReviewed(questionId) {
@@ -1870,11 +2174,264 @@ function openQuestionOverlay(item) {
   showQuestionOverlay.value = true;
 }
 
+function openSessionQuestionOverlay(item, session) {
+  analysisModalSession.value = session;
+  openQuestionOverlay(item);
+}
+
 function closeQuestionOverlay() {
   showQuestionOverlay.value = false;
   selectedAnalysisQuestion.value = null;
   revealAnswer.value = false;
 }
+
+// Session inline analysis functions
+async function loadSessionQuestions(session) {
+  if (sessionQuestionsCache.value[session.id] !== undefined || sessionQuestionsLoading.value[session.id]) { return; }
+  sessionQuestionsLoading.value = { ...sessionQuestionsLoading.value, [session.id]: true };
+  try {
+    const res = await axios.get(`/api/kangourou-sessions/${session.code}`);
+    sessionQuestionsCache.value = { ...sessionQuestionsCache.value, [session.id]: res.data.session?.paper?.questions ?? [] };
+  } catch {
+    sessionQuestionsCache.value = { ...sessionQuestionsCache.value, [session.id]: [] };
+  } finally {
+    sessionQuestionsLoading.value = { ...sessionQuestionsLoading.value, [session.id]: false };
+  }
+}
+
+function getSessionAnalysisData(session) {
+  const questions = sessionQuestionsCache.value[session.id] ?? [];
+  const analysis = session.pivot?.analysis ?? [];
+  return questions.map((question, index) => {
+    const analysisItem = analysis[index] ?? {};
+    return {
+      ...question,
+      question_id: question.id,
+      questionNumber: index + 1,
+      success_ratio: analysisItem.success_ratio ?? 0,
+      reviewed: analysisItem.reviewed ?? false,
+    };
+  });
+}
+
+async function toggleReviewedForSession(questionId, session) {
+  analysisModalSession.value = session;
+  await toggleReviewed(questionId);
+}
+
+// Parcours tab — course details
+async function loadCourseDetails() {
+  if (!selectedCourseId.value) { return; }
+  const data = await courseStore.fetchCourseDetails(selectedCourseId.value);
+  selectedCourseData.value = data;
+  subscribeToActiveCourseJumps();
+}
+
+function jumpNumber(jump) {
+  if (!selectedCourseData.value?.jumps) { return ''; }
+  const sorted = [...selectedCourseData.value.jumps].sort((a, b) => a.id - b.id);
+  return sorted.findIndex(j => j.id === jump.id) + 1;
+}
+
+function getAttempt(jump, student) {
+  return jump.attempts?.find(a => a.user_id === student.id) ?? null;
+}
+
+const courseJumpsSorted = computed(() =>
+  [...(selectedCourseData.value?.jumps ?? [])].sort((a, b) => b.id - a.id)
+);
+
+const courseFilteredSortedStudents = computed(() => {
+  if (!selectedCourseData.value?.students) { return []; }
+  let students = selectedCourseData.value.students;
+  const q = courseStudentSearch.value.trim().toLowerCase();
+  if (q) {
+    students = students.filter(s => (s.pivot?.class_name ?? s.name).toLowerCase().includes(q));
+  }
+  const dir = courseSortDir.value === 'asc' ? 1 : -1;
+  return [...students].sort((a, b) => {
+    if (courseSortKey.value === 'name') {
+      return (a.pivot?.class_name ?? a.name).toLowerCase().localeCompare((b.pivot?.class_name ?? b.name).toLowerCase()) * dir;
+    }
+    if (courseSortKey.value === 'total') {
+      return (courseStudentTotal(a) - courseStudentTotal(b)) * dir;
+    }
+    const jump = selectedCourseData.value.jumps?.find(j => j.id === courseSortKey.value);
+    if (!jump) { return 0; }
+    return ((getAttempt(jump, a)?.score ?? -1) - (getAttempt(jump, b)?.score ?? -1)) * dir;
+  });
+});
+
+function courseStudentTotal(student) {
+  if (!selectedCourseData.value?.jumps) { return 0; }
+  return selectedCourseData.value.jumps
+    .filter(j => j.status === 'expired')
+    .reduce((sum, jump) => sum + (getAttempt(jump, student)?.score ?? 0), 0);
+}
+
+function setCourseSort(key) {
+  if (courseSortKey.value === key) {
+    courseSortDir.value = courseSortDir.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    courseSortKey.value = key;
+    courseSortDir.value = 'asc';
+  }
+}
+
+function jumpStatusLabel(status) {
+  const labels = { draft: 'Brouillon', active: 'Actif', expiring: 'En notation', expired: 'Expiré' };
+  return labels[status] ?? status;
+}
+
+async function activateJump(jump) {
+  try {
+    await courseStore.updateJump(jump.id, { status: 'active' });
+    await loadCourseDetails();
+  } catch {
+    // error shown by store
+  }
+}
+
+async function reopenJump(jump) {
+  try {
+    await courseStore.updateJump(jump.id, { status: 'active' });
+    await loadCourseDetails();
+    subscribeToActiveCourseJumps();
+  } catch {
+    // error shown by store
+  }
+}
+
+function openEditExpiryModal(jump) {
+  editingJump.value = jump;
+  const d = jump.expiration ? new Date(jump.expiration) : new Date();
+  const offset = d.getTimezoneOffset() * 60_000;
+  editExpiryValue.value = new Date(d.getTime() - offset).toISOString().slice(0, 16);
+  showEditExpiryModal.value = true;
+}
+
+async function handleSaveExpiry() {
+  try {
+    await courseStore.updateJump(editingJump.value.id, { expiration: new Date(editExpiryValue.value).toISOString() });
+    showEditExpiryModal.value = false;
+    await loadCourseDetails();
+  } catch {
+    // error shown by store
+  }
+}
+
+async function handleExpireNow() {
+  try {
+    await courseStore.updateJump(editingJump.value.id, { expiration: new Date().toISOString(), status: 'expiring' });
+    showEditExpiryModal.value = false;
+    await loadCourseDetails();
+  } catch {
+    // error shown by store
+  }
+}
+
+function confirmDeleteJump(jump) {
+  deletingJump.value = jump;
+  showDeleteJumpConfirm.value = true;
+}
+
+async function handleDeleteJump() {
+  try {
+    await courseStore.deleteJump(deletingJump.value.id);
+    showDeleteJumpConfirm.value = false;
+    await loadCourseDetails();
+  } catch {
+    // error shown by store
+  }
+}
+
+let courseSubscribedJumpIds = [];
+let courseObservedJumpChannelId = null;
+let courseExpiringPollTimer = null;
+
+function openJumpObservation(jump) {
+  observingJumpData.value = jump;
+  showJumpObservationModal.value = true;
+  loadCourseDetails();
+  if (jump.status === 'active') {
+    courseObservedJumpChannelId = jump.id;
+    window.Echo.private(`jump.${jump.id}`)
+      .listen('.JumpAttemptUpdated', (e) => {
+        const jumpData = selectedCourseData.value?.jumps?.find(j => j.id === jump.id);
+        if (!jumpData) { return; }
+        const idx = jumpData.attempts.findIndex(a => a.user_id === e.attempt.user_id);
+        if (idx !== -1) {
+          jumpData.attempts[idx] = e.attempt;
+        } else {
+          jumpData.attempts.push(e.attempt);
+        }
+      });
+  }
+}
+
+function closeJumpObservation() {
+  if (courseObservedJumpChannelId) {
+    window.Echo.leaveChannel(`private-jump.${courseObservedJumpChannelId}`);
+    courseObservedJumpChannelId = null;
+  }
+  showJumpObservationModal.value = false;
+  observingJumpData.value = null;
+}
+
+function subscribeToActiveCourseJumps() {
+  const activeJumps = selectedCourseData.value?.jumps?.filter(j => j.status === 'active' || j.status === 'expiring') ?? [];
+  for (const jump of activeJumps) {
+    if (courseSubscribedJumpIds.includes(jump.id)) { continue; }
+    courseSubscribedJumpIds.push(jump.id);
+    window.Echo.channel(`jump.${jump.id}`)
+      .listen('.JumpExpired', async () => {
+        await loadCourseDetails();
+        subscribeToActiveCourseJumps();
+      });
+  }
+}
+
+function openCourseAttemptDetail(jump, student) {
+  const attempt = getAttempt(jump, student);
+  if (!attempt) { return; }
+  selectedCourseAttemptDetail.value = { jump, student, attempt };
+  showCourseAttemptDetailModal.value = true;
+}
+
+async function handleCreateJump() {
+  if (!selectedCourseId.value) { return; }
+  try {
+    await courseStore.createJump(selectedCourseId.value, {
+      nb_questions: newJump.value.nb_questions,
+      time: newJump.value.time,
+      growth: newJump.value.growth,
+      status: newJump.value.status,
+    });
+    showNewJumpModal.value = false;
+    await loadCourseDetails();
+  } catch {
+    // error shown by store
+  }
+}
+
+watch(selectedCourseId, async (id) => {
+  if (id) { await loadCourseDetails(); }
+});
+
+watch(
+  () => selectedCourseData.value?.jumps?.some(j => j.status === 'expiring'),
+  (hasExpiring) => {
+    if (hasExpiring && !courseExpiringPollTimer) {
+      courseExpiringPollTimer = setInterval(async () => {
+        await loadCourseDetails();
+        subscribeToActiveCourseJumps();
+      }, 3000);
+    } else if (!hasExpiring && courseExpiringPollTimer) {
+      clearInterval(courseExpiringPollTimer);
+      courseExpiringPollTimer = null;
+    }
+  }
+);
 
 // Suggested Questions functions (teacher)
 function suggestedQuestionsByLevel(level) {
@@ -1944,14 +2501,12 @@ async function handleDeleteSuggestedQuestion(sq) {
 // Public question overlay (student)
 function openPublicQuestionOverlay(sq) {
   selectedPublicQuestion.value = sq;
-  revealPublicAnswer.value = false;
   showPublicQuestionOverlay.value = true;
 }
 
 function closePublicQuestionOverlay() {
   showPublicQuestionOverlay.value = false;
   selectedPublicQuestion.value = null;
-  revealPublicAnswer.value = false;
 }
 
 function formatExpiredTime(expiresAt) {
@@ -1995,3 +2550,16 @@ function formatTimeUntilExpiration(expiresAt) {
   return `expires dans ${diffDays} jour${diffDays > 1 ? 's' : ''}`;
 }
 </script>
+
+<style scoped>
+.tab-slide-left-enter-active,
+.tab-slide-left-leave-active,
+.tab-slide-right-enter-active,
+.tab-slide-right-leave-active {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.tab-slide-left-enter-from  { transform: translateX(30px);  opacity: 0; }
+.tab-slide-left-leave-to    { transform: translateX(-30px); opacity: 0; }
+.tab-slide-right-enter-from { transform: translateX(-30px); opacity: 0; }
+.tab-slide-right-leave-to   { transform: translateX(30px);  opacity: 0; }
+</style>

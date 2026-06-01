@@ -2,7 +2,7 @@
   <div class="min-h-[calc(100vh-64px)] p-6 flex flex-col">
     <!-- Dans la poche -->
     <div
-      v-if="authStore.isAuthenticated && ((!authStore.user?.is_teacher && (divisionStore.invites.length > 0 || activeJumps.length > 0 || publicSuggestedQuestions.length > 0)) || activeSessions.length > 0 || teacherCourseCount > 0)"
+      v-if="authStore.isAuthenticated && ((!authStore.user?.is_teacher && (divisionStore.invites.length > 0 || activeJumps.length > 0 || publicSuggestedQuestions.length > 0)) || activeSessions.length > 0)"
       class="mb-4 rounded-xl border border-primary/20 overflow-hidden"
     >
       <!-- Toggle Header -->
@@ -12,7 +12,7 @@
       >
         <h3 class="text-base font-semibold text-text-main dark:text-surface">Dans la poche</h3>
         <div class="flex items-center gap-2">
-          <span class="inline-flex items-center justify-center w-5 h-5 bg-primary/20 text-primary rounded-full text-xs font-medium">{{ (!authStore.user?.is_teacher ? divisionStore.invites.length + activeJumps.length + publicSuggestedQuestions.length : teacherCourseCount) + activeSessions.length }}</span>
+          <span class="inline-flex items-center justify-center w-5 h-5 bg-primary/20 text-primary rounded-full text-xs font-medium">{{ (divisionStore.invites.length + activeJumps.length + publicSuggestedQuestions.length) + activeSessions.length }}</span>
           <span class="text-sm text-primary font-medium">{{ showHighlights ? 'Masquer' : 'Afficher' }}</span>
           <ChevronDown class="w-4 h-4 text-primary transition-transform duration-300" :class="showHighlights ? 'rotate-180' : ''" />
         </div>
@@ -74,24 +74,6 @@
                 </router-link>
               </div>
             </div>
-
-            <!-- Teacher Course Shortcuts -->
-            <template v-if="authStore.user?.is_teacher">
-              <div v-for="divisionData in teacherCoursesData" :key="divisionData.divisionId">
-                <h4 class="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">{{ divisionData.divisionName }}</h4>
-                <div class="space-y-2">
-                  <router-link
-                    v-for="course in divisionData.courses"
-                    :key="course.id"
-                    :to="{ name: 'CourseDetails', params: { id: divisionData.divisionId, courseId: course.id } }"
-                    class="group flex flex-col gap-1 p-3 rounded-lg bg-surface dark:bg-gray-900 border border-secondary/30 hover:border-secondary hover:shadow-md transition-all"
-                  >
-                    <p class="font-medium text-text-main dark:text-surface truncate">{{ course.title }}</p>
-                    <p class="text-xs text-text-muted">{{ course.jumps_count ?? 0 }} saut{{ (course.jumps_count ?? 0) !== 1 ? 's' : '' }}</p>
-                  </router-link>
-                </div>
-              </div>
-            </template>
 
             <!-- Public Suggested Questions -->
             <div v-if="!authStore.user?.is_teacher && publicSuggestedQuestions.length > 0" :class="publicSuggestedQuestions.length > 3 ? 'lg:col-span-2' : ''">
@@ -310,13 +292,11 @@ const pendingInviteId = ref(null);
 const inviteFirstName = ref('');
 const inviteLastName = ref('');
 const showClaimModal = ref(false);
-const publicSuggestedQuestions = ref([]);
 const showPublicQuestionOverlay = ref(false);
 const selectedPublicQuestion = ref(null);
-const revealPublicAnswer = ref(false);
+const publicSuggestedQuestions = ref([]);
 const selectedClaimIds = ref([]);
 const isClaiming = ref(false);
-const teacherCoursesData = ref([]);
 
 const claimableAttempts = computed(() => {
   return attemptStore.guestAttempts.filter(a => !a.user_id);
@@ -366,9 +346,6 @@ const activeJumps = computed(() => {
   return jumps;
 });
 
-const teacherCourseCount = computed(() => {
-  return teacherCoursesData.value.reduce((sum, d) => sum + d.courses.length, 0);
-});
 
 function openInviteModal(inviteId) {
   pendingInviteId.value = inviteId;
@@ -466,25 +443,6 @@ onMounted(async () => {
         });
     });
 
-    // Fetch courses for teacher shortcuts
-    if (authStore.user?.is_teacher) {
-      const results = await Promise.all(
-        divisionStore.divisions.map(async (division) => {
-          try {
-            const res = await axios.get(`/api/divisions/${division.id}/courses`);
-            const courses = (res.data.courses ?? []).filter(c => !c.archived);
-            if (courses.length === 0) { return null; }
-            return { divisionId: division.id, divisionName: division.name, courses };
-          } catch {
-            return null;
-          }
-        })
-      );
-      teacherCoursesData.value = results
-        .filter(Boolean)
-        .sort((a, b) => a.divisionName.localeCompare(b.divisionName));
-    }
-
     // Fetch invites if student
     if (!authStore.user?.is_teacher) {
       await divisionStore.fetchMyInvites();
@@ -518,14 +476,12 @@ onMounted(async () => {
 
 function openPublicQuestionOverlay(sq) {
   selectedPublicQuestion.value = sq;
-  revealPublicAnswer.value = false;
   showPublicQuestionOverlay.value = true;
 }
 
 function closePublicQuestionOverlay() {
   showPublicQuestionOverlay.value = false;
   selectedPublicQuestion.value = null;
-  revealPublicAnswer.value = false;
 }
 
 onUnmounted(() => {
