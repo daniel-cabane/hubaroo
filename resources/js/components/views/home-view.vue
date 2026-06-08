@@ -224,7 +224,7 @@
       <img
         v-if="selectedPublicQuestion.question.image"
         :src="'/' + selectedPublicQuestion.question.image"
-        class="max-h-64 object-contain"
+        class="max-h-64 object-contain select-none pointer-events-none"
         alt="Question"
       />
 
@@ -263,7 +263,7 @@
             <img
               v-if="randomQuestion.image"
               :src="'/' + randomQuestion.image"
-              class="max-h-64 object-contain"
+              class="max-h-64 object-contain select-none pointer-events-none"
               alt="Question"
             />
             <p v-else class="text-text-muted text-sm">Aucune image pour cette question.</p>

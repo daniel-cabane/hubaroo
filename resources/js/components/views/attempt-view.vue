@@ -713,10 +713,33 @@ onMounted(async () => {
       const timeLimitMinutes = preferences.time_limit ?? 50;
       startCountdown(timeLimitMinutes);
 
+      let isAppActive = true;
+      function updateAppState() {
+        // The app is truly active ONLY if it is visible AND has user focus
+        const currentlyActive = document.visibilityState === 'visible' && document.hasFocus();
+
+        // Only run your logic if the state actually changed
+        if (currentlyActive !== isAppActive) {
+          isAppActive = currentlyActive;
+          
+          if (isAppActive) {
+            handleFocus();
+          } else {
+            handleBlur();
+          }
+        }
+      }
+
       const blurSecurity = preferences.blur_security ?? true;
       if (blurSecurity) {
-        window.addEventListener('blur', handleBlur);
-        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', updateAppState);
+        window.addEventListener('focus', updateAppState);
+        window.addEventListener('blur', updateAppState);
+        document.addEventListener('visibilitychange', updateAppState);
+        window.addEventListener('focus', updateAppState);
+        window.addEventListener('blur', updateAppState);
+        // window.addEventListener('blur', handleBlur);
+        // window.addEventListener('focus', handleFocus);
       }
 
       if (session.value?.id && authStore.isAuthenticated) {
