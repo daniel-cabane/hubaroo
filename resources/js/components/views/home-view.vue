@@ -126,14 +126,27 @@
         class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-primary/20 bg-surface p-10 shadow-sm transition-all hover:border-primary hover:shadow-lg hover:-translate-y-1"
       >
         <div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
-          <PlusCircle class="h-8 w-8" />
+          <Layers class="h-8 w-8" />
         </div>
         <h2 class="text-xl font-bold text-text-main">Créer une session</h2>
         <p class="text-sm text-text-muted text-center">Choisissez un sujet et lancez une nouvelle session Kangourou pour vos élèves.</p>
       </router-link>
 
-      <!-- Join Session -->
+      <!-- Create Jump (teachers) or Join Session (students) -->
+      <button
+        v-if="authStore.isAuthenticated && authStore.user?.is_teacher"
+        @click="openCreateJumpModal"
+        class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-secondary/20 bg-surface p-10 shadow-sm transition-all hover:border-secondary hover:shadow-lg hover:-translate-y-1 cursor-pointer"
+      >
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+          <Redo class="h-8 w-8" />
+        </div>
+        <h2 class="text-xl font-bold text-text-main">Créer un saut</h2>
+        <p class="text-sm text-text-muted text-center">Créez un nouveau saut pour que vos élèves puissent améliorer leurs compétences.</p>
+      </button>
+
       <router-link
+        v-else
         to="/kangourou/join"
         class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-secondary/20 bg-surface p-10 shadow-sm transition-all hover:border-secondary hover:shadow-lg hover:-translate-y-1"
       >
@@ -405,11 +418,143 @@
       </div>
     </div>
   </div>
+
+  <!-- Create Jump Modal -->
+  <div
+    v-if="showCreateJumpModal"
+    class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
+    @click.self="closeCreateJumpModal"
+  >
+    <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-md">
+      <h3 class="text-lg font-semibold text-text-main dark:text-surface mb-4">Créer un saut</h3>
+      
+      <!-- Step 1: Select Division and Course -->
+      <div v-if="createJumpStep === 1" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-2">Sélectionner une classe</label>
+          <select
+            v-model="selectedDivisionId"
+            @change="handleDivisionChange"
+            class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">-- Choisir une classe --</option>
+            <option v-for="division in divisionStore.divisions" :key="division.id" :value="division.id">
+              {{ division.name }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-2">Sélectionner un cours</label>
+          <select
+            v-model="selectedCourseId"
+            :disabled="!selectedDivisionId || loadingCourses"
+            class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">
+              {{ loadingCourses ? 'Chargement des cours...' : '-- Choisir un cours --' }}
+            </option>
+            <option v-for="course in availableCourses" :key="course.id" :value="course.id">
+              {{ course.title }}
+            </option>
+          </select>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button @click="closeCreateJumpModal" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+            Annuler
+          </button>
+          <button
+            @click="proceedToStep2"
+            :disabled="!selectedCourseId"
+            class="px-4 py-2 bg-primary hover:bg-primary-hover cursor-pointer text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+          >
+            Suivant
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Configure Jump -->
+      <div v-if="createJumpStep === 2" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Nombre de questions</label>
+          <input
+            v-model.number="jumpForm.nb_questions"
+            type="number"
+            min="1"
+            max="30"
+            class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Durée (minutes)</label>
+          <input
+            v-model.number="jumpForm.time"
+            type="number"
+            min="5"
+            max="60"
+            class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Difficulté progressive (0-10)</label>
+          <input
+            v-model.number="jumpForm.growth"
+            type="number"
+            min="0"
+            max="10"
+            class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+        <div v-if="createJumpError" class="bg-error/10 border border-error/30 text-error px-4 py-3 rounded-lg text-sm">
+          {{ createJumpError }}
+        </div>
+        <div class="flex justify-end gap-2">
+          <button @click="createJumpStep = 1" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+            Retour
+          </button>
+          <button
+            @click="handleCreateJump"
+            :disabled="isCreatingJump"
+            class="px-4 py-2 bg-primary hover:bg-primary-hover cursor-pointer text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+          >
+            {{ isCreatingJump ? 'Création...' : 'Créer le saut' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Confirmation -->
+      <div v-if="createJumpStep === 3" class="space-y-4 text-center">
+        <div class="flex justify-center">
+          <div class="flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
+            <PlusCircle class="h-8 w-8" />
+          </div>
+        </div>
+        <div>
+          <h4 class="text-lg font-semibold text-text-main dark:text-surface mb-2">Saut créé avec succès !</h4>
+          <p class="text-sm text-text-muted">Le nouveau saut a été créé et activé pour votre classe.</p>
+        </div>
+        <div class="space-y-2">
+          <router-link
+            :to="{ name: 'DivisionDetails', params: { id: selectedDivisionId } }"
+            class="block w-full px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium transition-colors"
+            @click="closeCreateJumpModal"
+          >
+            Voir la classe
+          </router-link>
+          <button
+            @click="closeCreateJumpModal"
+            class="block w-full px-4 py-2 border border-border hover:border-primary text-text-main dark:text-surface rounded-lg text-sm font-medium transition-colors"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { PlusCircle, X, Star, Lightbulb, ChevronDown, TvMinimalPlay, Shuffle, ArrowBigRightDash, ArrowDownRight, ArrowUpRight, ArrowRight, CircleQuestionMark } from 'lucide-vue-next';
+import { PlusCircle, Redo, X, Star, Lightbulb, ChevronDown, TvMinimalPlay, Layers, ArrowBigRightDash, ArrowDownRight, ArrowUpRight, ArrowRight, CircleQuestionMark } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useAttemptStore } from '@/stores/attemptStore';
@@ -432,6 +577,22 @@ const selectedPublicQuestion = ref(null);
 const publicSuggestedQuestions = ref([]);
 const selectedClaimIds = ref([]);
 const isClaiming = ref(false);
+
+// Create Jump Modal
+const showCreateJumpModal = ref(false);
+const createJumpStep = ref(1);
+const selectedDivisionId = ref('');
+const selectedCourseId = ref('');
+const loadingCourses = ref(false);
+const courses = ref([]);
+const createdJump = ref(null);
+const jumpForm = ref({
+  nb_questions: 7,
+  time: 15,
+  growth: 3,
+});
+const isCreatingJump = ref(false);
+const createJumpError = ref('');
 
 // Random Question Modal
 const showRandomQuestionModal = ref(false);
@@ -489,6 +650,10 @@ const activeJumps = computed(() => {
   return jumps;
 });
 
+const availableCourses = computed(() => {
+  return courses.value;
+});
+
 
 function openInviteModal(inviteId) {
   pendingInviteId.value = inviteId;
@@ -526,6 +691,84 @@ function dismissClaimModal() {
   selectedClaimIds.value = [];
   // Clear guest attempts from localStorage since user chose to ignore
   attemptStore.removeGuestAttemptIds(claimableAttempts.value.map(a => a.id));
+}
+
+function openCreateJumpModal() {
+  showCreateJumpModal.value = true;
+  createJumpStep.value = 1;
+  selectedDivisionId.value = '';
+  selectedCourseId.value = '';
+  loadingCourses.value = false;
+  courses.value = [];
+  jumpForm.value = {
+    nb_questions: 7,
+    time: 15,
+    growth: 3,
+  };
+  createJumpError.value = '';
+}
+
+function closeCreateJumpModal() {
+  showCreateJumpModal.value = false;
+  createJumpStep.value = 1;
+  selectedDivisionId.value = '';
+  selectedCourseId.value = '';
+  loadingCourses.value = false;
+  courses.value = [];
+  createJumpError.value = '';
+}
+
+async function handleDivisionChange() {
+  selectedCourseId.value = '';
+  courses.value = [];
+  
+  if (!selectedDivisionId.value) {
+    return;
+  }
+
+  loadingCourses.value = true;
+  try {
+    const response = await axios.get(`/api/divisions/${selectedDivisionId.value}/courses`);
+    courses.value = response.data.courses ?? [];
+  } catch (err) {
+    createJumpError.value = err.response?.data?.message || 'Erreur lors du chargement des cours';
+  } finally {
+    loadingCourses.value = false;
+  }
+}
+
+function proceedToStep2() {
+  if (selectedCourseId.value) {
+    createJumpStep.value = 2;
+  }
+}
+
+async function handleCreateJump() {
+  if (!selectedCourseId.value || !jumpForm.value.nb_questions || !jumpForm.value.time) {
+    createJumpError.value = 'Tous les champs sont obligatoires';
+    return;
+  }
+
+  isCreatingJump.value = true;
+  createJumpError.value = '';
+
+  try {
+    const response = await axios.post(`/api/courses/${selectedCourseId.value}/jumps`, {
+      nb_questions: jumpForm.value.nb_questions,
+      time: jumpForm.value.time,
+      growth: jumpForm.value.growth,
+      status: 'active',
+    });
+
+    createdJump.value = response.data.jump;
+    createJumpStep.value = 3;
+    // Refresh divisions to show the newly created jump
+    await divisionStore.fetchMyDivisions();
+  } catch (err) {
+    createJumpError.value = err.response?.data?.message || 'Erreur lors de la création du saut';
+  } finally {
+    isCreatingJump.value = false;
+  }
 }
 
 // When user logs in, check for guest attempts to claim

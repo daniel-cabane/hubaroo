@@ -123,7 +123,7 @@
             <input
               v-model="divisionStudentSearch"
               type="text"
-              placeholder="Rechercher..."
+              placeholder="Chercher..."
               class="px-3 py-1.5 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary w-44"
             />
           </div>
@@ -233,14 +233,14 @@
                   <p class="text-xs text-text-muted mt-0.5">{{ session.code }}</p>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                  <button
+                  <!-- <button
                     @click="openActiveSessionModal(session)"
                     class="text-text-muted hover:text-primary transition-colors cursor-pointer"
                     title="Voir les tentatives"
                   >
                     <Eye class="w-5 h-5" />
-                  </button>
-                  <button
+                  </button> -->
+                  <!-- <button
                     @click="handleToggleSession(session)"
                     :class="[
                       'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
@@ -253,9 +253,16 @@
                         isSessionOpen(session.id) ? 'translate-x-6' : 'translate-x-1'
                       ]"
                     />
-                  </button>
+                  </button> -->
                 </div>
               </div>
+              <button
+                @click="openActiveSessionModal(session)"
+                class="flex justify-center items-center mt-2 w-full py-2 bg-primary hover:bg-primary-hover cursor-pointer text-surface rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+              >
+                <span>Suivre la session</span>
+                <Eye class="w-6 h-6 ml-2" />
+              </button>
             </div>
           </div>
         </div>
@@ -390,7 +397,7 @@
                 <input
                   v-model="courseStudentSearch"
                   type="text"
-                  placeholder="Rechercher un élève..."
+                  placeholder="Chercher un élève..."
                   class="w-full max-w-xs px-3 py-1.5 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -739,7 +746,7 @@
             <input
               v-model="sessionStudentSearch"
               type="text"
-              placeholder="Rechercher un élève…"
+              placeholder="Chercher un élève…"
               class="w-full px-3 py-1.5 pr-8 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <button
@@ -776,7 +783,7 @@
             <input
               v-model="sessionStudentSearch"
               type="text"
-              placeholder="Rechercher un élève…"
+              placeholder="Chercher un élève…"
               class="w-full px-3 py-1.5 pr-8 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <button
@@ -821,7 +828,7 @@
             <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Progression (sauts)</label>
             <input v-model.number="newJump.growth" type="number" min="0" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm" />
           </div>
-          <div class="flex items-center justify-between">
+          <!-- <div class="flex items-center justify-between">
             <span class="text-sm font-medium text-text-main dark:text-surface/80">Questions automatiques</span>
             <button
               @click="newJump.autoQuestions = !newJump.autoQuestions"
@@ -829,7 +836,7 @@
             >
               <span :class="['inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow', newJump.autoQuestions ? 'translate-x-6' : 'translate-x-1']" />
             </button>
-          </div>
+          </div> -->
           <div>
             <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Statut</label>
             <select v-model="newJump.status" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm cursor-pointer">
@@ -1880,6 +1887,29 @@ onMounted(async () => {
   // Subscribe to the active jump's channel if one exists
   if (activeCourseActiveJump.value?.id) {
     subscribeToActiveJump(activeCourseActiveJump.value.id);
+  }
+
+  // Auto-focus tabs based on active jumps/sessions
+  if (isTeacher.value) {
+    // Check for active jumps first
+    let hasActiveJump = false;
+    for (const course of courseStore.courses) {
+      const activeJump = course.jumps?.find(j => j.status === 'active' || j.status === 'expiring');
+      if (activeJump) {
+        selectedCourseId.value = course.id;
+        switchTab('parcours');
+        hasActiveJump = true;
+        break;
+      }
+    }
+
+    // If no active jump, check for active sessions
+    if (!hasActiveJump) {
+      const hasActiveSession = (divisionStore.division?.kangourou_sessions ?? []).some(s => s.status === 'active');
+      if (hasActiveSession) {
+        switchTab('sessions');
+      }
+    }
   }
 });
 
