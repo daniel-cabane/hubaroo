@@ -75,13 +75,14 @@ export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
     }
   }
 
-  async function submitAttempt(attemptId, timer, termination = 'submitted') {
+  async function submitAttempt(attemptId, timer, termination = 'submitted', questionList = null) {
     isLoading.value = true;
     error.value = null;
     try {
       const response = await axios.post(`/api/jump-attempts/${attemptId}/submit`, {
         timer,
         termination,
+        question_list: questionList,
       });
       attempt.value = response.data.attempt;
       clearLocalStorage();

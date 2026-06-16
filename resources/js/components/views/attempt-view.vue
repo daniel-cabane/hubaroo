@@ -405,29 +405,30 @@ function handleNumericKey(key) {
   saveNumericAnswer();
 }
 
-async function saveNumericAnswer() {
+function saveNumericAnswer() {
   if (!isInProgress.value) return;
   const val = numericInputValue.value;
-  if (val === '' || val === null || val === undefined) {
-    await attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, null, remainingSeconds.value);
-    return;
-  }
-  const num = parseInt(val, 10);
-  if (isNaN(num) || num < 0 || num > 1000000) return;
-  await attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, String(num), remainingSeconds.value);
+  const answer = val === '' || val === null || val === undefined ? null : String(parseInt(val, 10));
+  if (val !== '' && (isNaN(parseInt(val, 10)) || parseInt(val, 10) < 0 || parseInt(val, 10) > 1000000)) return;
+
+  // Optimistic local update
+  answers.value[currentOriginalIndex.value].answer = answer;
+
+  // Fire-and-forget
+  attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, answer, remainingSeconds.value);
 }
 
-async function selectAnswer(letter) {
+function selectAnswer(letter) {
   if (!isInProgress.value) return;
 
   const currentAnswer = answers.value[currentOriginalIndex.value]?.answer;
   const newAnswer = currentAnswer === letter ? null : letter;
 
-  try {
-    await attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, newAnswer, remainingSeconds.value);
-  } catch {
-    // error handled by store
-  }
+  // Optimistic local update
+  answers.value[currentOriginalIndex.value].answer = newAnswer;
+
+  // Fire-and-forget
+  attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, newAnswer, remainingSeconds.value);
 }
 
 async function handleSubmit() {

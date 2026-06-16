@@ -133,9 +133,7 @@ class JumpAttemptController extends Controller
             'timer' => $request->integer('timer', $jumpAttempt->timer),
         ]);
 
-        broadcast(new JumpAttemptUpdated($jumpAttempt->fresh()));
-
-        return response()->json(['attempt' => $this->withQuestionImages($jumpAttempt->fresh())]);
+        return response()->noContent();
     }
 
     public function submit(JumpAttempt $jumpAttempt, Request $request): JsonResponse
@@ -150,14 +148,22 @@ class JumpAttemptController extends Controller
 
         $request->validate([
             'timer' => ['nullable', 'integer', 'min:0'],
-            'termination' => ['nullable', 'string', 'in:submitted,timeout,blurred'],
+            'termination' => ['nullable', 'string', 'in:submitted,timeout,blurred,abandoned'],
+            'question_list' => ['nullable', 'array'],
         ]);
 
-        $jumpAttempt->update([
+        $updateData = [
             'status' => 'finished',
             'timer' => $request->integer('timer', $jumpAttempt->timer),
             'termination' => $request->input('termination', 'submitted'),
-        ]);
+        ];
+
+        // Persist all answers sent with the submit request
+        if ($request->has('question_list') && is_array($request->input('question_list'))) {
+            $updateData['question_list'] = $request->input('question_list');
+        }
+
+        $jumpAttempt->update($updateData);
 
         $fresh = $jumpAttempt->fresh()->load('jump.course');
 

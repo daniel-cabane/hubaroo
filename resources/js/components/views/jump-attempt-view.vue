@@ -336,42 +336,53 @@ function handleNumericKey(key) {
 
 async function saveNumericAnswer() {
   if (!isInProgress.value) return;
+  
   const val = numericInputValue.value;
   const answer = val === '' ? null : String(parseInt(val, 10));
+  
   if (val !== '' && (isNaN(parseInt(val, 10)) || parseInt(val, 10) < 0 || parseInt(val, 10) > 1000000)) return;
-  try {
-    await jumpAttemptStore.updateAnswer(
-      jumpAttemptStore.attempt.id,
-      currentIndex.value,
-      answer,
-      remainingSeconds.value
-    );
-  } catch {
-    // handled by store
-  }
+  
+  // Optimistic update
+  const item = questionList.value[currentIndex.value];
+  item.answer = answer;
+  
+  // Fire-and-forget
+  jumpAttemptStore.updateAnswer(
+    jumpAttemptStore.attempt.id,
+    currentIndex.value,
+    answer,
+    remainingSeconds.value
+  );
 }
 
 async function selectAnswer(letter) {
   if (!isInProgress.value) return;
+  
   const item = questionList.value[currentIndex.value];
   const newAnswer = item?.answer === letter ? null : letter;
-  try {
-    await jumpAttemptStore.updateAnswer(
-      jumpAttemptStore.attempt.id,
-      currentIndex.value,
-      newAnswer,
-      remainingSeconds.value
-    );
-  } catch {
-    // handled by store
-  }
+  
+  // 1. Optimistic local update - the UI reflects change instantly
+  item.answer = newAnswer;
+  
+  // 2. Fire-and-forget - no await, no catch, no loading state
+  jumpAttemptStore.updateAnswer(
+    jumpAttemptStore.attempt.id,
+    currentIndex.value,
+    newAnswer,
+    remainingSeconds.value
+  );
 }
 
 async function handleSubmit() {
   showSubmitModal.value = false;
   isSubmitting.value = true;
   try {
-    await jumpAttemptStore.submitAttempt(jumpAttemptStore.attempt.id, remainingSeconds.value, 'submitted');
+    await jumpAttemptStore.submitAttempt(
+      jumpAttemptStore.attempt.id,
+      remainingSeconds.value,
+      'submitted',
+      questionList.value
+    );
     router.replace({
       name: 'JumpResults',
       params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },

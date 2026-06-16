@@ -172,13 +172,9 @@ class AttemptController extends Controller
             'timer' => $request->validated('timer'),
         ]);
 
-        $fresh = $attempt->fresh();
-        broadcast(new AttemptUpdated($fresh));
+        broadcast(new AttemptUpdated($attempt)); // still works with pre-refresh model
 
-        return response()->json([
-            'message' => 'Answer saved.',
-            'attempt' => $fresh,
-        ]);
+        return response()->noContent();
     }
 
     public function submit(Attempt $attempt, Request $request): JsonResponse
