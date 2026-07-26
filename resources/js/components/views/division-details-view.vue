@@ -892,35 +892,60 @@
 
     <!-- Jump Observation Modal -->
     <div
-      v-if="showJumpObservationModal && observingJumpData"
+      v-if="showJumpObservationModal && observedJump"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
       @click.self="closeJumpObservation"
     >
-      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl w-full max-w-xl max-h-[85vh] flex flex-col">
         <div class="flex items-center justify-between p-4 border-b border-border">
-          <h3 class="text-lg font-semibold text-text-main dark:text-surface">
-            Saut {{ jumpNumber(observingJumpData) }} — {{ observingJumpData.status === 'active' || observingJumpData.status === 'expiring' ? 'En cours' : 'Terminé' }}
-          </h3>
+          <div>
+            <h3 class="text-lg font-semibold text-text-main dark:text-surface">Saut {{ jumpNumber(observedJump) }}</h3>
+            <p class="text-sm text-text-muted">{{ selectedCourseData?.students?.length ?? 0 }} élève{{ (selectedCourseData?.students?.length ?? 0) !== 1 ? 's' : '' }}</p>
+          </div>
           <button @click="closeJumpObservation" class="text-text-muted hover:text-text-main transition-colors cursor-pointer"><X class="w-5 h-5" /></button>
         </div>
-        <div class="p-4 overflow-y-auto flex-1">
+        <div class="overflow-y-auto flex-1">
           <div v-if="!selectedCourseData?.students?.length" class="text-sm text-text-muted text-center py-8">Aucun élève.</div>
-          <ul v-else class="space-y-2">
-            <li
+          <table v-else class="w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-800 border-b border-border sticky top-0">
+              <tr>
+                <th class="px-4 py-3 text-left font-semibold text-text-main dark:text-surface">Élève</th>
+                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Réponses</th>
+                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Temps restant</th>
+                <th v-if="observedJump.status === 'expired'" class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Score</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              <tr
               v-for="student in selectedCourseData.students"
               :key="student.id"
-              class="flex items-center justify-between py-1.5 border-b border-border last:border-0"
+              class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              <span class="text-sm font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name ?? student.name }}</span>
-              <div class="text-sm">
-                <template v-if="getAttempt(observingJumpData, student)">
-                  <span v-if="observingJumpData.status === 'expired'" class="font-semibold text-primary">{{ getAttempt(observingJumpData, student).score }}</span>
-                  <span v-else class="text-success font-medium">En cours</span>
+              <td class="px-4 py-3 font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name ?? student.name }}</td>
+              <td class="px-4 py-3 text-center">
+                <span v-if="getAttempt(observedJump, student)" class="font-medium text-text-main dark:text-surface">
+                  {{ formatCourseObservationProgress(getAttempt(observedJump, student)) }}
+                </span>
+                <span v-else class="text-xs text-text-muted">—</span>
+              </td>
+              <td class="px-4 py-3 text-center font-mono text-sm text-text-muted">
+                <template v-if="getAttempt(observedJump, student)?.status === 'inProgress'">
+                  {{ formatCourseObservationTimer(getCourseObservationRemainingSeconds(getAttempt(observedJump, student))) }}
                 </template>
-                <span v-else class="text-text-muted">—</span>
-              </div>
-            </li>
-          </ul>
+                <span
+                  v-else-if="getAttempt(observedJump, student)?.status === 'finished'"
+                  class="inline-flex items-center rounded-full bg-text-muted/10 px-2 py-0.5 text-xs font-medium text-text-muted"
+                >
+                  Terminé
+                </span>
+                <span v-else class="opacity-40">—</span>
+              </td>
+              <td v-if="observedJump.status === 'expired'" class="px-4 py-3 text-center font-semibold text-primary">
+                {{ getAttempt(observedJump, student)?.score ?? '—' }}
+              </td>
+            </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -936,7 +961,15 @@
           <h3 class="text-lg font-semibold text-text-main dark:text-surface">Détail de la tentative</h3>
           <button @click="showCourseAttemptDetailModal = false" class="text-text-muted hover:text-text-main cursor-pointer"><X class="w-5 h-5" /></button>
         </div>
-        <div class="space-y-2 text-sm">
+        <div v-if="courseAttemptDetailLoading" class="py-8 text-center text-sm text-text-muted">Chargement de la tentative...</div>
+        <div v-else-if="courseAttemptDetailError" class="rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">
+          <p>{{ courseAttemptDetailError }}</p>
+          <button
+            @click="retryCourseAttemptDetailLoad"
+            class="mt-3 rounded-lg bg-error px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-error/90 cursor-pointer"
+          >Réessayer</button>
+        </div>
+        <div v-else-if="selectedCourseAttemptDetail.attempt" class="space-y-2 text-sm">
           <div class="flex justify-between">
             <span class="text-text-muted">Élève</span>
             <span class="font-medium text-text-main dark:text-surface">{{ selectedCourseAttemptDetail.student?.pivot?.class_name ?? selectedCourseAttemptDetail.student?.name }}</span>
@@ -946,8 +979,16 @@
             <span class="font-medium text-text-main dark:text-surface">Saut {{ jumpNumber(selectedCourseAttemptDetail.jump) }}</span>
           </div>
           <div class="flex justify-between">
+            <span class="text-text-muted">Réponses</span>
+            <span class="font-medium text-text-main dark:text-surface">{{ formatCourseObservationProgress(selectedCourseAttemptDetail.attempt) }}</span>
+          </div>
+          <div class="flex justify-between">
             <span class="text-text-muted">Score</span>
             <span class="font-semibold text-primary text-lg">{{ selectedCourseAttemptDetail.attempt?.score }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-text-muted">Fin</span>
+            <span class="font-medium text-text-main dark:text-surface">{{ selectedCourseAttemptDetail.attempt?.termination ?? '—' }}</span>
           </div>
           <div v-if="selectedCourseAttemptDetail.attempt?.completed_at" class="flex justify-between">
             <span class="text-text-muted">Complété le</span>
@@ -1749,9 +1790,13 @@ const editExpiryValue = ref('');
 const showDeleteJumpConfirm = ref(false);
 const deletingJump = ref(null);
 const showJumpObservationModal = ref(false);
-const observingJumpData = ref(null);
+const observingJumpId = ref(null);
+const observedJump = computed(() => selectedCourseData.value?.jumps?.find(j => j.id === observingJumpId.value) ?? null);
 const showCourseAttemptDetailModal = ref(false);
 const selectedCourseAttemptDetail = ref(null);
+const courseAttemptDetailLoading = ref(false);
+const courseAttemptDetailError = ref('');
+const courseObservationNow = ref(Date.now());
 
 // Suggested Questions (teacher)
 const showSuggestedQuestionsModal = ref(false);
@@ -1928,6 +1973,7 @@ onUnmounted(() => {
   if (courseExpiringPollTimer) {
     clearInterval(courseExpiringPollTimer);
   }
+  stopCourseObservationClock();
   if (courseObservedJumpChannelId) {
     window.Echo.leaveChannel(`private-jump.${courseObservedJumpChannelId}`);
   }
@@ -2254,7 +2300,7 @@ async function toggleReviewedForSession(questionId, session) {
 async function loadCourseDetails() {
   if (!selectedCourseId.value) { return; }
   const data = await courseStore.fetchCourseDetails(selectedCourseId.value);
-  selectedCourseData.value = data;
+  selectedCourseData.value = decorateCourseObservationData(data);
   subscribeToActiveCourseJumps();
 }
 
@@ -2379,23 +2425,126 @@ async function handleDeleteJump() {
 let courseSubscribedJumpIds = [];
 let courseObservedJumpChannelId = null;
 let courseExpiringPollTimer = null;
+let courseObservationClockTimer = null;
+
+function formatCourseObservationTimer(seconds) {
+  if (!seconds) { return '0:00'; }
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}:${String(remaining).padStart(2, '0')}`;
+}
+
+function startCourseObservationClock() {
+  if (courseObservationClockTimer) { return; }
+  courseObservationNow.value = Date.now();
+  courseObservationClockTimer = setInterval(() => {
+    courseObservationNow.value = Date.now();
+  }, 1000);
+}
+
+function stopCourseObservationClock() {
+  if (!courseObservationClockTimer) { return; }
+  clearInterval(courseObservationClockTimer);
+  courseObservationClockTimer = null;
+}
+
+function getCourseObservationSyncTimestamp(attempt) {
+  if (typeof attempt?.last_sync_received_at === 'number') {
+    return attempt.last_sync_received_at;
+  }
+
+  if (attempt?.updated_at) {
+    return new Date(attempt.updated_at).getTime();
+  }
+
+  return Date.now();
+}
+
+function stampCourseObservationAttempt(attempt, receivedAt = Date.now()) {
+  if (!attempt) { return attempt; }
+
+  return {
+    ...attempt,
+    last_sync_received_at: typeof attempt.last_sync_received_at === 'number'
+      ? attempt.last_sync_received_at
+      : attempt.updated_at
+        ? new Date(attempt.updated_at).getTime()
+        : receivedAt,
+  };
+}
+
+function decorateCourseObservationData(data) {
+  if (!data?.jumps) { return data; }
+
+  for (const jump of data.jumps) {
+    jump.attempts = (jump.attempts ?? []).map((attempt) => stampCourseObservationAttempt(attempt));
+  }
+
+  return data;
+}
+
+function countCourseObservationAnswers(attempt) {
+  if (!attempt?.question_list) {
+    return 0;
+  }
+
+  return attempt.question_list.filter((item) => item?.answer !== null && item?.answer !== undefined && item?.answer !== '').length;
+}
+
+function formatCourseObservationProgress(attempt) {
+  if (!attempt) {
+    return '—';
+  }
+
+  const answeredCount = attempt.answered_count ?? countCourseObservationAnswers(attempt);
+  const totalQuestions = attempt.total_questions ?? attempt.question_list?.length ?? 0;
+
+  if (totalQuestions === 0) {
+    return '—';
+  }
+
+  return `${answeredCount} / ${totalQuestions}`;
+}
+
+function getCourseObservationRemainingSeconds(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return null;
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((courseObservationNow.value - getCourseObservationSyncTimestamp(attempt)) / 1000));
+  return Math.max(0, (attempt.timer ?? 0) - elapsedSeconds);
+}
 
 function openJumpObservation(jump) {
-  observingJumpData.value = jump;
+  observingJumpId.value = jump.id;
   showJumpObservationModal.value = true;
-  loadCourseDetails();
-  if (jump.status === 'active') {
+  startCourseObservationClock();
+
+  if (courseObservedJumpChannelId && courseObservedJumpChannelId !== jump.id) {
+    window.Echo.leaveChannel(`private-jump.${courseObservedJumpChannelId}`);
+    courseObservedJumpChannelId = null;
+  }
+
+  void loadCourseDetails();
+
+  if (jump.status === 'active' || jump.status === 'expiring') {
     courseObservedJumpChannelId = jump.id;
     window.Echo.private(`jump.${jump.id}`)
       .listen('.JumpAttemptUpdated', (e) => {
         const jumpData = selectedCourseData.value?.jumps?.find(j => j.id === jump.id);
         if (!jumpData) { return; }
-        const idx = jumpData.attempts.findIndex(a => a.user_id === e.attempt.user_id);
+        const attempts = jumpData.attempts ?? [];
+        const idx = attempts.findIndex(a => a.user_id === e.attempt.user_id);
+        const mergedAttempt = stampCourseObservationAttempt(
+          idx !== -1 ? { ...attempts[idx], ...e.attempt } : e.attempt,
+          Date.now(),
+        );
         if (idx !== -1) {
-          jumpData.attempts[idx] = e.attempt;
+          attempts[idx] = mergedAttempt;
         } else {
-          jumpData.attempts.push(e.attempt);
+          attempts.push(mergedAttempt);
         }
+        jumpData.attempts = attempts;
       });
   }
 }
@@ -2405,8 +2554,9 @@ function closeJumpObservation() {
     window.Echo.leaveChannel(`private-jump.${courseObservedJumpChannelId}`);
     courseObservedJumpChannelId = null;
   }
+  stopCourseObservationClock();
   showJumpObservationModal.value = false;
-  observingJumpData.value = null;
+  observingJumpId.value = null;
 }
 
 function subscribeToActiveCourseJumps() {
@@ -2422,11 +2572,40 @@ function subscribeToActiveCourseJumps() {
   }
 }
 
-function openCourseAttemptDetail(jump, student) {
+async function loadCourseAttemptDetail(jump, student, attemptId) {
+  courseAttemptDetailLoading.value = true;
+  selectedCourseAttemptDetail.value = { jump, student, attemptId, attempt: null };
+
+  try {
+    const response = await axios.get(`/api/jump-attempts/${attemptId}`);
+    selectedCourseAttemptDetail.value = {
+      jump,
+      student,
+      attemptId,
+      attempt: response.data.attempt,
+    };
+  } catch {
+    courseAttemptDetailError.value = 'Impossible de charger la tentative.';
+  } finally {
+    courseAttemptDetailLoading.value = false;
+  }
+}
+
+async function openCourseAttemptDetail(jump, student) {
   const attempt = getAttempt(jump, student);
-  if (!attempt) { return; }
-  selectedCourseAttemptDetail.value = { jump, student, attempt };
+  if (!attempt?.id) { return; }
   showCourseAttemptDetailModal.value = true;
+  await loadCourseAttemptDetail(jump, student, attempt.id);
+}
+
+function retryCourseAttemptDetailLoad() {
+  if (!selectedCourseAttemptDetail.value?.attemptId) { return; }
+
+  void loadCourseAttemptDetail(
+    selectedCourseAttemptDetail.value.jump,
+    selectedCourseAttemptDetail.value.student,
+    selectedCourseAttemptDetail.value.attemptId,
+  );
 }
 
 async function handleCreateJump() {

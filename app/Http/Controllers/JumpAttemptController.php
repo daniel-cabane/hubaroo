@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Events\JumpAttemptUpdated;
+use App\Http\Requests\SubmitJumpAttemptRequest;
+use App\Http\Requests\SyncJumpAttemptRequest;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
 use App\Models\Question;
@@ -10,6 +12,7 @@ use App\Models\User;
 use App\Services\JumpQuestionSelector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class JumpAttemptController extends Controller
 {
@@ -50,12 +53,12 @@ class JumpAttemptController extends Controller
             'question_list' => $questionList,
             'score' => 0,
             'status' => 'inProgress',
-            'timer' => 0,
+            'timer' => $jump->time * 60,
             'extra_time' => 0,
             'termination' => 'none',
         ]);
 
-        broadcast(new JumpAttemptUpdated($attempt->fresh()->load('user:id,name,email')));
+        broadcast(new JumpAttemptUpdated($attempt->fresh()));
 
         return response()->json([
             'message' => 'Attempt created.',
@@ -103,7 +106,7 @@ class JumpAttemptController extends Controller
         return response()->json(['attempt' => $attemptData]);
     }
 
-    public function updateAnswer(JumpAttempt $jumpAttempt, Request $request): JsonResponse
+    public function updateAnswer(JumpAttempt $jumpAttempt, Request $request): Response
     {
         if ($jumpAttempt->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Forbidden.'], 403);
@@ -136,21 +139,53 @@ class JumpAttemptController extends Controller
         return response()->noContent();
     }
 
-    public function submit(JumpAttempt $jumpAttempt, Request $request): JsonResponse
+    public function sync(SyncJumpAttemptRequest $request, JumpAttempt $jumpAttempt): Response
     {
-        if ($jumpAttempt->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Forbidden.'], 403);
+        if ($jumpAttempt->status !== 'inProgress') {
+            return response()->json(['message' => 'This attempt is not in progress.'], 403);
         }
 
+        $questionList = $jumpAttempt->question_list ?? [];
+        $questionListChanged = false;
+
+        foreach ($request->validated('changes', []) as $change) {
+            $index = $change['question_index'];
+
+            if (! isset($questionList[$index])) {
+                return response()->json(['message' => 'Invalid question index.'], 422);
+            }
+
+            $newAnswer = $change['answer'];
+            $currentAnswer = $questionList[$index]['answer'] ?? null;
+
+            if ($currentAnswer !== $newAnswer) {
+                $questionList[$index]['answer'] = $newAnswer;
+                $questionListChanged = true;
+            }
+        }
+
+        $timer = $request->integer('timer', $jumpAttempt->timer);
+        $timerChanged = $timer !== $jumpAttempt->timer;
+
+        if (! $questionListChanged && ! $timerChanged) {
+            return response()->noContent();
+        }
+
+        $jumpAttempt->update([
+            'question_list' => $questionList,
+            'timer' => $timer,
+        ]);
+
+        broadcast(new JumpAttemptUpdated($jumpAttempt->fresh()));
+
+        return response()->noContent();
+    }
+
+    public function submit(SubmitJumpAttemptRequest $request, JumpAttempt $jumpAttempt): JsonResponse
+    {
         if ($jumpAttempt->status !== 'inProgress') {
             return response()->json(['message' => 'Already submitted.'], 403);
         }
-
-        $request->validate([
-            'timer' => ['nullable', 'integer', 'min:0'],
-            'termination' => ['nullable', 'string', 'in:submitted,timeout,blurred,abandoned'],
-            'question_list' => ['nullable', 'array'],
-        ]);
 
         $updateData = [
             'status' => 'finished',

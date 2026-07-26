@@ -210,7 +210,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
-import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
+import { JUMP_ATTEMPT_SYNC_INTERVAL_MS, useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useAuthStore } from '@/stores/authStore';
 
 const route = useRoute();
@@ -232,6 +232,7 @@ const showKeypad = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
+let answerSyncInterval = null;
 const isSubmitting = ref(false);
 
 const questionList = computed(() => jumpAttemptStore.attempt?.question_list ?? []);
@@ -345,14 +346,8 @@ async function saveNumericAnswer() {
   // Optimistic update
   const item = questionList.value[currentIndex.value];
   item.answer = answer;
-  
-  // Fire-and-forget
-  jumpAttemptStore.updateAnswer(
-    jumpAttemptStore.attempt.id,
-    currentIndex.value,
-    answer,
-    remainingSeconds.value
-  );
+
+  jumpAttemptStore.queueAnswerChange(currentIndex.value, answer);
 }
 
 async function selectAnswer(letter) {
@@ -363,20 +358,50 @@ async function selectAnswer(letter) {
   
   // 1. Optimistic local update - the UI reflects change instantly
   item.answer = newAnswer;
-  
-  // 2. Fire-and-forget - no await, no catch, no loading state
-  jumpAttemptStore.updateAnswer(
-    jumpAttemptStore.attempt.id,
-    currentIndex.value,
-    newAnswer,
-    remainingSeconds.value
-  );
+
+  // 2. Buffer the latest answer locally for the next batch sync.
+  jumpAttemptStore.queueAnswerChange(currentIndex.value, newAnswer);
+}
+
+async function flushPendingAnswerChanges() {
+  if (!jumpAttemptStore.attempt?.id || !jumpAttemptStore.hasPendingAnswerChanges()) {
+    return false;
+  }
+
+  try {
+    return await jumpAttemptStore.flushAnswerChanges(
+      jumpAttemptStore.attempt.id,
+      remainingSeconds.value
+    );
+  } catch {
+    return false;
+  }
+}
+
+function startAnswerSyncLoop() {
+  if (answerSyncInterval || !isInProgress.value) {
+    return;
+  }
+
+  answerSyncInterval = setInterval(() => {
+    void flushPendingAnswerChanges();
+  }, JUMP_ATTEMPT_SYNC_INTERVAL_MS);
+}
+
+function stopAnswerSyncLoop() {
+  if (!answerSyncInterval) {
+    return;
+  }
+
+  clearInterval(answerSyncInterval);
+  answerSyncInterval = null;
 }
 
 async function handleSubmit() {
   showSubmitModal.value = false;
   isSubmitting.value = true;
   try {
+    await flushPendingAnswerChanges();
     await jumpAttemptStore.submitAttempt(
       jumpAttemptStore.attempt.id,
       remainingSeconds.value,
@@ -452,7 +477,13 @@ async function autoSubmit(termination = 'timeout') {
   if (!isInProgress.value) return;
   isSubmitting.value = true;
   try {
-    await jumpAttemptStore.submitAttempt(jumpAttemptStore.attempt.id, remainingSeconds.value, termination);
+    await flushPendingAnswerChanges();
+    await jumpAttemptStore.submitAttempt(
+      jumpAttemptStore.attempt.id,
+      remainingSeconds.value,
+      termination,
+      questionList.value
+    );
     router.replace({
       name: 'JumpResults',
       params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
@@ -474,7 +505,11 @@ function submitBeacon() {
       'Content-Type': 'application/json',
       'X-XSRF-TOKEN': csrfToken,
     },
-    body: JSON.stringify({ timer: remainingSeconds.value, termination: 'blurred' }),
+    body: JSON.stringify({
+      timer: remainingSeconds.value,
+      termination: 'blurred',
+      question_list: questionList.value,
+    }),
   });
 }
 
@@ -596,6 +631,7 @@ onMounted(async () => {
     const jump = jumpAttemptStore.attempt?.jump;
     const extraTimeSeconds = jumpAttemptStore.attempt?.extra_time ?? 0;
     startCountdown(jump?.time ?? 15, extraTimeSeconds);
+    startAnswerSyncLoop();
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', handlePageHide);
@@ -611,6 +647,8 @@ onMounted(async () => {
         timerInterval = null;
         clearInterval(blurInterval);
         blurInterval = null;
+        stopAnswerSyncLoop();
+        jumpAttemptStore.resetAnswerSyncState();
         showBlurAlarm.value = false;
         window.removeEventListener('keydown', handleKeydown);
         window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -628,6 +666,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
+  stopAnswerSyncLoop();
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('pagehide', handlePageHide);

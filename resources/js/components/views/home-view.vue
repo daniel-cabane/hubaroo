@@ -102,10 +102,7 @@
     </div>
 
     <div class="flex items-center justify-center flex-1">
-      <div 
-        class=" gap-8 max-w-3xl w-full justify-items-center"
-        :class="authStore.isAuthenticated ? 'grid grid-cols-1 md:grid-cols-2' : 'grid grid-cols-1'"
-      >
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl w-full justify-items-center">
       <!-- Random Question (students) -->
       <button
         v-if="authStore.isAuthenticated && !authStore.user?.is_teacher"
@@ -155,6 +152,18 @@
         </div>
         <h2 class="text-xl font-bold text-text-main">Rejoindre une session</h2>
         <p class="text-sm text-text-muted text-center">Entrez un code de session pour rejoindre une session Kangourou existante.</p>
+      </router-link>
+
+      <router-link
+        v-if="!authStore.isAuthenticated"
+        to="/login"
+        class="group flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-primary/20 bg-surface p-10 shadow-sm transition-all hover:border-primary hover:shadow-lg hover:-translate-y-1"
+      >
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+          <LogIn class="h-8 w-8" />
+        </div>
+        <h2 class="text-xl font-bold text-text-main">Connexion</h2>
+        <p class="text-sm text-text-muted text-center">Connectez-vous pour retrouver vos classes, vos sessions et votre progression.</p>
       </router-link>
     </div>
     </div>
@@ -238,7 +247,6 @@
         v-if="selectedPublicQuestion.question.image"
         :src="'/' + selectedPublicQuestion.question.image"
         class="max-h-64 object-contain select-none pointer-events-none"
-        alt="Question"
       />
 
     </div>
@@ -536,7 +544,6 @@
           <router-link
             :to="{ name: 'DivisionDetails', params: { id: selectedDivisionId } }"
             class="block w-full px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium transition-colors"
-            @click="closeCreateJumpModal"
           >
             Voir la classe
           </router-link>
@@ -554,7 +561,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { PlusCircle, Redo, X, Star, Lightbulb, ChevronDown, TvMinimalPlay, Layers, ArrowBigRightDash, ArrowDownRight, ArrowUpRight, ArrowRight, CircleQuestionMark } from 'lucide-vue-next';
+import { PlusCircle, Redo, X, Star, Lightbulb, ChevronDown, TvMinimalPlay, Layers, ArrowBigRightDash, ArrowDownRight, ArrowUpRight, ArrowRight, CircleQuestionMark, LogIn } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/authStore';
 import { useDivisionStore } from '@/stores/divisionStore';
 import { useAttemptStore } from '@/stores/attemptStore';

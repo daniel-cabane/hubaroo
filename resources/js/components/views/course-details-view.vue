@@ -381,26 +381,22 @@
                   {{ student.pivot?.class_name ?? student.name }}
                 </td>
                 <td class="px-4 py-3 text-center">
-                  <span v-if="!getAttempt(observedJump, student)" class="text-xs text-text-muted">Non commencé</span>
-                  <span v-else-if="getAttempt(observedJump, student).status === 'inProgress'" class="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success">En cours</span>
-                  <span v-else class="text-xs px-2 py-0.5 rounded-full bg-text-muted/10 text-text-muted">Terminé</span>
+                  <span :class="observationStatusClass(getAttempt(observedJump, student))">{{ observationStatusLabel(getAttempt(observedJump, student)) }}</span>
                 </td>
                 <td class="px-4 py-3 text-center font-mono text-sm text-text-muted">
                   <template v-if="getAttempt(observedJump, student)?.status === 'inProgress'">
-                    {{ formatObservationTimer(getAttempt(observedJump, student).timer) }}
+                    {{ formatObservationTimer(getObservationRemainingSeconds(getAttempt(observedJump, student))) }}
                   </template>
                   <span v-else class="opacity-30">—</span>
                 </td>
                 <td class="px-4 py-3">
-                  <div v-if="getAttempt(observedJump, student)" class="flex gap-1 justify-center flex-wrap">
+                  <div v-if="getAttempt(observedJump, student)" class="flex flex-col items-center gap-1 text-center">
+                    <span class="font-medium text-text-main dark:text-surface">{{ formatObservationProgress(getAttempt(observedJump, student)) }}</span>
                     <span
-                      v-for="(item, idx) in getAttempt(observedJump, student).question_list"
-                      :key="idx"
-                      class="w-6 h-6 rounded text-xs font-bold flex items-center justify-center"
-                      :class="observedJump.status === 'expired'
-                        ? item.status === 'correct' ? 'bg-success text-white' : item.status === 'incorrect' ? 'bg-error text-white' : 'bg-gray-200 dark:bg-gray-700 text-text-muted'
-                        : (item.answer !== null && item.answer !== undefined) ? 'bg-primary/20 text-primary' : 'bg-gray-200 dark:bg-gray-700 text-text-muted'"
-                    >{{ idx + 1 }}</span>
+                      v-if="getAttempt(observedJump, student)?.status === 'inProgress'"
+                      class="text-xs"
+                      :class="isObservationAttemptStale(getAttempt(observedJump, student)) ? 'text-warning' : 'text-text-muted'"
+                    >{{ formatObservationFreshness(getAttempt(observedJump, student)) }}</span>
                   </div>
                   <span v-else class="block text-center opacity-30 text-xs">—</span>
                 </td>
@@ -433,61 +429,71 @@
           </button>
         </div>
         <div class="p-4 overflow-y-auto flex-1 space-y-3">
-          <p class="text-center text-3xl font-bold text-primary mb-1">Score : {{ selectedAttemptDetail.attempt.score }}</p>
-          <div
-            v-for="(item, idx) in selectedAttemptDetail.attempt.question_list"
-            :key="idx"
-            class="flex flex-col rounded-lg border overflow-hidden"
-            :class="{
-              'border-success': item.status === 'correct',
-              'border-error': item.status === 'incorrect',
-              'border-border': item.status === 'pending',
-            }"
-          >
-            <img
-              v-if="item.image"
-              :src="'/' + item.image"
-              :alt="'Question ' + (idx + 1)"
-              class="w-full object-contain bg-gray-50 dark:bg-gray-800 select-none pointer-events-none"
-              draggable="false"
-              oncontextmenu="return false;"
-            />
+          <div v-if="attemptDetailLoading" class="py-8 text-center text-sm text-text-muted">Chargement de la tentative...</div>
+          <div v-else-if="attemptDetailError" class="rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">
+            <p>{{ attemptDetailError }}</p>
+            <button
+              @click="retryAttemptDetailLoad"
+              class="mt-3 rounded-lg bg-error px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-error/90 cursor-pointer"
+            >Réessayer</button>
+          </div>
+          <template v-else-if="selectedAttemptDetail.attempt">
+            <p class="text-center text-3xl font-bold text-primary mb-1">Score : {{ selectedAttemptDetail.attempt.score }}</p>
             <div
-              class="flex items-center justify-between p-3"
+              v-for="(item, idx) in selectedAttemptDetail.attempt.question_list"
+              :key="idx"
+              class="flex flex-col rounded-lg border overflow-hidden"
               :class="{
-                'bg-success/5': item.status === 'correct',
-                'bg-error/5': item.status === 'incorrect',
+                'border-success': item.status === 'correct',
+                'border-error': item.status === 'incorrect',
+                'border-border': item.status === 'pending',
               }"
             >
-              <div class="flex items-center gap-3">
-                <span
-                  class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                  :class="{
-                    'bg-success text-white': item.status === 'correct',
-                    'bg-error text-white': item.status === 'incorrect',
-                    'bg-gray-200 dark:bg-gray-700 text-text-muted': item.status === 'pending',
-                  }"
-                >{{ idx + 1 }}</span>
-                <div>
-                  <p class="text-sm font-medium text-text-main dark:text-surface">Question #{{ item.id }}</p>
-                  <p class="text-xs text-text-muted">Difficulté : {{ item.difficulty }}</p>
+              <img
+                v-if="item.image"
+                :src="'/' + item.image"
+                :alt="'Question ' + (idx + 1)"
+                class="w-full object-contain bg-gray-50 dark:bg-gray-800 select-none pointer-events-none"
+                draggable="false"
+                oncontextmenu="return false;"
+              />
+              <div
+                class="flex items-center justify-between p-3"
+                :class="{
+                  'bg-success/5': item.status === 'correct',
+                  'bg-error/5': item.status === 'incorrect',
+                }"
+              >
+                <div class="flex items-center gap-3">
+                  <span
+                    class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                    :class="{
+                      'bg-success text-white': item.status === 'correct',
+                      'bg-error text-white': item.status === 'incorrect',
+                      'bg-gray-200 dark:bg-gray-700 text-text-muted': item.status === 'pending',
+                    }"
+                  >{{ idx + 1 }}</span>
+                  <div>
+                    <p class="text-sm font-medium text-text-main dark:text-surface">Question #{{ item.id }}</p>
+                    <p class="text-xs text-text-muted">Difficulté : {{ item.difficulty }}</p>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <p class="text-sm font-medium"
+                    :class="{
+                      'text-success': item.status === 'correct',
+                      'text-error': item.status === 'incorrect',
+                      'text-text-muted': item.status === 'pending',
+                    }"
+                  >
+                    {{ item.status === 'correct' ? '+' + item.difficulty : item.status === 'incorrect' ? '0' : '—' }}
+                  </p>
+                  <p v-if="item.answer" class="text-xs text-text-muted">Réponse : {{ item.answer }}</p>
+                  <p v-if="item.status === 'incorrect' && item.correct_answer" class="text-xs text-success font-medium">Correcte : {{ item.correct_answer }}</p>
                 </div>
               </div>
-              <div class="text-right">
-                <p class="text-sm font-medium"
-                  :class="{
-                    'text-success': item.status === 'correct',
-                    'text-error': item.status === 'incorrect',
-                    'text-text-muted': item.status === 'pending',
-                  }"
-                >
-                  {{ item.status === 'correct' ? '+' + item.difficulty : item.status === 'incorrect' ? '0' : '—' }}
-                </p>
-                <p v-if="item.answer" class="text-xs text-text-muted">Réponse : {{ item.answer }}</p>
-                <p v-if="item.status === 'incorrect' && item.correct_answer" class="text-xs text-success font-medium">Correcte : {{ item.correct_answer }}</p>
-              </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </div>
@@ -495,10 +501,12 @@
 </template>
 
 <script setup>
+import axios from 'axios';
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ChevronLeft, Plus, X, Clock, Trash2, Eye, RotateCcw } from 'lucide-vue-next';
 import { useCourseStore } from '@/stores/courseStore';
+import { JUMP_ATTEMPT_SYNC_INTERVAL_MS } from '@/stores/jumpAttemptStore';
 
 const route = useRoute();
 const router = useRouter();
@@ -517,6 +525,9 @@ const showArchiveConfirm = ref(false);
 const showDeleteJumpConfirm = ref(false);
 const showEditExpiryModal = ref(false);
 const showAttemptDetailModal = ref(false);
+const attemptDetailLoading = ref(false);
+const attemptDetailError = ref('');
+const observationNow = ref(Date.now());
 
 const studentSearch = ref('');
 const sortKey = ref('name');
@@ -527,6 +538,8 @@ const editingJump = ref(null);
 const deletingJump = ref(null);
 const editExpiryValue = ref('');
 const selectedAttemptDetail = ref(null);
+
+let observationClockTimer = null;
 
 const newJump = ref({
   time: 15,
@@ -549,6 +562,136 @@ function formatObservationTimer(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function startObservationClock() {
+  if (observationClockTimer) return;
+  observationNow.value = Date.now();
+  observationClockTimer = setInterval(() => {
+    observationNow.value = Date.now();
+  }, 1000);
+}
+
+function stopObservationClock() {
+  if (!observationClockTimer) return;
+  clearInterval(observationClockTimer);
+  observationClockTimer = null;
+}
+
+function getObservationSyncTimestamp(attempt) {
+  if (typeof attempt?.last_sync_received_at === 'number') {
+    return attempt.last_sync_received_at;
+  }
+
+  if (attempt?.updated_at) {
+    return new Date(attempt.updated_at).getTime();
+  }
+
+  return Date.now();
+}
+
+function stampObservationAttempt(attempt, receivedAt = Date.now()) {
+  if (!attempt) return attempt;
+
+  return {
+    ...attempt,
+    last_sync_received_at: typeof attempt.last_sync_received_at === 'number'
+      ? attempt.last_sync_received_at
+      : attempt.updated_at
+        ? new Date(attempt.updated_at).getTime()
+        : receivedAt,
+  };
+}
+
+function decorateObservationData(data) {
+  if (!data?.jumps) return data;
+
+  for (const jump of data.jumps) {
+    jump.attempts = (jump.attempts ?? []).map((attempt) => stampObservationAttempt(attempt));
+  }
+
+  return data;
+}
+
+function countObservationAnswers(attempt) {
+  if (!attempt?.question_list) {
+    return 0;
+  }
+
+  return attempt.question_list.filter((item) => item?.answer !== null && item?.answer !== undefined && item?.answer !== '').length;
+}
+
+function formatObservationProgress(attempt) {
+  if (!attempt) {
+    return '—';
+  }
+
+  const answeredCount = attempt.answered_count ?? countObservationAnswers(attempt);
+  const totalQuestions = attempt.total_questions ?? attempt.question_list?.length ?? 0;
+
+  if (totalQuestions === 0) {
+    return '—';
+  }
+
+  return `${answeredCount} / ${totalQuestions}`;
+}
+
+function isObservationAttemptStale(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return false;
+  }
+
+  return (observationNow.value - getObservationSyncTimestamp(attempt)) > JUMP_ATTEMPT_SYNC_INTERVAL_MS * 2;
+}
+
+function observationStatusLabel(attempt) {
+  if (!attempt) {
+    return 'Non commencé';
+  }
+
+  if (attempt.status === 'finished') {
+    return 'Terminé';
+  }
+
+  return isObservationAttemptStale(attempt) ? 'Sync lent' : 'En cours';
+}
+
+function observationStatusClass(attempt) {
+  if (!attempt) {
+    return 'text-xs text-text-muted';
+  }
+
+  if (attempt.status === 'finished') {
+    return 'text-xs px-2 py-0.5 rounded-full bg-text-muted/10 text-text-muted';
+  }
+
+  if (isObservationAttemptStale(attempt)) {
+    return 'text-xs px-2 py-0.5 rounded-full bg-warning/15 text-warning';
+  }
+
+  return 'text-xs px-2 py-0.5 rounded-full bg-success/10 text-success';
+}
+
+function getObservationRemainingSeconds(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return null;
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((observationNow.value - getObservationSyncTimestamp(attempt)) / 1000));
+  return Math.max(0, (attempt.timer ?? 0) - elapsedSeconds);
+}
+
+function formatObservationFreshness(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return '';
+  }
+
+  const ageSeconds = Math.max(0, Math.floor((observationNow.value - getObservationSyncTimestamp(attempt)) / 1000));
+  if (ageSeconds < 2) {
+    return 'à l’instant';
+  }
+
+  return `mise à jour il y a ${ageSeconds}s`;
+}
+
 function formatJumpDate(val) {
   if (!val) return '';
   return new Date(val).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
@@ -569,11 +712,36 @@ function getAttempt(jump, student) {
   return jump.attempts?.find(a => a.user_id === student.id) ?? null;
 }
 
-function openAttemptDetail(jump, student) {
+async function loadAttemptDetail(jump, student, attemptId) {
+  attemptDetailLoading.value = true;
+  attemptDetailError.value = '';
+  selectedAttemptDetail.value = { jump, student, attemptId, attempt: null };
+
+  try {
+    const response = await axios.get(`/api/jump-attempts/${attemptId}`);
+    selectedAttemptDetail.value = { jump, student, attemptId, attempt: response.data.attempt };
+  } catch {
+    attemptDetailError.value = 'Impossible de charger la tentative.';
+  } finally {
+    attemptDetailLoading.value = false;
+  }
+}
+
+async function openAttemptDetail(jump, student) {
   const attempt = getAttempt(jump, student);
-  if (!attempt) return;
-  selectedAttemptDetail.value = { jump, student, attempt };
+  if (!attempt?.id) return;
   showAttemptDetailModal.value = true;
+  await loadAttemptDetail(jump, student, attempt.id);
+}
+
+function retryAttemptDetailLoad() {
+  if (!selectedAttemptDetail.value?.attemptId) return;
+
+  void loadAttemptDetail(
+    selectedAttemptDetail.value.jump,
+    selectedAttemptDetail.value.student,
+    selectedAttemptDetail.value.attemptId,
+  );
 }
 
 function openEditExpiryModal(jump) {
@@ -737,7 +905,7 @@ function setSort(key) {
 
 async function loadDetails() {
   const data = await courseStore.fetchCourseDetails(courseId.value);
-  courseData.value = data;
+  courseData.value = decorateObservationData(data);
 }
 
 let subscribedJumpIds = [];
@@ -747,6 +915,7 @@ let expiringPollTimer = null;
 function openJumpObservation(jump) {
   observingJumpId.value = jump.id;
   showJumpObservationModal.value = true;
+  startObservationClock();
 
   loadDetails();
 
@@ -757,10 +926,14 @@ function openJumpObservation(jump) {
         const jumpData = courseData.value?.jumps?.find(j => j.id === jump.id);
         if (!jumpData) { return; }
         const idx = jumpData.attempts.findIndex(a => a.user_id === e.attempt.user_id);
+        const mergedAttempt = stampObservationAttempt(
+          idx !== -1 ? { ...jumpData.attempts[idx], ...e.attempt } : e.attempt,
+          Date.now(),
+        );
         if (idx !== -1) {
-          jumpData.attempts[idx] = e.attempt;
+          jumpData.attempts[idx] = mergedAttempt;
         } else {
-          jumpData.attempts.push(e.attempt);
+          jumpData.attempts.push(mergedAttempt);
         }
       });
   }
@@ -771,6 +944,7 @@ function closeJumpObservation() {
     window.Echo.leaveChannel(`private-jump.${observedJumpPrivateChannelId}`);
     observedJumpPrivateChannelId = null;
   }
+  stopObservationClock();
   showJumpObservationModal.value = false;
   observingJumpId.value = null;
 }
@@ -814,6 +988,7 @@ onUnmounted(() => {
     window.Echo.leave(`jump.${id}`);
   }
   subscribedJumpIds = [];
+  stopObservationClock();
   if (observedJumpPrivateChannelId) {
     window.Echo.leaveChannel(`private-jump.${observedJumpPrivateChannelId}`);
     observedJumpPrivateChannelId = null;

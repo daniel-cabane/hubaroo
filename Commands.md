@@ -306,3 +306,25 @@ This helps diagnose what went wrong:
 | `kangourou:test-scraper` | Test if scraper works for a paper | No | Debugging import issues |
 
 Both commands include comprehensive error handling, validation, and logging to help diagnose issues with the Kangourou data import pipeline.
+
+
+## Review prompts
+### Preprompt
+I've outlined a new feature spec in the attached file/section. Please act as a Senior Product Manager and Software Architect to review it for clarity, completeness, and feasibility.
+
+Review Goals:
+1. Goal & Intent: Is the core objective clear? Could a developer read this and immediately understand *what* we are building and *why*?
+2. Edge Cases & Gaps: What missing details, unaddressed edge cases, or potential failure points stand out?
+3. Efficiency & Scope: Are there any redundant parts that should be deleted, or complex items that should be simplified?
+
+Please organize your feedback into four distinct sections:
+- Strengths & Core Takeaways (1-2 sentences on what's already clear)
+- Ambiguities & Open Questions (Things that need clarification or precise definition)
+- Additions & Suggestions (Edge cases, missing acceptance criteria, or performance considerations)
+- Recommended Deletions / Simplifications (Anything over-engineered, out of scope, or unnecessary)
+
+Be candid, direct, and focused on making this spec production-ready.
+
+### Postprompt
+Update the .md file with your suggestion. Format this file so that it can serve as a detailed and thourough plan for implementation by an AI agent.
+Ask me questions whenever anything is ambiguous.

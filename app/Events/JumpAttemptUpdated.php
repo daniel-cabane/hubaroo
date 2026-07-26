@@ -29,8 +29,24 @@ class JumpAttemptUpdated implements ShouldBroadcast
 
     public function broadcastWith(): array
     {
+        $questionList = $this->jumpAttempt->question_list ?? [];
+        $answeredCount = collect($questionList)
+            ->filter(fn (array $question): bool => array_key_exists('answer', $question) && $question['answer'] !== null && $question['answer'] !== '')
+            ->count();
+
         return [
-            'attempt' => $this->jumpAttempt->load('user:id,name,email')->toArray(),
+            'attempt' => [
+                'id' => $this->jumpAttempt->id,
+                'jump_id' => $this->jumpAttempt->jump_id,
+                'user_id' => $this->jumpAttempt->user_id,
+                'status' => $this->jumpAttempt->status,
+                'termination' => $this->jumpAttempt->termination,
+                'timer' => $this->jumpAttempt->timer,
+                'answered_count' => $answeredCount,
+                'total_questions' => count($questionList),
+                'score' => $this->jumpAttempt->status === 'finished' ? $this->jumpAttempt->score : null,
+                'updated_at' => $this->jumpAttempt->updated_at?->toJSON(),
+            ],
         ];
     }
 }

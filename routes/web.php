@@ -124,6 +124,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/my/jump-attempts', [JumpAttemptController::class, 'myIndex'])->name('jump-attempts.myIndex');
     Route::get('/api/jump-attempts/{jumpAttempt}', [JumpAttemptController::class, 'show'])->name('jump-attempts.show');
     Route::patch('/api/jump-attempts/{jumpAttempt}/answer', [JumpAttemptController::class, 'updateAnswer'])->name('jump-attempts.updateAnswer');
+    Route::patch('/api/jump-attempts/{jumpAttempt}/sync', [JumpAttemptController::class, 'sync'])->name('jump-attempts.sync');
     Route::post('/api/jump-attempts/{jumpAttempt}/submit', [JumpAttemptController::class, 'submit'])->name('jump-attempts.submit');
 
     Route::post('/api/jump-attempts/{jumpAttempt}/rejoin-demand', [JumpRejoinDemandController::class, 'store'])->name('jump-rejoin-demands.store');
