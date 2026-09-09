@@ -4,6 +4,7 @@ import axios from 'axios';
 
 const STORAGE_KEY = 'hubaroo_active_attempt';
 const GUEST_ATTEMPTS_KEY = 'hubaroo_guest_attempts';
+export const ATTEMPT_SYNC_INTERVAL_MS = 3000;
 
 export const useAttemptStore = defineStore('attempt', () => {
   const attempt = ref(null);
@@ -12,9 +13,32 @@ export const useAttemptStore = defineStore('attempt', () => {
   const isLoading = ref(false);
   const error = ref(null);
   const activeRecovery = ref(null);
+  const pendingAnswerChanges = ref({});
+  const isSyncingAnswers = ref(false);
+
+  let flushQueued = false;
+  let queuedTimer = null;
 
   const isInProgress = computed(() => attempt.value?.status === 'inProgress');
   const isFinished = computed(() => attempt.value?.status === 'finished');
+
+  function resetAnswerSyncState() {
+    pendingAnswerChanges.value = {};
+    isSyncingAnswers.value = false;
+    flushQueued = false;
+    queuedTimer = null;
+  }
+
+  function hasPendingAnswerChanges() {
+    return Object.keys(pendingAnswerChanges.value).length > 0;
+  }
+
+  function queueAnswerChange(questionIndex, answer) {
+    pendingAnswerChanges.value = {
+      ...pendingAnswerChanges.value,
+      [questionIndex]: answer,
+    };
+  }
 
   function saveToLocalStorage(attemptData, sessionCode) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -67,7 +91,6 @@ export const useAttemptStore = defineStore('attempt', () => {
         ids.map(id => axios.get(`/api/attempts/${id}`).then(r => r.data.attempt).catch(() => null))
       );
       guestAttempts.value = results.filter(Boolean);
-      // Clean up any IDs that no longer exist
       const validIds = guestAttempts.value.map(a => a.id);
       localStorage.setItem(GUEST_ATTEMPTS_KEY, JSON.stringify(validIds));
     } catch {
@@ -94,8 +117,8 @@ export const useAttemptStore = defineStore('attempt', () => {
         name,
       });
       attempt.value = response.data.attempt;
+      resetAnswerSyncState();
       saveToLocalStorage(response.data.attempt, sessionCode);
-      // Track guest attempts for later recovery
       if (!response.data.attempt.user_id) {
         addGuestAttemptId(response.data.attempt.id);
       }
@@ -114,6 +137,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     try {
       const response = await axios.get(`/api/attempts/${attemptId}`);
       attempt.value = response.data.attempt;
+      resetAnswerSyncState();
       return response.data.attempt;
     } catch (err) {
       error.value = err.response?.data?.message || 'Failed to fetch attempt';
@@ -123,30 +147,72 @@ export const useAttemptStore = defineStore('attempt', () => {
     }
   }
 
-  async function updateAnswer(attemptId, questionIndex, answer, timer = null) {
+  async function flushAnswerChanges(attemptId, timer) {
+    error.value = null;
+
+    if (!attemptId) {
+      return false;
+    }
+
+    if (isSyncingAnswers.value) {
+      flushQueued = true;
+      queuedTimer = timer;
+      return false;
+    }
+
+    if (!hasPendingAnswerChanges()) {
+      return false;
+    }
+
+    const changeSnapshot = { ...pendingAnswerChanges.value };
+    const changes = Object.entries(changeSnapshot).map(([questionIndex, answer]) => ({
+      question_index: Number(questionIndex),
+      answer,
+    }));
+
+    pendingAnswerChanges.value = {};
+    isSyncingAnswers.value = true;
+
     try {
-      const response = await axios.patch(`/api/attempts/${attemptId}/answer`, {
-        question_index: questionIndex,
-        answer: answer,
+      await axios.patch(`/api/attempts/${attemptId}/sync`, {
         timer,
+        changes,
       });
-      attempt.value = response.data.attempt;
-      return response.data.attempt;
+      return true;
     } catch (err) {
-      error.value = err.response?.data?.message || 'Failed to save answer';
+      pendingAnswerChanges.value = {
+        ...changeSnapshot,
+        ...pendingAnswerChanges.value,
+      };
+      error.value = err.response?.data?.message || 'Failed to update answer';
       throw err;
+    } finally {
+      const shouldFlushAgain = flushQueued && Object.keys(pendingAnswerChanges.value).length > 0;
+      const nextTimer = queuedTimer ?? timer;
+      isSyncingAnswers.value = false;
+      flushQueued = false;
+      queuedTimer = null;
+
+      if (shouldFlushAgain) {
+        void flushAnswerChanges(attemptId, nextTimer);
+      }
     }
   }
 
-  async function submitAttempt(attemptId, timer = null, termination = 'submitted') {
+  async function submitAttempt(attemptId, timer = null, termination = 'submitted', answers = null) {
     isLoading.value = true;
     error.value = null;
     try {
-      const response = await axios.post(`/api/attempts/${attemptId}/submit`, {
+      const payload = {
         timer,
         termination,
-      });
+      };
+      if (answers) {
+        payload.answers = answers;
+      }
+      const response = await axios.post(`/api/attempts/${attemptId}/submit`, payload);
       attempt.value = response.data.attempt;
+      resetAnswerSyncState();
       clearLocalStorage();
       return response.data;
     } catch (err) {
@@ -163,6 +229,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     try {
       const response = await axios.get(`/api/attempts/recover/${code}`);
       attempt.value = response.data.attempt;
+      resetAnswerSyncState();
       return response.data.attempt;
     } catch (err) {
       error.value = err.response?.data?.message || 'Attempt not found';
@@ -203,11 +270,8 @@ export const useAttemptStore = defineStore('attempt', () => {
       } else {
         activeRecovery.value = null;
         if (!sessionActive) {
-          // Session is over — clear the stored attempt; no rejoin is possible.
           clearLocalStorage();
         }
-        // If the session is still active but the attempt is finished, keep localStorage
-        // so session-view can present the rejoin form instead of a blank name prompt.
       }
     } catch {
       clearLocalStorage();
@@ -227,11 +291,15 @@ export const useAttemptStore = defineStore('attempt', () => {
     isLoading,
     error,
     activeRecovery,
+    pendingAnswerChanges,
+    isSyncingAnswers,
     isInProgress,
     isFinished,
     createAttempt,
     fetchAttempt,
-    updateAnswer,
+    queueAnswerChange,
+    flushAnswerChanges,
+    hasPendingAnswerChanges,
     submitAttempt,
     recoverAttempt,
     fetchMyAttempts,
@@ -244,5 +312,6 @@ export const useAttemptStore = defineStore('attempt', () => {
     clearError,
     checkRecovery,
     dismissRecovery,
+    resetAnswerSyncState,
   };
 });

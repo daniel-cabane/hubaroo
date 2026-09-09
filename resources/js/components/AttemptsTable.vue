@@ -95,21 +95,15 @@
                   </div>
                 </td>
                 <td class="px-4 py-3 text-center">
-                  <span
-                    :class="`px-2 py-1 rounded text-xs font-semibold ${
-                      attempt.status === 'finished'
-                        ? 'bg-success/10 text-success'
-                        : 'bg-warning/10 text-warning'
-                    }`"
-                  >
-                    {{ statusLabel(attempt.status) }}
+                  <span :class="statusBadgeClass(attempt)">
+                    {{ statusLabel(attempt) }}
                   </span>
                 </td>
                 <td class="px-4 py-3 font-semibold text-text-main text-center dark:text-surface">
-                  {{ attempt.score !== null ? attempt.score : '—' }}
+                  {{ attempt.score !== null && attempt.score !== undefined ? attempt.score : '—' }}
                 </td>
-                <td class="px-4 py-3 text-text-muted text-center">
-                  {{ attempt.timer !== null ? `${Math.floor(attempt.timer / 60)}:${String(attempt.timer % 60).padStart(2, '0')}` : '—' }}
+                <td class="px-4 py-3 text-text-muted text-center font-mono">
+                  {{ formatDisplayedTimer(attempt) }}
                 </td>
                 <td class="px-4 py-3 text-text-muted text-center">{{ terminationLabel(attempt.termination) }}</td>
                 <td class="px-4 py-3 text-text-muted text-xs text-center" :title="new Date(attempt.updated_at).toLocaleString('fr-FR')">
@@ -118,9 +112,15 @@
               </tr>
               <tr>
                 <td colspan="7" class="px-4 py-4">
-                  <div class="flex flex-wrap gap-2">
+                  <div v-if="attempt.status === 'inProgress'" class="flex flex-col items-center gap-1 text-center">
+                    <span class="font-medium text-text-main dark:text-surface">{{ formatProgress(attempt) }}</span>
+                    <span class="text-xs" :class="isStale(attempt) ? 'text-warning' : 'text-text-muted'">
+                      {{ formatFreshness(attempt) }}
+                    </span>
+                  </div>
+                  <div v-else-if="answersFor(attempt)" class="flex flex-wrap gap-2">
                     <div
-                      v-for="(answer, idx) in attempt.answers"
+                      v-for="(answer, idx) in answersFor(attempt)"
                       :key="idx"
                       :title="`Q${idx + 1}: ${answer.status == 'unanswered' ? 'Pas de réponse' : answer.status}`"
                       :class="`
@@ -130,6 +130,18 @@
                     >
                       {{ answer.answer || '' }}
                     </div>
+                  </div>
+                  <div v-else-if="answerLoadState[attempt.id]?.loading" class="text-center text-sm text-text-muted">
+                    Chargement des réponses...
+                  </div>
+                  <div v-else class="flex flex-col items-center gap-2 text-center">
+                    <p class="text-sm text-error">Impossible de charger les réponses.</p>
+                    <button
+                      @click="loadAttemptAnswers(attempt.id)"
+                      class="px-3 py-1.5 rounded-lg bg-error text-white text-xs font-medium hover:bg-error/90 cursor-pointer"
+                    >
+                      Réessayer
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -142,8 +154,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Edit, Trash2 } from 'lucide-vue-next';
+import axios from 'axios';
+import { ATTEMPT_SYNC_INTERVAL_MS } from '@/stores/attemptStore';
 
 const props = defineProps({
   attempts: {
@@ -161,14 +175,161 @@ defineEmits(['edit', 'delete']);
 const filterName = ref('');
 const sortBy = ref('name');
 const sortOrder = ref('asc');
+const observationNow = ref(Date.now());
+const fetchedAnswers = ref({});
+const answerLoadState = ref({});
 
-const statusLabels = { active: 'Active', expired: 'Expirée', draft: 'Brouillon', inProgress: 'En cours', finished: 'Terminée' };
+let observationClockTimer = null;
 
-function statusLabel(status) {
-  return statusLabels[status] || status;
+onMounted(() => {
+  observationClockTimer = setInterval(() => {
+    observationNow.value = Date.now();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (observationClockTimer) {
+    clearInterval(observationClockTimer);
+  }
+});
+
+watch(
+  () => props.attempts.map((attempt) => `${attempt.id}:${attempt.status}:${Array.isArray(attempt.answers)}`).join('|'),
+  () => {
+    props.attempts.forEach((attempt) => {
+      if (attempt.status === 'finished' && !answersFor(attempt)) {
+        void loadAttemptAnswers(attempt.id);
+      }
+    });
+  },
+  { immediate: true },
+);
+
+function answersFor(attempt) {
+  if (Array.isArray(attempt.answers)) {
+    return attempt.answers;
+  }
+
+  return fetchedAnswers.value[attempt.id] ?? null;
 }
 
-const terminationLabels = { none: 'Aucune', submitted: 'Soumise', blurred: 'Floutée', timeout: 'Timeout' };
+async function loadAttemptAnswers(attemptId) {
+  if (!attemptId || answerLoadState.value[attemptId]?.loading) {
+    return;
+  }
+
+  answerLoadState.value = {
+    ...answerLoadState.value,
+    [attemptId]: { loading: true, error: false },
+  };
+
+  try {
+    const response = await axios.get(`/api/attempts/${attemptId}`);
+    fetchedAnswers.value = {
+      ...fetchedAnswers.value,
+      [attemptId]: response.data.attempt?.answers ?? [],
+    };
+    answerLoadState.value = {
+      ...answerLoadState.value,
+      [attemptId]: { loading: false, error: false },
+    };
+  } catch {
+    answerLoadState.value = {
+      ...answerLoadState.value,
+      [attemptId]: { loading: false, error: true },
+    };
+  }
+}
+
+function getSyncTimestamp(attempt) {
+  if (typeof attempt?.last_sync_received_at === 'number') {
+    return attempt.last_sync_received_at;
+  }
+
+  if (attempt?.updated_at) {
+    return new Date(attempt.updated_at).getTime();
+  }
+
+  return observationNow.value;
+}
+
+function isStale(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return false;
+  }
+
+  return (observationNow.value - getSyncTimestamp(attempt)) > ATTEMPT_SYNC_INTERVAL_MS * 2;
+}
+
+function statusLabel(attempt) {
+  if (attempt.status === 'finished') {
+    return 'Terminée';
+  }
+
+  return isStale(attempt) ? 'Sync lent' : 'En cours';
+}
+
+function statusBadgeClass(attempt) {
+  if (attempt.status === 'finished') {
+    return 'px-2 py-1 rounded text-xs font-semibold bg-success/10 text-success';
+  }
+
+  if (isStale(attempt)) {
+    return 'px-2 py-1 rounded text-xs font-semibold bg-warning/10 text-warning';
+  }
+
+  return 'px-2 py-1 rounded text-xs font-semibold bg-success/10 text-success';
+}
+
+function formatProgress(attempt) {
+  const answeredCount = attempt.answered_count ?? (Array.isArray(attempt.answers)
+    ? attempt.answers.filter((item) => item?.answer !== null && item?.answer !== undefined && item?.answer !== '').length
+    : 0);
+  const totalQuestions = attempt.total_questions ?? attempt.answers?.length ?? 26;
+
+  return `${answeredCount} / ${totalQuestions}`;
+}
+
+function formatTimer(seconds) {
+  if (seconds === null || seconds === undefined) {
+    return '—';
+  }
+
+  const safeSeconds = Math.max(0, seconds);
+  const m = Math.floor(safeSeconds / 60);
+  const s = safeSeconds % 60;
+
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function getRemainingSeconds(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return attempt?.timer ?? null;
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((observationNow.value - getSyncTimestamp(attempt)) / 1000));
+
+  return Math.max(0, (attempt.timer ?? 0) - elapsedSeconds);
+}
+
+function formatDisplayedTimer(attempt) {
+  if (attempt.status === 'inProgress') {
+    return formatTimer(getRemainingSeconds(attempt));
+  }
+
+  return attempt.timer !== null && attempt.timer !== undefined ? formatTimer(attempt.timer) : '—';
+}
+
+function formatFreshness(attempt) {
+  const ageSeconds = Math.max(0, Math.floor((observationNow.value - getSyncTimestamp(attempt)) / 1000));
+  if (ageSeconds < 2) {
+    return 'à l’instant';
+  }
+
+  return `mise à jour il y a ${ageSeconds}s`;
+}
+
+const terminationLabels = { none: 'Aucune', submitted: 'Soumise', blurred: 'Floutée', timeout: 'Timeout', abandoned: 'Abandonnée' };
 
 function terminationLabel(termination) {
   return terminationLabels[termination] || termination;

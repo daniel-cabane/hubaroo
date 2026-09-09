@@ -94,6 +94,17 @@ class KangourouSession extends Model
         return $this->status === 'expired' || $this->expires_at->isPast();
     }
 
+    /**
+     * Delayed-correction sessions keep scoring until expiry so teachers
+     * cannot see correct/incorrect while the session is still running.
+     */
+    public function shouldDelayGrading(): bool
+    {
+        $correction = $this->getEffectivePreferences()['correction'] ?? 'delayed';
+
+        return $correction === 'delayed' && ! $this->isExpired();
+    }
+
     public static function generateCode(): string
     {
         do {

@@ -71,8 +71,63 @@ test('job auto-submits in-progress attempts when session expires', function () {
     (new ExpireKangourouSessions)->handle(app(GradingService::class));
 
     $attempt->refresh();
-    expect($attempt->status)->toBe('finished');
-    expect($attempt->termination)->toBe('timeout');
+    expect($attempt->status)->toBe('finished')
+        ->and($attempt->termination)->toBe('timeout')
+        ->and($attempt->score)->not->toBeNull();
+});
+
+test('job grades finished delayed attempts that were submitted before expiry', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+
+    $questions = $this->paper->questions()->orderByPivot('order')->get();
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => $questions[0]->correct_answer, 'status' => 'answered'];
+
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'answers' => $answers,
+        'score' => null,
+        'termination' => 'submitted',
+    ]);
+
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
+
+    $attempt->refresh();
+    expect($attempt->status)->toBe('finished')
+        ->and($attempt->termination)->toBe('submitted')
+        ->and($attempt->score)->not->toBeNull()
+        ->and($attempt->answers[0]['status'])->toBe('correct');
+});
+
+test('job does not regrade already scored attempts', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+        'preferences' => ['correction' => 'immediate'],
+    ]);
+
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'incorrect'];
+
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'answers' => $answers,
+        'score' => 99.0,
+        'termination' => 'submitted',
+    ]);
+
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
+
+    $attempt->refresh();
+    expect($attempt->score)->toEqual(99.0)
+        ->and($attempt->answers[0]['status'])->toBe('incorrect')
+        ->and($attempt->termination)->toBe('submitted');
 });
 
 test('job broadcasts SessionExpired event for each expired session', function () {
@@ -118,5 +173,39 @@ test('job computes analysis per division when session expires', function () {
         ->and($pivot->analysis[0]['question_id'])->toBe($questions[0]->id)
         ->and($pivot->analysis[0]['success_ratio'])->toEqual(1.0)
         ->and($pivot->analysis[0]['reviewed'])->toBeFalse()
+        ->and($pivot->analysis[1]['success_ratio'])->toEqual(0.0);
+});
+
+test('job computes analysis from delayed attempts that were submitted before expiry', function () {
+    $division = Division::factory()->create();
+    $student = User::factory()->create();
+    $division->students()->attach($student->id);
+
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+    $division->kangourouSessions()->attach($session->id);
+
+    $questions = $this->paper->questions()->orderByPivot('order')->get();
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => $questions[0]->correct_answer, 'status' => 'answered'];
+
+    Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'user_id' => $student->id,
+        'answers' => $answers,
+        'score' => null,
+        'termination' => 'submitted',
+    ]);
+
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
+
+    $pivot = $division->kangourouSessions()->where('kangourou_session_id', $session->id)->first()->pivot;
+
+    expect($pivot->analysis)->toBeArray()
+        ->and($pivot->analysis[0]['success_ratio'])->toEqual(1.0)
         ->and($pivot->analysis[1]['success_ratio'])->toEqual(0.0);
 });

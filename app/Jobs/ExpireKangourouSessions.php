@@ -28,10 +28,19 @@ class ExpireKangourouSessions implements ShouldQueue
             $session->update(['status' => 'expired']);
 
             Attempt::where('kangourou_session_id', $session->id)
-                ->where('status', 'inProgress')
                 ->each(function (Attempt $attempt) use ($gradingService): void {
-                    $attempt->update(['termination' => 'timeout']);
+                    $needsGrading = $attempt->status === 'inProgress' || $attempt->score === null;
+
+                    if ($attempt->status === 'inProgress') {
+                        $attempt->update(['termination' => 'timeout']);
+                    }
+
+                    if (! $needsGrading) {
+                        return;
+                    }
+
                     $gradingService->gradeAndSave($attempt);
+                    UpdateMasteryAndDifficulty::dispatch($attempt);
                 });
 
             $this->computeAnalysis($session);

@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\AttemptUpdated;
 use App\Events\RejoinDemandCreated;
 use App\Events\RejoinDemandResolved;
 use App\Models\Attempt;
@@ -82,6 +83,13 @@ test('session author can approve a rejoin demand', function () {
     expect($attempt->fresh()->status)->toBe('inProgress');
     expect(RejoinDemand::find($demand->id))->toBeNull();
     Event::assertDispatched(RejoinDemandResolved::class, fn ($e) => $e->resolution === 'approved');
+    Event::assertDispatched(AttemptUpdated::class, function (AttemptUpdated $event) {
+        $payload = $event->broadcastWith()['attempt'];
+
+        return $payload['extra_time'] === 300
+            && $payload['status'] === 'inProgress'
+            && ! array_key_exists('answers', $payload);
+    });
 });
 
 test('session author can reject a rejoin demand', function () {
@@ -141,4 +149,33 @@ test('approve adds extra time cumulatively', function () {
         ->postJson("/api/rejoin-demands/{$demand->id}/approve", ['extra_time' => 180]);
 
     expect($attempt->fresh()->extra_time)->toBe(300);
+});
+
+test('rejoin after delayed submit does not expose correct or incorrect statuses', function () {
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'answered'];
+
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'answers' => $answers,
+    ]);
+
+    $this->postJson("/api/attempts/{$attempt->id}/submit")->assertOk();
+    $this->postJson("/api/attempts/{$attempt->id}/rejoin-demand")->assertCreated();
+
+    $demand = RejoinDemand::where('attempt_id', $attempt->id)->first();
+
+    $this->actingAs($this->author)
+        ->postJson("/api/rejoin-demands/{$demand->id}/approve", ['extra_time' => 60])
+        ->assertOk();
+
+    $fresh = $attempt->fresh();
+    expect($fresh->status)->toBe('inProgress')
+        ->and($fresh->score)->toBeNull()
+        ->and($fresh->answers[0]['status'])->toBe('answered');
+
+    $this->patchJson("/api/attempts/{$attempt->id}/answer", [
+        'question_index' => 1,
+        'answer' => 'B',
+    ])->assertOk();
 });

@@ -31,15 +31,15 @@
                 </div>
               </td>
               <td class="px-4 py-3 text-center">
-                <span :class="`px-2 py-1 rounded text-xs font-semibold ${ attemptMap[student.id].status === 'finished' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }`">
-                  {{ statusLabel(attemptMap[student.id].status) }}
+                <span :class="statusBadgeClass(attemptMap[student.id])">
+                  {{ statusLabel(attemptMap[student.id]) }}
                 </span>
               </td>
               <td class="px-4 py-3 font-semibold text-text-main text-center dark:text-surface">
-                {{ attemptMap[student.id].score !== null ? attemptMap[student.id].score : '—' }}
+                {{ attemptMap[student.id].score !== null && attemptMap[student.id].score !== undefined ? attemptMap[student.id].score : '—' }}
               </td>
-              <td class="px-4 py-3 text-text-muted text-center">
-                {{ attemptMap[student.id].timer !== null ? `${Math.floor(attemptMap[student.id].timer / 60)}:${String(attemptMap[student.id].timer % 60).padStart(2, '0')}` : '—' }}
+              <td class="px-4 py-3 text-text-muted text-center font-mono">
+                {{ formatDisplayedTimer(attemptMap[student.id]) }}
               </td>
               <td class="px-4 py-3 text-text-muted text-center">{{ terminationLabel(attemptMap[student.id].termination) }}</td>
               <td class="px-4 py-3 text-text-muted text-xs text-center" :title="new Date(attemptMap[student.id].updated_at).toLocaleString('fr-FR')">
@@ -48,15 +48,33 @@
             </tr>
             <tr>
               <td colspan="5" class="px-4 py-3">
-                <div class="flex flex-wrap gap-2">
+                <div v-if="attemptMap[student.id].status === 'inProgress'" class="flex flex-col items-center gap-1 text-center">
+                  <span class="font-medium text-text-main dark:text-surface">{{ formatProgress(attemptMap[student.id]) }}</span>
+                  <span class="text-xs" :class="isStale(attemptMap[student.id]) ? 'text-warning' : 'text-text-muted'">
+                    {{ formatFreshness(attemptMap[student.id]) }}
+                  </span>
+                </div>
+                <div v-else-if="answersFor(attemptMap[student.id])" class="flex flex-wrap gap-2">
                   <div
-                    v-for="(answer, idx) in attemptMap[student.id].answers"
+                    v-for="(answer, idx) in answersFor(attemptMap[student.id])"
                     :key="idx"
                     :title="`Q${idx + 1}: ${answer.status === 'unanswered' ? 'Pas de réponse' : answer.status}`"
                     :class="`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold cursor-help ${answerColorClass(answer.status)}`"
                   >
                     {{ answer.answer || '' }}
                   </div>
+                </div>
+                <div v-else-if="answerLoadState[attemptMap[student.id].id]?.loading" class="text-center text-sm text-text-muted">
+                  Chargement des réponses...
+                </div>
+                <div v-else class="flex flex-col items-center gap-2 text-center">
+                  <p class="text-sm text-error">Impossible de charger les réponses.</p>
+                  <button
+                    @click="loadAttemptAnswers(attemptMap[student.id].id)"
+                    class="px-3 py-1.5 rounded-lg bg-error text-white text-xs font-medium hover:bg-error/90 cursor-pointer"
+                  >
+                    Réessayer
+                  </button>
                 </div>
               </td>
             </tr>
@@ -77,8 +95,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { Trash2 } from 'lucide-vue-next';
+import axios from 'axios';
+import { ATTEMPT_SYNC_INTERVAL_MS } from '@/stores/attemptStore';
 
 defineEmits(['delete']);
 
@@ -97,6 +117,23 @@ const props = defineProps({
   },
 });
 
+const observationNow = ref(Date.now());
+const fetchedAnswers = ref({});
+const answerLoadState = ref({});
+let observationClockTimer = null;
+
+onMounted(() => {
+  observationClockTimer = setInterval(() => {
+    observationNow.value = Date.now();
+  }, 1000);
+});
+
+onUnmounted(() => {
+  if (observationClockTimer) {
+    clearInterval(observationClockTimer);
+  }
+});
+
 const sortedStudents = computed(() =>
   [...props.students].sort((a, b) => (a.pivot?.class_name || a.name).localeCompare(b.pivot?.class_name || b.name))
 );
@@ -105,12 +142,144 @@ const attemptMap = computed(() =>
   Object.fromEntries(props.attempts.map(a => [a.user_id, a]))
 );
 
-function statusLabel(status) {
-  return { active: 'Active', expired: 'Expirée', draft: 'Brouillon', inProgress: 'En cours', finished: 'Terminée' }[status] || status;
+watch(
+  () => props.attempts.map((attempt) => `${attempt.id}:${attempt.status}:${Array.isArray(attempt.answers)}`).join('|'),
+  () => {
+    props.attempts.forEach((attempt) => {
+      if (attempt.status === 'finished' && !answersFor(attempt)) {
+        void loadAttemptAnswers(attempt.id);
+      }
+    });
+  },
+  { immediate: true },
+);
+
+function answersFor(attempt) {
+  if (Array.isArray(attempt.answers)) {
+    return attempt.answers;
+  }
+
+  return fetchedAnswers.value[attempt.id] ?? null;
+}
+
+async function loadAttemptAnswers(attemptId) {
+  if (!attemptId || answerLoadState.value[attemptId]?.loading) {
+    return;
+  }
+
+  answerLoadState.value = {
+    ...answerLoadState.value,
+    [attemptId]: { loading: true, error: false },
+  };
+
+  try {
+    const response = await axios.get(`/api/attempts/${attemptId}`);
+    fetchedAnswers.value = {
+      ...fetchedAnswers.value,
+      [attemptId]: response.data.attempt?.answers ?? [],
+    };
+    answerLoadState.value = {
+      ...answerLoadState.value,
+      [attemptId]: { loading: false, error: false },
+    };
+  } catch {
+    answerLoadState.value = {
+      ...answerLoadState.value,
+      [attemptId]: { loading: false, error: true },
+    };
+  }
+}
+
+function getSyncTimestamp(attempt) {
+  if (typeof attempt?.last_sync_received_at === 'number') {
+    return attempt.last_sync_received_at;
+  }
+
+  if (attempt?.updated_at) {
+    return new Date(attempt.updated_at).getTime();
+  }
+
+  return observationNow.value;
+}
+
+function isStale(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return false;
+  }
+
+  return (observationNow.value - getSyncTimestamp(attempt)) > ATTEMPT_SYNC_INTERVAL_MS * 2;
+}
+
+function statusLabel(attempt) {
+  if (attempt.status === 'finished') {
+    return 'Terminée';
+  }
+
+  return isStale(attempt) ? 'Sync lent' : 'En cours';
+}
+
+function statusBadgeClass(attempt) {
+  if (attempt.status === 'finished') {
+    return 'px-2 py-1 rounded text-xs font-semibold bg-success/10 text-success';
+  }
+
+  if (isStale(attempt)) {
+    return 'px-2 py-1 rounded text-xs font-semibold bg-warning/10 text-warning';
+  }
+
+  return 'px-2 py-1 rounded text-xs font-semibold bg-success/10 text-success';
+}
+
+function formatProgress(attempt) {
+  const answeredCount = attempt.answered_count ?? (Array.isArray(attempt.answers)
+    ? attempt.answers.filter((item) => item?.answer !== null && item?.answer !== undefined && item?.answer !== '').length
+    : 0);
+  const totalQuestions = attempt.total_questions ?? attempt.answers?.length ?? 26;
+
+  return `${answeredCount} / ${totalQuestions}`;
+}
+
+function formatTimer(seconds) {
+  if (seconds === null || seconds === undefined) {
+    return '—';
+  }
+
+  const safeSeconds = Math.max(0, seconds);
+  const m = Math.floor(safeSeconds / 60);
+  const s = safeSeconds % 60;
+
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function getRemainingSeconds(attempt) {
+  if (!attempt || attempt.status !== 'inProgress') {
+    return attempt?.timer ?? null;
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((observationNow.value - getSyncTimestamp(attempt)) / 1000));
+
+  return Math.max(0, (attempt.timer ?? 0) - elapsedSeconds);
+}
+
+function formatDisplayedTimer(attempt) {
+  if (attempt.status === 'inProgress') {
+    return formatTimer(getRemainingSeconds(attempt));
+  }
+
+  return attempt.timer !== null && attempt.timer !== undefined ? formatTimer(attempt.timer) : '—';
+}
+
+function formatFreshness(attempt) {
+  const ageSeconds = Math.max(0, Math.floor((observationNow.value - getSyncTimestamp(attempt)) / 1000));
+  if (ageSeconds < 2) {
+    return 'à l’instant';
+  }
+
+  return `mise à jour il y a ${ageSeconds}s`;
 }
 
 function terminationLabel(termination) {
-  return { none: 'Aucune', submitted: 'Soumise', blurred: 'Floutée', timeout: 'Timeout' }[termination] || termination;
+  return { none: 'Aucune', submitted: 'Soumise', blurred: 'Floutée', timeout: 'Timeout', abandoned: 'Abandonnée' }[termination] || termination;
 }
 
 function answerColorClass(status) {

@@ -1,10 +1,14 @@
 <?php
 
+use App\Events\AttemptUpdated;
+use App\Jobs\ExpireKangourouSessions;
 use App\Models\Attempt;
 use App\Models\Division;
 use App\Models\KangourouSession;
 use App\Models\Paper;
 use App\Models\User;
+use App\Services\GradingService;
+use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
     $this->paper = Paper::factory()->withQuestions()->create();
@@ -108,7 +112,8 @@ test('can submit an attempt', function () {
     $response->assertOk();
     $response->assertJsonStructure(['message', 'score', 'attempt']);
     expect($response->json('attempt.status'))->toBe('finished');
-    expect($response->json('attempt.score'))->not->toBeNull();
+    expect($response->json('attempt.score'))->toBeNull();
+    expect($attempt->fresh()->score)->toBeNull();
 });
 
 test('cannot submit already finished attempt', function () {
@@ -189,18 +194,32 @@ test('guest cannot fetch attempt history', function () {
     $this->getJson('/api/my/attempts')->assertUnauthorized();
 });
 
-test('submit with delayed correction masks answer statuses while session active', function () {
+test('submit with delayed correction does not grade while session is active', function () {
     $session = KangourouSession::factory()->create([
         'paper_id' => $this->paper->id,
         'preferences' => ['correction' => 'delayed'],
     ]);
     $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
 
+    $this->patchJson("/api/attempts/{$attempt->id}/answer", [
+        'question_index' => 0,
+        'answer' => 'A',
+    ]);
+
     $response = $this->postJson("/api/attempts/{$attempt->id}/submit");
 
     $response->assertOk();
-    expect($response->json('attempt.status'))->toBe('finished');
+    expect($response->json('attempt.status'))->toBe('finished')
+        ->and($response->json('score'))->toBeNull()
+        ->and($response->json('attempt.score'))->toBeNull();
+
     foreach ($response->json('attempt.answers') as $answer) {
+        expect($answer['status'])->toBeIn(['answered', 'unanswered']);
+    }
+
+    $stored = $attempt->fresh();
+    expect($stored->score)->toBeNull();
+    foreach ($stored->answers as $answer) {
         expect($answer['status'])->toBeIn(['answered', 'unanswered']);
     }
 });
@@ -221,6 +240,8 @@ test('submit with immediate correction shows answer statuses', function () {
     $response = $this->postJson("/api/attempts/{$attempt->id}/submit");
 
     $response->assertOk();
+    expect($response->json('attempt.score'))->not->toBeNull()
+        ->and($attempt->fresh()->score)->not->toBeNull();
     $answers = $response->json('attempt.answers');
     $hasCorrectOrIncorrect = collect($answers)->contains(fn ($a) => in_array($a['status'], ['correct', 'incorrect']));
     expect($hasCorrectOrIncorrect)->toBeTrue();
@@ -255,15 +276,70 @@ test('show attempt with delayed correction reveals statuses after session expire
     ]);
     $this->postJson("/api/attempts/{$attempt->id}/submit");
 
-    // Expire the session
-    $session->update(['status' => 'expired', 'expires_at' => now()->subMinute()]);
+    expect($attempt->fresh()->score)->toBeNull();
+
+    $session->update(['expires_at' => now()->subMinute()]);
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
 
     $response = $this->getJson("/api/attempts/{$attempt->id}");
 
     $response->assertOk();
+    expect($attempt->fresh()->score)->not->toBeNull();
     $answers = $response->json('attempt.answers');
     $hasCorrectOrIncorrect = collect($answers)->contains(fn ($a) => in_array($a['status'], ['correct', 'incorrect']));
     expect($hasCorrectOrIncorrect)->toBeTrue();
+});
+
+test('delayed submit grades immediately when the session has already expired', function () {
+    $session = KangourouSession::factory()->expired()->create([
+        'paper_id' => $this->paper->id,
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'answered'];
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $session->id,
+        'answers' => $answers,
+    ]);
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit");
+
+    $response->assertOk();
+    expect($response->json('attempt.score'))->not->toBeNull()
+        ->and($attempt->fresh()->score)->not->toBeNull();
+    $hasCorrectOrIncorrect = collect($attempt->fresh()->answers)->contains(
+        fn ($a) => in_array($a['status'], ['correct', 'incorrect'])
+    );
+    expect($hasCorrectOrIncorrect)->toBeTrue();
+});
+
+test('delayed submit grades immediately when expires_at has passed but status is still active', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit");
+
+    $response->assertOk();
+    expect($response->json('attempt.status'))->toBe('finished')
+        ->and($attempt->fresh()->score)->not->toBeNull();
+});
+
+test('cannot update answers after a delayed submit', function () {
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
+
+    $this->postJson("/api/attempts/{$attempt->id}/submit")->assertOk();
+
+    $response = $this->patchJson("/api/attempts/{$attempt->id}/answer", [
+        'question_index' => 0,
+        'answer' => 'A',
+    ]);
+
+    $response->assertForbidden();
 });
 
 test('guest can create attempt with a name', function () {
@@ -543,4 +619,258 @@ test('guest can still update and submit their own attempt', function () {
     ])->assertOk();
 
     $this->postJson("/api/attempts/{$attempt->id}/submit")->assertOk();
+});
+
+test('creating an attempt broadcasts a summary event without answers', function () {
+    Event::fake();
+
+    $response = $this->postJson("/api/kangourou-sessions/{$this->session->code}/attempts", [
+        'name' => 'Jean DUPONT',
+    ]);
+
+    $response->assertCreated();
+
+    Event::assertDispatched(AttemptUpdated::class, function (AttemptUpdated $event) {
+        $payload = $event->broadcastWith()['attempt'];
+
+        return $payload['name'] === 'Jean DUPONT'
+            && $payload['status'] === 'inProgress'
+            && $payload['answered_count'] === 0
+            && $payload['total_questions'] === 26
+            && $payload['extra_time'] === 0
+            && ! array_key_exists('answers', $payload)
+            && ! array_key_exists('user', $payload);
+    });
+});
+
+test('can sync multiple answers in one request', function () {
+    Event::fake();
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
+
+    $response = $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'timer' => 421,
+        'changes' => [
+            ['question_index' => 0, 'answer' => 'A'],
+            ['question_index' => 7, 'answer' => 'C'],
+        ],
+    ]);
+
+    $response->assertNoContent();
+
+    $fresh = $attempt->fresh();
+
+    expect($fresh->timer)->toBe(421)
+        ->and($fresh->answers[0]['answer'])->toBe('A')
+        ->and($fresh->answers[0]['status'])->toBe('answered')
+        ->and($fresh->answers[7]['answer'])->toBe('C')
+        ->and($fresh->answers[7]['status'])->toBe('answered');
+
+    Event::assertDispatched(AttemptUpdated::class, function (AttemptUpdated $event) use ($attempt) {
+        $payload = $event->broadcastWith()['attempt'];
+
+        return $event->attempt->is($attempt->fresh())
+            && $payload['timer'] === 421
+            && $payload['answered_count'] === 2
+            && $payload['total_questions'] === 26
+            && $payload['score'] === null
+            && is_string($payload['updated_at'] ?? null)
+            && ! array_key_exists('answers', $payload);
+    });
+});
+
+test('sync can clear an answer', function () {
+    Event::fake();
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'answered'];
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'answers' => $answers,
+    ]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 0, 'answer' => null],
+        ],
+    ])->assertNoContent();
+
+    expect($attempt->fresh()->answers[0]['answer'])->toBeNull()
+        ->and($attempt->fresh()->answers[0]['status'])->toBe('unanswered');
+});
+
+test('sync accepts a numeric answer for question 25', function () {
+    Event::fake();
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'timer' => 100,
+        'changes' => [
+            ['question_index' => 24, 'answer' => 17],
+        ],
+    ])->assertNoContent();
+
+    expect($attempt->fresh()->answers[24]['answer'])->toBe(17)
+        ->and($attempt->fresh()->answers[24]['status'])->toBe('answered');
+});
+
+test('sync rejects invalid question indices', function () {
+    Event::fake();
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 30, 'answer' => 'A'],
+        ],
+    ])->assertUnprocessable()->assertJsonValidationErrors(['changes.0.question_index']);
+
+    Event::assertNotDispatched(AttemptUpdated::class);
+});
+
+test('sync rejects invalid letters and invalid numeric values', function () {
+    Event::fake();
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 0, 'answer' => 'Z'],
+        ],
+    ])->assertUnprocessable();
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 24, 'answer' => 101],
+        ],
+    ])->assertUnprocessable();
+
+    Event::assertNotDispatched(AttemptUpdated::class);
+});
+
+test('sync rejects unauthorized authenticated users', function () {
+    Event::fake();
+    $owner = User::factory()->create();
+    $intruder = User::factory()->create();
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => $owner->id,
+    ]);
+
+    $this->actingAs($intruder)->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 0, 'answer' => 'A'],
+        ],
+    ])->assertForbidden();
+
+    Event::assertNotDispatched(AttemptUpdated::class);
+});
+
+test('guest can sync a guest attempt', function () {
+    Event::fake();
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'user_id' => null,
+    ]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'timer' => 50,
+        'changes' => [
+            ['question_index' => 1, 'answer' => 'B'],
+        ],
+    ])->assertNoContent();
+
+    expect($attempt->fresh()->answers[1]['answer'])->toBe('B');
+    Event::assertDispatched(AttemptUpdated::class);
+});
+
+test('sync rejects a finished attempt', function () {
+    Event::fake();
+    $attempt = Attempt::factory()->finished()->create(['kangourou_session_id' => $this->session->id]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 0, 'answer' => 'A'],
+        ],
+    ])->assertForbidden();
+
+    Event::assertNotDispatched(AttemptUpdated::class);
+});
+
+test('sync rejects an attempt whose session is no longer active', function () {
+    Event::fake();
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 0, 'answer' => 'A'],
+        ],
+    ])->assertForbidden();
+
+    Event::assertNotDispatched(AttemptUpdated::class);
+});
+
+test('sync does not broadcast when nothing changed', function () {
+    Event::fake();
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'answered'];
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $this->session->id,
+        'answers' => $answers,
+        'timer' => 100,
+    ]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'timer' => 100,
+        'changes' => [
+            ['question_index' => 0, 'answer' => 'A'],
+        ],
+    ])->assertNoContent();
+
+    Event::assertNotDispatched(AttemptUpdated::class);
+});
+
+test('submit persists unsynced answers from the request body', function () {
+    Event::fake();
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'answered'];
+    $answers[3] = ['answer' => 'D', 'status' => 'answered'];
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit", [
+        'timer' => 12,
+        'termination' => 'submitted',
+        'answers' => $answers,
+    ]);
+
+    $response->assertOk();
+    $fresh = $attempt->fresh();
+    expect($fresh->answers[0]['answer'])->toBe('A')
+        ->and($fresh->answers[3]['answer'])->toBe('D')
+        ->and($fresh->status)->toBe('finished');
+
+    Event::assertDispatched(AttemptUpdated::class, function (AttemptUpdated $event) {
+        $payload = $event->broadcastWith()['attempt'];
+
+        return $payload['status'] === 'finished'
+            && $payload['termination'] === 'submitted'
+            && $payload['answered_count'] === 2
+            && ! array_key_exists('answers', $payload);
+    });
+});
+
+test('submit with delayed correction still does not grade when answers are included', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'answered'];
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit", [
+        'answers' => $answers,
+    ]);
+
+    $response->assertOk();
+    expect($response->json('score'))->toBeNull()
+        ->and($attempt->fresh()->score)->toBeNull()
+        ->and($attempt->fresh()->answers[0]['answer'])->toBe('A');
 });

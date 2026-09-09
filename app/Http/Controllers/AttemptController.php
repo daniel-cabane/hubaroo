@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Events\AttemptNameUpdated;
 use App\Events\AttemptUpdated;
+use App\Http\Requests\SubmitAttemptRequest;
+use App\Http\Requests\SyncAttemptRequest;
 use App\Http\Requests\UpdateAnswerRequest;
 use App\Jobs\UpdateMasteryAndDifficulty;
 use App\Models\Attempt;
@@ -13,6 +15,7 @@ use App\Services\GradingService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class AttemptController extends Controller
 {
@@ -98,6 +101,8 @@ class AttemptController extends Controller
             }
         } while (true);
 
+        broadcast(new AttemptUpdated($attempt->fresh()));
+
         return response()->json([
             'message' => 'Attempt created.',
             'attempt' => $attempt,
@@ -146,9 +151,8 @@ class AttemptController extends Controller
 
     public function updateAnswer(UpdateAnswerRequest $request, Attempt $attempt): JsonResponse
     {
-        $user = $request->user();
-        if ($user && $attempt->user_id !== null && $attempt->user_id !== $user->id) {
-            return response()->json(['message' => 'Forbidden.'], 403);
+        if ($forbidden = $this->forbiddenUnlessOwner($request, $attempt)) {
+            return $forbidden;
         }
 
         if ($attempt->status === 'finished') {
@@ -172,41 +176,103 @@ class AttemptController extends Controller
             'timer' => $request->validated('timer'),
         ]);
 
-        broadcast(new AttemptUpdated($attempt)); // still works with pre-refresh model
+        broadcast(new AttemptUpdated($attempt->fresh()));
 
-        return response()->noContent();
+        return response()->json(['attempt' => $attempt->fresh()]);
     }
 
-    public function submit(Attempt $attempt, Request $request): JsonResponse
+    public function sync(SyncAttemptRequest $request, Attempt $attempt): Response
     {
-        $user = $request->user();
-        if ($user && $attempt->user_id !== null && $attempt->user_id !== $user->id) {
-            return response()->json(['message' => 'Forbidden.'], 403);
+        if ($forbidden = $this->forbiddenUnlessOwner($request, $attempt)) {
+            return $forbidden;
         }
 
         if ($attempt->status === 'finished') {
             return response()->json(['message' => 'This attempt has already been submitted.'], 403);
         }
 
-        $request->validate([
-            'timer' => ['nullable', 'integer', 'min:0'],
-            'termination' => ['nullable', 'in:submitted,blurred,timeout,abandoned'],
-        ]);
+        $session = $attempt->kangourouSession;
+        if (! $session->isActive()) {
+            return response()->json(['message' => 'This session is no longer active.'], 403);
+        }
+
+        $answers = $attempt->answers ?? Attempt::defaultAnswers();
+        $answersChanged = false;
+
+        foreach ($request->validated('changes', []) as $change) {
+            $index = (int) $change['question_index'];
+
+            if (! isset($answers[$index])) {
+                return response()->json(['message' => 'Invalid question index.'], 422);
+            }
+
+            $newAnswer = $change['answer'];
+            if ($newAnswer !== null && in_array($index, [24, 25], true)) {
+                $newAnswer = (int) $newAnswer;
+            }
+
+            $currentAnswer = $answers[$index]['answer'] ?? null;
+
+            if ((string) ($currentAnswer ?? '') !== (string) ($newAnswer ?? '')) {
+                $answers[$index]['answer'] = $newAnswer;
+                $answers[$index]['status'] = $newAnswer !== null && $newAnswer !== '' ? 'answered' : 'unanswered';
+                $answersChanged = true;
+            }
+        }
+
+        $timer = $request->has('timer') ? $request->integer('timer') : $attempt->timer;
+        $timerChanged = $timer !== $attempt->timer;
+
+        if (! $answersChanged && ! $timerChanged) {
+            return response()->noContent();
+        }
 
         $attempt->update([
-            'timer' => $request->input('timer'),
-            'termination' => $request->input('termination', 'submitted'),
+            'answers' => $answers,
+            'timer' => $timer,
         ]);
 
-        $score = $this->gradingService->gradeAndSave($attempt);
+        broadcast(new AttemptUpdated($attempt->fresh()));
 
-        UpdateMasteryAndDifficulty::dispatch($attempt);
+        return response()->noContent();
+    }
+
+    public function submit(SubmitAttemptRequest $request, Attempt $attempt): JsonResponse
+    {
+        if ($forbidden = $this->forbiddenUnlessOwner($request, $attempt)) {
+            return $forbidden;
+        }
+
+        if ($attempt->status === 'finished') {
+            return response()->json(['message' => 'This attempt has already been submitted.'], 403);
+        }
+
+        $delayGrading = $attempt->kangourouSession->shouldDelayGrading();
+
+        $updateData = [
+            'timer' => $request->input('timer'),
+            'termination' => $request->input('termination', 'submitted'),
+            'status' => $delayGrading ? 'finished' : $attempt->status,
+        ];
+
+        if ($request->has('answers') && is_array($request->input('answers'))) {
+            $updateData['answers'] = $this->normalizeSubmittedAnswers($request->input('answers'));
+        }
+
+        $attempt->update($updateData);
+
+        $score = null;
+
+        if (! $delayGrading) {
+            $score = $this->gradingService->gradeAndSave($attempt);
+            UpdateMasteryAndDifficulty::dispatch($attempt);
+        }
 
         $fresh = $this->maskCorrectionIfNeeded($attempt->fresh());
         broadcast(new AttemptUpdated($fresh));
 
         return response()->json([
-            'message' => 'Attempt submitted and graded.',
+            'message' => $delayGrading ? 'Attempt submitted.' : 'Attempt submitted and graded.',
             'score' => $score,
             'attempt' => $fresh,
         ]);
@@ -300,6 +366,40 @@ class AttemptController extends Controller
             'message' => "$claimed attempt(s) claimed successfully.",
             'claimed' => $claimed,
         ]);
+    }
+
+    private function forbiddenUnlessOwner(Request $request, Attempt $attempt): ?JsonResponse
+    {
+        $user = $request->user();
+        if ($user && $attempt->user_id !== null && $attempt->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden.'], 403);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, mixed>  $answers
+     * @return array<int, array{answer: mixed, status: string}>
+     */
+    private function normalizeSubmittedAnswers(array $answers): array
+    {
+        $normalized = Attempt::defaultAnswers();
+
+        foreach ($answers as $index => $item) {
+            if (! isset($normalized[$index]) || ! is_array($item)) {
+                continue;
+            }
+
+            $answer = $item['answer'] ?? null;
+            if ($answer !== null && in_array((int) $index, [24, 25], true) && is_numeric($answer)) {
+                $answer = (int) $answer;
+            }
+            $normalized[$index]['answer'] = $answer;
+            $normalized[$index]['status'] = $answer ? 'answered' : 'unanswered';
+        }
+
+        return $normalized;
     }
 
     /**

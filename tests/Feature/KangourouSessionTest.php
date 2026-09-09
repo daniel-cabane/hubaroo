@@ -409,6 +409,48 @@ test('author can change session code', function () {
     expect($session->fresh()->code)->toBe($newCode);
 });
 
+test('shouldDelayGrading is true for active delayed sessions', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->addHour(),
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+
+    expect($session->shouldDelayGrading())->toBeTrue();
+});
+
+test('shouldDelayGrading is false for immediate correction sessions', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->addHour(),
+        'preferences' => ['correction' => 'immediate'],
+    ]);
+
+    expect($session->shouldDelayGrading())->toBeFalse();
+});
+
+test('shouldDelayGrading is false once the session has expired', function () {
+    $session = KangourouSession::factory()->expired()->create([
+        'paper_id' => $this->paper->id,
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+
+    expect($session->shouldDelayGrading())->toBeFalse();
+});
+
+test('shouldDelayGrading is false when expires_at has passed even if status is still active', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+
+    expect($session->shouldDelayGrading())->toBeFalse();
+});
+
 test('non-author cannot change session code', function () {
     $author = User::factory()->create();
     $other = User::factory()->create();

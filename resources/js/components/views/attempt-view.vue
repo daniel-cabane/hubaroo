@@ -265,7 +265,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ChevronLeft, ChevronRight, AlertTriangle, X, Delete } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
-import { useAttemptStore } from '@/stores/attemptStore';
+import { ATTEMPT_SYNC_INTERVAL_MS, useAttemptStore } from '@/stores/attemptStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';
 
@@ -295,6 +295,7 @@ const isShuffled = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
+let answerSyncInterval = null;
 const isSubmitting = ref(false);
 
 const session = computed(() => sessionStore.session);
@@ -413,9 +414,7 @@ function saveNumericAnswer() {
 
   // Optimistic local update
   answers.value[currentOriginalIndex.value].answer = answer;
-
-  // Fire-and-forget
-  attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, answer, remainingSeconds.value);
+  attemptStore.queueAnswerChange(currentOriginalIndex.value, answer);
 }
 
 function selectAnswer(letter) {
@@ -424,18 +423,55 @@ function selectAnswer(letter) {
   const currentAnswer = answers.value[currentOriginalIndex.value]?.answer;
   const newAnswer = currentAnswer === letter ? null : letter;
 
-  // Optimistic local update
   answers.value[currentOriginalIndex.value].answer = newAnswer;
+  attemptStore.queueAnswerChange(currentOriginalIndex.value, newAnswer);
+}
 
-  // Fire-and-forget
-  attemptStore.updateAnswer(attemptStore.attempt.id, currentOriginalIndex.value, newAnswer, remainingSeconds.value);
+async function flushPendingAnswerChanges() {
+  if (!attemptStore.attempt?.id || !attemptStore.hasPendingAnswerChanges()) {
+    return false;
+  }
+
+  try {
+    return await attemptStore.flushAnswerChanges(
+      attemptStore.attempt.id,
+      remainingSeconds.value,
+    );
+  } catch (err) {
+    if (err.response?.status === 403 && !isSubmitting.value) {
+      stopAnswerSyncLoop();
+      void autoSubmit('timeout');
+    }
+    return false;
+  }
+}
+
+function startAnswerSyncLoop() {
+  if (answerSyncInterval || !isInProgress.value) {
+    return;
+  }
+
+  answerSyncInterval = setInterval(() => {
+    void flushPendingAnswerChanges();
+  }, ATTEMPT_SYNC_INTERVAL_MS);
+}
+
+function stopAnswerSyncLoop() {
+  if (!answerSyncInterval) {
+    return;
+  }
+
+  clearInterval(answerSyncInterval);
+  answerSyncInterval = null;
 }
 
 async function handleSubmit() {
   showSubmitModal.value = false;
   isSubmitting.value = true;
+  stopAnswerSyncLoop();
   try {
-    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, 'submitted');
+    await flushPendingAnswerChanges();
+    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, 'submitted', answers.value);
     router.replace({
       name: 'Results',
       params: { code: route.params.code, attemptId: attemptStore.attempt.id },
@@ -589,10 +625,12 @@ function startCountdown(timeLimitMinutes) {
 }
 
 async function autoSubmit(termination = 'timeout') {
-  if (!isInProgress.value) return;
+  if (!isInProgress.value || isSubmitting.value) return;
   isSubmitting.value = true;
+  stopAnswerSyncLoop();
   try {
-    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, termination);
+    await flushPendingAnswerChanges();
+    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, termination, answers.value);
     router.replace({
       name: 'Results',
       params: { code: route.params.code, attemptId: attemptStore.attempt.id },
@@ -614,7 +652,11 @@ function submitBeacon() {
       'Content-Type': 'application/json',
       'X-XSRF-TOKEN': csrfToken,
     },
-    body: JSON.stringify({ timer: remainingSeconds.value, termination: 'abandoned' }),
+    body: JSON.stringify({
+      timer: remainingSeconds.value,
+      termination: 'abandoned',
+      answers: answers.value,
+    }),
   });
 }
 
@@ -704,6 +746,7 @@ onMounted(async () => {
     window.addEventListener('pagehide', handlePageHide);
 
     if (isInProgress.value) {
+      startAnswerSyncLoop();
       const preferences = session.value?.preferences || {};
       const shuffleMode = preferences.shuffle ?? 'none';
       if (shuffleMode !== 'none') {
@@ -775,6 +818,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
+  stopAnswerSyncLoop();
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('pagehide', handlePageHide);

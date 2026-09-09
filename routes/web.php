@@ -49,6 +49,7 @@ Route::get('/api/kangourou-sessions/{code}', [KangourouSessionController::class,
 Route::post('/api/kangourou-sessions/{code}/attempts', [AttemptController::class, 'store'])->name('attempts.store')->middleware('throttle:300,1');
 Route::get('/api/attempts/{attempt}', [AttemptController::class, 'show'])->name('attempts.show')->middleware('throttle:300,1');
 Route::patch('/api/attempts/{attempt}/answer', [AttemptController::class, 'updateAnswer'])->name('attempts.updateAnswer')->middleware('throttle:300,1');
+Route::patch('/api/attempts/{attempt}/sync', [AttemptController::class, 'sync'])->name('attempts.sync')->middleware('throttle:300,1');
 Route::post('/api/attempts/{attempt}/submit', [AttemptController::class, 'submit'])->name('attempts.submit')->middleware('throttle:300,1');
 Route::get('/api/attempts/recover/{code}', [AttemptController::class, 'recover'])->name('attempts.recover')->middleware('throttle:60,1');
 

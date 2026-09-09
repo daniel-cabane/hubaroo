@@ -349,11 +349,10 @@
 
       <!-- Parcours tab -->
       <div v-else key="parcours" @click="courseOpenMenuJumpId = null">
-        <div v-if="!courseStore.courses.length" class="text-sm text-text-muted">Aucun parcours. Créez-en un !</div>
-        <template v-else>
           <!-- Course select + action buttons -->
           <div class="flex items-center gap-3 mb-6 flex-wrap">
             <select
+              v-if="courseStore.courses.length"
               v-model="selectedCourseId"
               class="flex-1 min-w-[200px] px-4 py-2.5 text-base font-medium border border-border rounded-xl dark:bg-gray-900 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary bg-surface cursor-pointer"
             >
@@ -362,6 +361,7 @@
               </option>
             </select>
             <button
+              v-if="courseStore.courses.length"
               @click.stop="showNewJumpModal = true"
               :disabled="!selectedCourseId"
               class="flex items-center gap-1 px-3 py-2.5 text-sm bg-primary text-surface rounded-xl hover:bg-primary-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
@@ -370,6 +370,7 @@
               Nouveau saut
             </button>
             <button
+              v-if="courseStore.courses.length"
               @click.stop="selectedCourseId && openSuggestedQuestionsModal(courseStore.courses.find(c => c.id === selectedCourseId))"
               :disabled="!selectedCourseId"
               class="flex items-center gap-1 px-3 py-2.5 text-sm border border-border text-text-muted rounded-xl hover:text-primary hover:border-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
@@ -379,13 +380,18 @@
             </button>
             <button
               @click.stop="showNewCourseModal = true"
-              class="flex items-center gap-1 px-3 py-2.5 text-sm border border-border text-text-muted rounded-xl hover:text-primary hover:border-primary transition-colors cursor-pointer"
+              class="flex items-center gap-1 px-3 py-2.5 text-sm rounded-xl transition-colors cursor-pointer"
+              :class="courseStore.courses.length
+                ? 'border border-border text-text-muted hover:text-primary hover:border-primary'
+                : 'bg-primary text-surface hover:bg-primary-hover'"
             >
               <Plus class="w-4 h-4" />
               Nouveau parcours
             </button>
           </div>
 
+          <div v-if="!courseStore.courses.length" class="text-sm text-text-muted">Aucun parcours. Créez-en un !</div>
+          <template v-else>
           <!-- Course details table -->
           <div v-if="courseStore.isLoading && !selectedCourseData" class="text-sm text-text-muted">Chargement...</div>
           <div v-else-if="selectedCourseData" class="bg-surface dark:bg-gray-900 border border-border rounded-xl overflow-hidden">
@@ -553,7 +559,7 @@
           :to="{ name: 'Session', params: { code: session.code } }"
           class="block p-5 rounded-xl border border-border bg-surface dark:bg-gray-900 hover:border-primary hover:shadow-md transition-all"
         >
-          <p class="font-semibold text-text-main dark:text-surface">{{ session.paper?.title }}</p>
+          <p class="font-semibold text-text-main dark:text-surface">Session Kangourou</p>
           <p class="text-sm text-text-muted mt-1">{{ formatTimeUntilExpiration(session.expires_at) }}</p>
         </router-link>
       </div>
@@ -825,7 +831,7 @@
             <input v-model.number="newJump.nb_questions" type="number" min="1" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Progression (sauts)</label>
+            <label class="block text-sm font-medium text-text-main dark:text-surface/80 mb-1">Difficulté progressive (0-10)</label>
             <input v-model.number="newJump.growth" type="number" min="0" class="w-full px-3 py-2 border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary text-sm" />
           </div>
           <!-- <div class="flex items-center justify-between">
@@ -1783,7 +1789,7 @@ const courseOpenMenuJumpId = ref(null);
 
 // Jump management (Parcours tab)
 const showNewJumpModal = ref(false);
-const newJump = ref({ time: 15, nb_questions: 7, growth: 3, status: 'active', autoQuestions: true });
+const newJump = ref({ time: 12, nb_questions: 8, growth: 3, status: 'active', autoQuestions: true });
 const showEditExpiryModal = ref(false);
 const editingJump = ref(null);
 const editExpiryValue = ref('');
@@ -2074,6 +2080,58 @@ async function handleInvite() {
   }
 }
 
+function stampDivisionSessionAttempt(attempt, receivedAt = Date.now()) {
+  if (!attempt) {
+    return attempt;
+  }
+
+  return {
+    ...attempt,
+    last_sync_received_at: typeof attempt.last_sync_received_at === 'number'
+      ? attempt.last_sync_received_at
+      : attempt.updated_at
+        ? new Date(attempt.updated_at).getTime()
+        : receivedAt,
+  };
+}
+
+function stampDivisionSessionDetails(data) {
+  if (!data?.attempts) {
+    return data;
+  }
+
+  return {
+    ...data,
+    attempts: data.attempts.map((attempt) => stampDivisionSessionAttempt(attempt)),
+  };
+}
+
+function mergeDivisionSessionAttempt(existing, incoming) {
+  const receivedAt = Date.now();
+
+  return stampDivisionSessionAttempt({
+    ...(existing ?? {}),
+    ...incoming,
+    answers: incoming.answers ?? existing?.answers,
+    last_sync_received_at: receivedAt,
+  }, receivedAt);
+}
+
+function applyDivisionSessionAttemptUpdate(detailRef, incoming) {
+  if (!detailRef.value) {
+    return;
+  }
+
+  const attempts = [...(detailRef.value.attempts ?? [])];
+  const idx = attempts.findIndex((attempt) => attempt.id === incoming.id);
+  if (idx !== -1) {
+    attempts[idx] = mergeDivisionSessionAttempt(attempts[idx], incoming);
+  } else {
+    attempts.push(mergeDivisionSessionAttempt(null, incoming));
+  }
+  detailRef.value = { ...detailRef.value, attempts };
+}
+
 async function openExpiredSessionModal(session) {
   sessionStudentSearch.value = '';
   showExpiredSessionModal.value = true;
@@ -2081,22 +2139,11 @@ async function openExpiredSessionModal(session) {
   expiredSessionDetail.value = null;
   try {
     const data = await sessionStore.fetchSessionDetails(session.id);
-    expiredSessionDetail.value = data;
+    expiredSessionDetail.value = stampDivisionSessionDetails(data);
     expiredSessionChannelId.value = session.id;
     window.Echo.private(`session.${session.id}`)
       .listen('.AttemptUpdated', (e) => {
-        if (!expiredSessionDetail.value) {
-          return;
-        }
-        const updated = e.attempt;
-        const attempts = expiredSessionDetail.value.attempts ?? [];
-        const idx = attempts.findIndex(a => a.id === updated.id);
-        if (idx !== -1) {
-          attempts[idx] = updated;
-        } else {
-          attempts.push(updated);
-        }
-        expiredSessionDetail.value = { ...expiredSessionDetail.value, attempts };
+        applyDivisionSessionAttemptUpdate(expiredSessionDetail, e.attempt);
       });
   } catch (err) {
     // error handled by store
@@ -2121,22 +2168,11 @@ async function openActiveSessionModal(session) {
   activeSessionDetail.value = null;
   try {
     const data = await sessionStore.fetchSessionDetails(session.id);
-    activeSessionDetail.value = data;
+    activeSessionDetail.value = stampDivisionSessionDetails(data);
     activeSessionChannelId.value = session.id;
     window.Echo.private(`session.${session.id}`)
       .listen('.AttemptUpdated', (e) => {
-        if (!activeSessionDetail.value) {
-          return;
-        }
-        const updated = e.attempt;
-        const attempts = activeSessionDetail.value.attempts ?? [];
-        const idx = attempts.findIndex(a => a.id === updated.id);
-        if (idx !== -1) {
-          attempts[idx] = updated;
-        } else {
-          attempts.push(updated);
-        }
-        activeSessionDetail.value = { ...activeSessionDetail.value, attempts };
+        applyDivisionSessionAttemptUpdate(activeSessionDetail, e.attempt);
       });
   } catch (err) {
     // error handled by store
@@ -2188,10 +2224,13 @@ function closeActiveSessionModal() {
 
 async function handleCreateCourse() {
   try {
-    await courseStore.createCourse(divisionId.value, newCourseTitle.value);
+    const course = await courseStore.createCourse(divisionId.value, newCourseTitle.value);
     showNewCourseModal.value = false;
     newCourseTitle.value = '';
     await courseStore.fetchCourses(divisionId.value);
+    if (!selectedCourseId.value) {
+      selectedCourseId.value = course.id;
+    }
   } catch {
     // error handled by store
   }

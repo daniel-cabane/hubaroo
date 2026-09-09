@@ -1,11 +1,13 @@
 <?php
 
+use App\Jobs\ExpireKangourouSessions;
 use App\Jobs\UpdateMasteryAndDifficulty;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
 use App\Models\Paper;
 use App\Models\Question;
 use App\Models\User;
+use App\Services\GradingService;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Role;
 
@@ -199,14 +201,53 @@ test('guest attempt skips mastery and difficulty update', function () {
     expect($firstQuestion->difficulty)->toBe(400);
 });
 
-test('submitting an attempt dispatches UpdateMasteryAndDifficulty job', function () {
+test('submitting an immediate correction attempt dispatches UpdateMasteryAndDifficulty job', function () {
     Queue::fake();
 
     $paper = Paper::factory()->withQuestions()->create();
-    $session = KangourouSession::factory()->create(['paper_id' => $paper->id]);
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $paper->id,
+        'preferences' => ['correction' => 'immediate'],
+    ]);
     $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
 
     $this->postJson("/api/attempts/{$attempt->id}/submit");
+
+    Queue::assertPushed(UpdateMasteryAndDifficulty::class, fn ($job) => $job->attempt->id === $attempt->id);
+});
+
+test('submitting a delayed correction attempt does not dispatch UpdateMasteryAndDifficulty', function () {
+    Queue::fake();
+
+    $paper = Paper::factory()->withQuestions()->create();
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $paper->id,
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+
+    $this->postJson("/api/attempts/{$attempt->id}/submit");
+
+    Queue::assertNotPushed(UpdateMasteryAndDifficulty::class);
+});
+
+test('expiring a delayed session dispatches UpdateMasteryAndDifficulty for submitted attempts', function () {
+    Queue::fake();
+
+    $paper = Paper::factory()->withQuestions()->create();
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+        'preferences' => ['correction' => 'delayed'],
+    ]);
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'score' => null,
+        'termination' => 'submitted',
+    ]);
+
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
 
     Queue::assertPushed(UpdateMasteryAndDifficulty::class, fn ($job) => $job->attempt->id === $attempt->id);
 });

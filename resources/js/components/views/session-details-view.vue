@@ -329,7 +329,7 @@
     >
       <div class="bg-surface dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl space-y-5">
         <h3 class="text-lg font-bold text-text-main dark:text-surface">Activer la session ?</h3>
-        <p class="text-sm text-text-muted">Une fois activée, la session sera visible aux étudiants et ils pourront commencer leurs tentatives.</p>
+        <p class="text-sm text-text-muted">Une fois activée, la session sera visible pour les élèves et ils pourront commencer leurs tentatives.</p>
 
         <div class="flex gap-3">
           <button
@@ -660,12 +660,49 @@ function initializeForm() {
   }
 }
 
+function stampSessionAttempt(attempt, receivedAt = Date.now()) {
+  if (!attempt) {
+    return attempt;
+  }
+
+  return {
+    ...attempt,
+    last_sync_received_at: typeof attempt.last_sync_received_at === 'number'
+      ? attempt.last_sync_received_at
+      : attempt.updated_at
+        ? new Date(attempt.updated_at).getTime()
+        : receivedAt,
+  };
+}
+
+function stampSessionAttempts(sessionData) {
+  if (!sessionData?.attempts) {
+    return sessionData;
+  }
+
+  return {
+    ...sessionData,
+    attempts: sessionData.attempts.map((attempt) => stampSessionAttempt(attempt)),
+  };
+}
+
+function mergeSessionAttempt(existing, incoming) {
+  const receivedAt = Date.now();
+
+  return stampSessionAttempt({
+    ...(existing ?? {}),
+    ...incoming,
+    answers: incoming.answers ?? existing?.answers,
+    last_sync_received_at: receivedAt,
+  }, receivedAt);
+}
+
 async function loadSessionDetails() {
   try {
     isLoading.value = true;
     error.value = null;
     const sessionId = route.params.id;
-    session.value = await sessionStore.fetchSessionDetails(sessionId);
+    session.value = stampSessionAttempts(await sessionStore.fetchSessionDetails(sessionId));
     activeTab.value = session.value?.status === 'draft' ? 'parametres' : 'tentatives';
     initializeForm();
   } catch (err) {
@@ -681,7 +718,7 @@ async function reloadSessionDetails() {
 
 async function refreshSession() {
   const sessionId = route.params.id;
-  session.value = await sessionStore.fetchSessionDetails(sessionId);
+  session.value = stampSessionAttempts(await sessionStore.fetchSessionDetails(sessionId));
   initializeForm();
 }
 
@@ -694,7 +731,7 @@ async function autoSavePrivacy() {
       preferences: editForm.preferences,
     });
     const sessionId = route.params.id;
-    session.value = await sessionStore.fetchSessionDetails(sessionId);
+    session.value = stampSessionAttempts(await sessionStore.fetchSessionDetails(sessionId));
     privacySaveStatus.value = 'saved';
     setTimeout(() => { privacySaveStatus.value = null; }, 2000);
   } catch (err) {
@@ -714,7 +751,7 @@ async function saveChanges() {
       preferences: editForm.preferences,
     });
     const sessionId = route.params.id;
-    session.value = await sessionStore.fetchSessionDetails(sessionId);
+    session.value = stampSessionAttempts(await sessionStore.fetchSessionDetails(sessionId));
   } catch (err) {
     error.value = err.message || 'Failed to save changes';
   } finally {
@@ -919,9 +956,9 @@ onMounted(() => {
           const index = session.value.attempts.findIndex(a => a.id === updated.id);
 
           if (index !== -1) {
-            session.value.attempts[index] = updated;
+            session.value.attempts[index] = mergeSessionAttempt(session.value.attempts[index], updated);
           } else {
-            session.value.attempts.push(updated);
+            session.value.attempts.push(mergeSessionAttempt(null, updated));
           }
         });
     }
