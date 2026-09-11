@@ -2,6 +2,7 @@
 
 use App\Events\AttemptUpdated;
 use App\Jobs\ExpireKangourouSessions;
+use App\Jobs\UpdateMasteryAndDifficulty;
 use App\Models\Attempt;
 use App\Models\Division;
 use App\Models\KangourouSession;
@@ -9,6 +10,7 @@ use App\Models\Paper;
 use App\Models\User;
 use App\Services\GradingService;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 
 beforeEach(function () {
     $this->paper = Paper::factory()->withQuestions()->create();
@@ -92,7 +94,24 @@ test('cannot update answer after submission', function () {
     $response->assertForbidden();
 });
 
-test('cannot update answer for expired session', function () {
+test('cannot update answer for expired session outside the grace window', function () {
+    $session = KangourouSession::factory()->expired()->create([
+        'paper_id' => $this->paper->id,
+        'expires_at' => now()->subMinutes(5),
+    ]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+    $original = $attempt->answers;
+
+    $response = $this->patchJson("/api/attempts/{$attempt->id}/answer", [
+        'question_index' => 0,
+        'answer' => 'A',
+    ]);
+
+    $response->assertOk();
+    expect($attempt->fresh()->answers[0]['answer'])->toBe($original[0]['answer']);
+});
+
+test('can update answer for expired session inside the grace window', function () {
     $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
     $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
 
@@ -101,7 +120,8 @@ test('cannot update answer for expired session', function () {
         'answer' => 'A',
     ]);
 
-    $response->assertForbidden();
+    $response->assertOk();
+    expect($response->json('attempt.answers.0.answer'))->toBe('A');
 });
 
 test('can submit an attempt', function () {
@@ -793,7 +813,7 @@ test('sync rejects a finished attempt', function () {
     Event::assertNotDispatched(AttemptUpdated::class);
 });
 
-test('sync rejects an attempt whose session is no longer active', function () {
+test('sync persists answers inside the post-expiry grace window', function () {
     Event::fake();
     $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
     $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
@@ -802,8 +822,35 @@ test('sync rejects an attempt whose session is no longer active', function () {
         'changes' => [
             ['question_index' => 0, 'answer' => 'A'],
         ],
-    ])->assertForbidden();
+    ])->assertOk()
+        ->assertJson([
+            'session_expired' => true,
+            'saved' => true,
+        ]);
 
+    expect($attempt->fresh()->answers[0]['answer'])->toBe('A');
+    Event::assertDispatched(AttemptUpdated::class);
+});
+
+test('sync does not persist answers outside the post-expiry grace window', function () {
+    Event::fake();
+    $session = KangourouSession::factory()->expired()->create([
+        'paper_id' => $this->paper->id,
+        'expires_at' => now()->subMinutes(5),
+    ]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+
+    $this->patchJson("/api/attempts/{$attempt->id}/sync", [
+        'changes' => [
+            ['question_index' => 0, 'answer' => 'A'],
+        ],
+    ])->assertOk()
+        ->assertJson([
+            'session_expired' => true,
+            'saved' => false,
+        ]);
+
+    expect($attempt->fresh()->answers[0]['answer'])->toBeNull();
     Event::assertNotDispatched(AttemptUpdated::class);
 });
 
@@ -873,4 +920,159 @@ test('submit with delayed correction still does not grade when answers are inclu
     expect($response->json('score'))->toBeNull()
         ->and($attempt->fresh()->score)->toBeNull()
         ->and($attempt->fresh()->answers[0]['answer'])->toBe('A');
+});
+
+test('expired in-progress submit with answers inside grace window persists and grades', function () {
+    Queue::fake();
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'A', 'status' => 'answered'];
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit", [
+        'timer' => 12,
+        'termination' => 'submitted',
+        'answers' => $answers,
+    ]);
+
+    $response->assertOk();
+    $fresh = $attempt->fresh();
+    expect($fresh->answers[0]['answer'])->toBe('A')
+        ->and($fresh->status)->toBe('finished')
+        ->and($fresh->score)->not->toBeNull();
+    Queue::assertPushed(UpdateMasteryAndDifficulty::class, fn ($job) => $job->attempt->id === $attempt->id);
+});
+
+test('expired timeout-finished submit overwrites answers inside the grace window without a second mastery job', function () {
+    Queue::fake();
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $originalAnswers = Attempt::defaultAnswers();
+    $originalAnswers[0] = ['answer' => 'A', 'status' => 'incorrect'];
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'termination' => 'timeout',
+        'answers' => $originalAnswers,
+        'score' => 10.0,
+    ]);
+    $answers = Attempt::defaultAnswers();
+    $questions = $this->paper->questions()->orderByPivot('order')->get();
+    $answers[0] = ['answer' => $questions[0]->correct_answer, 'status' => 'answered'];
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit", [
+        'termination' => 'timeout',
+        'answers' => $answers,
+    ]);
+
+    $response->assertOk();
+    $fresh = $attempt->fresh();
+    expect($fresh->answers[0]['answer'])->toBe($questions[0]->correct_answer)
+        ->and($fresh->status)->toBe('finished')
+        ->and((float) $fresh->score)->not->toEqual(10.0);
+    Queue::assertNotPushed(UpdateMasteryAndDifficulty::class);
+});
+
+test('expired already-finished submit ignores answers outside the grace window', function () {
+    $session = KangourouSession::factory()->expired()->create([
+        'paper_id' => $this->paper->id,
+        'expires_at' => now()->subMinutes(5),
+    ]);
+    $originalAnswers = Attempt::defaultAnswers();
+    $originalAnswers[0] = ['answer' => 'A', 'status' => 'answered'];
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'termination' => 'timeout',
+        'answers' => $originalAnswers,
+        'score' => 42.0,
+    ]);
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => 'B', 'status' => 'answered'];
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit", [
+        'answers' => $answers,
+    ]);
+
+    $response->assertOk()
+        ->assertJsonStructure(['message', 'score', 'attempt']);
+    expect($attempt->fresh()->answers[0]['answer'])->toBe('A')
+        ->and((float) $attempt->fresh()->score)->toEqual(42.0);
+});
+
+test('expired already-finished submit without answers returns success unchanged', function () {
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'termination' => 'timeout',
+        'score' => 33.0,
+    ]);
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit");
+
+    $response->assertOk()
+        ->assertJsonStructure(['message', 'score', 'attempt']);
+    expect($attempt->fresh()->score)->toEqual(33.0)
+        ->and($attempt->fresh()->status)->toBe('finished');
+});
+
+test('guest can submit after expiry inside the grace window', function () {
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $session->id,
+        'user_id' => null,
+        'name' => 'Guest',
+    ]);
+    $answers = Attempt::defaultAnswers();
+    $answers[1] = ['answer' => 'C', 'status' => 'answered'];
+
+    $response = $this->postJson("/api/attempts/{$attempt->id}/submit", [
+        'answers' => $answers,
+    ]);
+
+    $response->assertOk();
+    expect($attempt->fresh()->answers[1]['answer'])->toBe('C')
+        ->and($attempt->fresh()->status)->toBe('finished');
+});
+
+test('authenticated user cannot submit another users attempt after expiry', function () {
+    $owner = User::factory()->create();
+    $intruder = User::factory()->create();
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $attempt = Attempt::factory()->create([
+        'kangourou_session_id' => $session->id,
+        'user_id' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($intruder)->postJson("/api/attempts/{$attempt->id}/submit");
+
+    $response->assertForbidden();
+});
+
+test('late submit inside the grace window recomputes session analysis', function () {
+    $division = Division::factory()->create();
+    $student = User::factory()->create();
+    $division->students()->attach($student->id);
+
+    $session = KangourouSession::factory()->expired()->create(['paper_id' => $this->paper->id]);
+    $division->kangourouSessions()->attach($session->id);
+
+    $questions = $this->paper->questions()->orderByPivot('order')->get();
+    $originalAnswers = Attempt::defaultAnswers();
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'user_id' => $student->id,
+        'termination' => 'timeout',
+        'answers' => $originalAnswers,
+        'score' => 24.0,
+    ]);
+
+    $answers = Attempt::defaultAnswers();
+    $answers[0] = ['answer' => $questions[0]->correct_answer, 'status' => 'answered'];
+
+    $this->postJson("/api/attempts/{$attempt->id}/submit", [
+        'answers' => $answers,
+    ])->assertOk();
+
+    $pivot = $division->kangourouSessions()->where('kangourou_session_id', $session->id)->first()->pivot;
+
+    expect($pivot->analysis)->toBeArray()
+        ->and($pivot->analysis[0]['success_ratio'])->toEqual(1.0);
 });

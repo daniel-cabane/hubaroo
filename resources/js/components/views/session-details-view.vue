@@ -960,6 +960,11 @@ onMounted(() => {
           } else {
             session.value.attempts.push(mergeSessionAttempt(null, updated));
           }
+        })
+        .listen('.SessionExpired', () => {
+          if (session.value) {
+            session.value.status = 'expired';
+          }
         });
     }
   });

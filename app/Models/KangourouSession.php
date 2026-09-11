@@ -15,6 +15,8 @@ class KangourouSession extends Model
     /** @use HasFactory<KangourouSessionFactory> */
     use HasFactory;
 
+    public const POST_EXPIRY_ANSWER_GRACE_SECONDS = 180;
+
     public const DEFAULT_PREFERENCES = [
         'time_limit' => 50,
         'blur_security' => true,
@@ -92,6 +94,21 @@ class KangourouSession extends Model
     public function isExpired(): bool
     {
         return $this->status === 'expired' || $this->expires_at->isPast();
+    }
+
+    /**
+     * Learners may still persist unsaved answers for a short window after expiry.
+     */
+    public function allowsLateAnswerSave(): bool
+    {
+        if ($this->expires_at === null || $this->expires_at->isFuture()) {
+            return false;
+        }
+
+        return $this->expires_at
+            ->copy()
+            ->addSeconds(self::POST_EXPIRY_ANSWER_GRACE_SECONDS)
+            ->isFuture();
     }
 
     /**

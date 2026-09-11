@@ -296,6 +296,7 @@ const isShuffled = ref(false);
 let timerInterval = null;
 let blurInterval = null;
 let answerSyncInterval = null;
+let sessionExpiryTimeout = null;
 const isSubmitting = ref(false);
 
 const session = computed(() => sessionStore.session);
@@ -433,14 +434,19 @@ async function flushPendingAnswerChanges() {
   }
 
   try {
-    return await attemptStore.flushAnswerChanges(
+    const result = await attemptStore.flushAnswerChanges(
       attemptStore.attempt.id,
       remainingSeconds.value,
     );
+    if (result?.sessionExpired && !isSubmitting.value) {
+      stopAnswerSyncLoop();
+      void finalizeAttempt('timeout', { forceAfterExpiry: true });
+    }
+    return result;
   } catch (err) {
     if (err.response?.status === 403 && !isSubmitting.value) {
       stopAnswerSyncLoop();
-      void autoSubmit('timeout');
+      void finalizeAttempt('timeout', { forceAfterExpiry: isSessionExpired() });
     }
     return false;
   }
@@ -467,19 +473,7 @@ function stopAnswerSyncLoop() {
 
 async function handleSubmit() {
   showSubmitModal.value = false;
-  isSubmitting.value = true;
-  stopAnswerSyncLoop();
-  try {
-    await flushPendingAnswerChanges();
-    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, 'submitted', answers.value);
-    router.replace({
-      name: 'Results',
-      params: { code: route.params.code, attemptId: attemptStore.attempt.id },
-    });
-  } catch {
-    isSubmitting.value = false;
-    // error handled by store
-  }
+  await finalizeAttempt('submitted', { forceAfterExpiry: isSessionExpired() });
 }
 
 function toggleTimer() {
@@ -625,19 +619,90 @@ function startCountdown(timeLimitMinutes) {
 }
 
 async function autoSubmit(termination = 'timeout') {
-  if (!isInProgress.value || isSubmitting.value) return;
+  await finalizeAttempt(termination, { forceAfterExpiry: isSessionExpired() });
+}
+
+function isSessionExpired() {
+  if (!session.value) {
+    return false;
+  }
+
+  return session.value.status === 'expired' || new Date(session.value.expires_at) <= new Date();
+}
+
+function goToResults() {
+  if (!attemptStore.attempt?.id) {
+    return;
+  }
+
+  router.replace({
+    name: 'Results',
+    params: { code: route.params.code, attemptId: attemptStore.attempt.id },
+  });
+}
+
+function stopSessionExpiryDeadline() {
+  if (!sessionExpiryTimeout) {
+    return;
+  }
+
+  clearTimeout(sessionExpiryTimeout);
+  sessionExpiryTimeout = null;
+}
+
+function startSessionExpiryDeadline() {
+  stopSessionExpiryDeadline();
+
+  const expiresAt = session.value?.expires_at;
+  if (!expiresAt || !isInProgress.value) {
+    return;
+  }
+
+  const delay = new Date(expiresAt).getTime() - Date.now();
+  if (delay <= 0) {
+    void finalizeAttempt('timeout', { forceAfterExpiry: true });
+    return;
+  }
+
+  sessionExpiryTimeout = setTimeout(() => {
+    sessionExpiryTimeout = null;
+    void finalizeAttempt('timeout', { forceAfterExpiry: true });
+  }, delay);
+}
+
+async function finalizeAttempt(termination = 'submitted', { forceAfterExpiry = false } = {}) {
+  if (isSubmitting.value) {
+    return;
+  }
+  if (!isInProgress.value && !forceAfterExpiry) {
+    return;
+  }
+
   isSubmitting.value = true;
   stopAnswerSyncLoop();
+  stopSessionExpiryDeadline();
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  showSubmitModal.value = false;
+  showBlurAlarm.value = false;
+
   try {
     await flushPendingAnswerChanges();
-    await attemptStore.submitAttempt(attemptStore.attempt.id, remainingSeconds.value, termination, answers.value);
-    router.replace({
-      name: 'Results',
-      params: { code: route.params.code, attemptId: attemptStore.attempt.id },
-    });
+    await attemptStore.submitAttempt(
+      attemptStore.attempt.id,
+      remainingSeconds.value,
+      termination,
+      answers.value,
+    );
+    goToResults();
   } catch {
+    if (forceAfterExpiry || isSessionExpired()) {
+      goToResults();
+      return;
+    }
     isSubmitting.value = false;
-    // error handled by store
   }
 }
 
@@ -756,6 +821,7 @@ onMounted(async () => {
 
       const timeLimitMinutes = preferences.time_limit ?? 50;
       startCountdown(timeLimitMinutes);
+      startSessionExpiryDeadline();
 
       let isAppActive = true;
       function updateAppState() {
@@ -789,9 +855,7 @@ onMounted(async () => {
       if (session.value?.id && authStore.isAuthenticated) {
         window.Echo.private(`session.${session.value.id}`)
           .listen('.SessionExpired', () => {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            autoSubmit('timeout');
+            void finalizeAttempt('timeout', { forceAfterExpiry: true });
           })
           .listen('.AttemptUpdated', (event) => {
             if (String(event.attempt?.id) !== String(attemptStore.attempt?.id)) return;
@@ -819,6 +883,7 @@ onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
   stopAnswerSyncLoop();
+  stopSessionExpiryDeadline();
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('pagehide', handlePageHide);

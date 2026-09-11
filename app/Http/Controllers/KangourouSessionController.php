@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SessionExpired;
 use App\Events\SessionOpenedForDivision;
 use App\Http\Requests\CreateKangourouSessionRequest;
 use App\Http\Requests\UpdateKangourouSessionRequest;
@@ -109,11 +110,19 @@ class KangourouSessionController extends Controller
             $data['preferences'] = array_replace_recursive($current, $incoming);
         }
 
+        $wasActive = $kangourouSession->isActive();
+
         $kangourouSession->update($data);
+
+        $fresh = $kangourouSession->fresh()->load('paper');
+
+        if ($request->has('expires_at') && $wasActive && $fresh->isExpired()) {
+            broadcast(new SessionExpired($fresh));
+        }
 
         return response()->json([
             'message' => 'Session updated.',
-            'session' => $kangourouSession->fresh()->load('paper'),
+            'session' => $fresh,
         ]);
     }
 

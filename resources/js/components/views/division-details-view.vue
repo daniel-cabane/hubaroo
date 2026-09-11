@@ -2132,6 +2132,31 @@ function applyDivisionSessionAttemptUpdate(detailRef, incoming) {
   detailRef.value = { ...detailRef.value, attempts };
 }
 
+function markDivisionSessionExpired(sessionId) {
+  if (activeSessionDetail.value?.id === sessionId) {
+    activeSessionDetail.value = { ...activeSessionDetail.value, status: 'expired' };
+  }
+  if (expiredSessionDetail.value?.id === sessionId) {
+    expiredSessionDetail.value = { ...expiredSessionDetail.value, status: 'expired' };
+  }
+
+  const linked = divisionStore.division?.kangourou_sessions;
+  if (linked) {
+    const index = linked.findIndex((item) => item.id === sessionId);
+    if (index !== -1) {
+      linked[index] = { ...linked[index], status: 'expired' };
+    }
+  }
+
+  const mine = sessionStore.mySessions;
+  if (mine) {
+    const index = mine.findIndex((item) => item.id === sessionId);
+    if (index !== -1) {
+      mine[index] = { ...mine[index], status: 'expired' };
+    }
+  }
+}
+
 async function openExpiredSessionModal(session) {
   sessionStudentSearch.value = '';
   showExpiredSessionModal.value = true;
@@ -2144,6 +2169,9 @@ async function openExpiredSessionModal(session) {
     window.Echo.private(`session.${session.id}`)
       .listen('.AttemptUpdated', (e) => {
         applyDivisionSessionAttemptUpdate(expiredSessionDetail, e.attempt);
+      })
+      .listen('.SessionExpired', () => {
+        markDivisionSessionExpired(session.id);
       });
   } catch (err) {
     // error handled by store
@@ -2173,6 +2201,9 @@ async function openActiveSessionModal(session) {
     window.Echo.private(`session.${session.id}`)
       .listen('.AttemptUpdated', (e) => {
         applyDivisionSessionAttemptUpdate(activeSessionDetail, e.attempt);
+      })
+      .listen('.SessionExpired', () => {
+        markDivisionSessionExpired(session.id);
       });
   } catch (err) {
     // error handled by store

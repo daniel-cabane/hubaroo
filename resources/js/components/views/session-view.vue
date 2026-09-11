@@ -16,7 +16,7 @@
     </div>
 
     <!-- Rejoin demand: waiting for approval -->
-    <div v-else-if="pendingDemandId" class="space-y-4">
+    <div v-else-if="pendingDemandId && !isExpired" class="space-y-4">
       <div class="bg-info/10 border border-info/30 rounded-lg p-6 space-y-3">
         <p class="text-lg font-semibold text-text-main dark:text-surface">Demande de reprise envoyée</p>
         <p class="text-sm text-text-muted">En attente de l'approbation de l'enseignant...</p>
@@ -29,7 +29,7 @@
     </div>
 
     <!-- Rejoin demand: denied -->
-    <div v-else-if="rejoinDenied" class="bg-error/10 border border-error/30 rounded-lg p-6 space-y-2">
+    <div v-else-if="rejoinDenied && !isExpired" class="bg-error/10 border border-error/30 rounded-lg p-6 space-y-2">
       <p class="text-lg font-semibold text-error">Demande refusée</p>
       <p class="text-sm text-text-muted">L'enseignant a refusé votre demande de reprise.</p>
     </div>
@@ -49,7 +49,16 @@
         </div>
       </div>
 
-      <template v-if="existingAttempt.status === 'inProgress'">
+      <template v-if="isExpired">
+        <p class="text-sm text-text-muted">Cette session a expiré.</p>
+        <router-link
+          :to="{ name: 'Results', params: { code: route.params.code, attemptId: existingAttempt.id } }"
+          class="inline-block w-full bg-primary hover:bg-primary-hover text-surface font-medium py-2 px-4 rounded-lg transition-colors"
+        >
+          Voir les résultats
+        </router-link>
+      </template>
+      <template v-else-if="existingAttempt.status === 'inProgress'">
         <p class="text-sm text-text-muted">L'enseignant a approuvé votre reprise. Vous pouvez rejoindre directement.</p>
         <button
           @click="directRejoin"
@@ -133,10 +142,13 @@ const existingAttempt = ref(null);
 const pendingDemandId = ref(null);
 const isRequestingRejoin = ref(false);
 const rejoinDenied = ref(false);
+const expiredNow = ref(false);
+let sessionExpiryTimeout = null;
 
 const isExpired = computed(() => {
+  if (expiredNow.value) return true;
   if (!session.value) return true;
-  return session.value.status === 'expired' || new Date(session.value.expires_at) < new Date();
+  return session.value.status === 'expired' || new Date(session.value.expires_at) <= new Date();
 });
 
 const answeredCount = computed(() => {
@@ -239,6 +251,7 @@ onMounted(async () => {
     const code = route.params.code;
     const data = await sessionStore.fetchSession(code);
     session.value = data;
+    startExpiryWatch();
 
     if (data.status === 'active' && new Date(data.expires_at) > new Date()) {
       // Check if we already have an active attempt (same or different session)
@@ -283,6 +296,28 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (sessionExpiryTimeout) {
+    clearTimeout(sessionExpiryTimeout);
+  }
 });
+
+function startExpiryWatch() {
+  if (!session.value?.expires_at) {
+    return;
+  }
+
+  const delay = new Date(session.value.expires_at).getTime() - Date.now();
+  if (delay <= 0) {
+    expiredNow.value = true;
+    return;
+  }
+
+  sessionExpiryTimeout = setTimeout(() => {
+    expiredNow.value = true;
+    if (session.value) {
+      session.value.status = 'expired';
+    }
+  }, delay);
+}
 </script>
 

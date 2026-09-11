@@ -1,9 +1,11 @@
 <?php
 
+use App\Events\SessionExpired;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
 use App\Models\Paper;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 
 beforeEach(function () {
     $this->paper = Paper::factory()->withQuestions()->create();
@@ -461,4 +463,86 @@ test('non-author cannot change session code', function () {
     $response = $this->actingAs($other)->patchJson("/api/kangourou-sessions/{$session->id}/change-code");
 
     $response->assertForbidden();
+});
+
+test('allowsLateAnswerSave is false while expiry is still in the future', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    expect($session->allowsLateAnswerSave())->toBeFalse();
+});
+
+test('allowsLateAnswerSave is true one minute after expiry', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'expired',
+        'expires_at' => now()->subMinute(),
+    ]);
+
+    expect($session->allowsLateAnswerSave())->toBeTrue();
+});
+
+test('allowsLateAnswerSave is true just inside the three minute window', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'expired',
+        'expires_at' => now()->subSeconds(KangourouSession::POST_EXPIRY_ANSWER_GRACE_SECONDS - 1),
+    ]);
+
+    expect($session->allowsLateAnswerSave())->toBeTrue();
+});
+
+test('allowsLateAnswerSave is false just outside the three minute window', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'expired',
+        'expires_at' => now()->subSeconds(KangourouSession::POST_EXPIRY_ANSWER_GRACE_SECONDS + 1),
+    ]);
+
+    expect($session->allowsLateAnswerSave())->toBeFalse();
+});
+
+test('allowsLateAnswerSave uses expires_at even when status is still active', function () {
+    $session = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+    ]);
+
+    expect($session->allowsLateAnswerSave())->toBeTrue();
+});
+
+test('author setting expires_at in the past broadcasts SessionExpired', function () {
+    Event::fake();
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}", [
+        'expires_at' => now()->subSecond()->toIso8601String(),
+    ])->assertOk();
+
+    Event::assertDispatched(SessionExpired::class, fn (SessionExpired $event) => $event->session->id === $session->id);
+});
+
+test('author delaying expiry does not broadcast SessionExpired', function () {
+    Event::fake();
+    $user = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($user)->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->addHour(),
+    ]);
+
+    $this->actingAs($user)->patchJson("/api/kangourou-sessions/{$session->id}", [
+        'expires_at' => now()->addHours(3)->toIso8601String(),
+    ])->assertOk();
+
+    Event::assertNotDispatched(SessionExpired::class);
 });

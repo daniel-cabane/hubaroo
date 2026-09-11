@@ -174,11 +174,15 @@ export const useAttemptStore = defineStore('attempt', () => {
     isSyncingAnswers.value = true;
 
     try {
-      await axios.patch(`/api/attempts/${attemptId}/sync`, {
+      const response = await axios.patch(`/api/attempts/${attemptId}/sync`, {
         timer,
         changes,
       });
-      return true;
+
+      return {
+        sessionExpired: Boolean(response.data?.session_expired),
+        saved: response.data?.saved !== false,
+      };
     } catch (err) {
       pendingAnswerChanges.value = {
         ...changeSnapshot,

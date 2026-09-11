@@ -46,7 +46,7 @@
             Retour à l'accueil
           </router-link>
         </div>
-        <div v-if="attempt.termination !== 'timeout'" class="pt-10">
+        <div v-if="attempt.termination !== 'timeout' && !isSessionExpired" class="pt-10">
           <div v-if="rejoinApproved" class="text-success font-medium">
             Demande acceptée ! Consultez le centre d'alertes (🔔) pour rejoindre.
           </div>
@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { LaptopMinimalCheck } from 'lucide-vue-next';
 import { useKangourouSessionStore } from '@/stores/kangourouSessionStore';
@@ -140,6 +140,8 @@ const isLoading = ref(true);
 const session = ref(null);
 const attempt = ref(null);
 const isRequestingRejoin = ref(false);
+const sessionExpiredFlag = ref(false);
+let sessionExpiryTimeout = null;
 
 // Derived from store so AlertCenter and this view stay in sync
 const currentDemand = computed(() =>
@@ -156,6 +158,12 @@ const correctAnswers = computed(() => {
 
 const correctionAvailable = computed(() => {
   return correctAnswers.value.length > 0 && correctAnswers.value[0] != null;
+});
+
+const isSessionExpired = computed(() => {
+  if (sessionExpiredFlag.value) return true;
+  if (!session.value) return false;
+  return session.value.status === 'expired' || new Date(session.value.expires_at) <= new Date();
 });
 
 const terminationLabel = computed(() => {
@@ -200,10 +208,62 @@ onMounted(async () => {
     await sessionStore.fetchSession(code, { attemptId });
     session.value = sessionStore.session;
     attempt.value = attemptStore.attempt;
+    startExpiryWatch();
   } catch {
     // error
   } finally {
     isLoading.value = false;
+  }
+});
+
+async function handleSessionExpired() {
+  sessionExpiredFlag.value = true;
+  if (session.value) {
+    session.value.status = 'expired';
+  }
+  try {
+    const { code, attemptId } = route.params;
+    await attemptStore.fetchAttempt(attemptId);
+    await sessionStore.fetchSession(code, { attemptId });
+    session.value = sessionStore.session;
+    attempt.value = attemptStore.attempt;
+  } catch {
+    // keep the expired flag even if refetch fails
+  }
+}
+
+function startExpiryWatch() {
+  if (isSessionExpired.value) {
+    return;
+  }
+
+  const expiresAt = session.value?.expires_at;
+  if (expiresAt) {
+    const delay = new Date(expiresAt).getTime() - Date.now();
+    if (delay <= 0) {
+      void handleSessionExpired();
+    } else {
+      sessionExpiryTimeout = setTimeout(() => {
+        sessionExpiryTimeout = null;
+        void handleSessionExpired();
+      }, delay);
+    }
+  }
+
+  if (authStore.isAuthenticated && session.value?.id) {
+    window.Echo.private(`session.${session.value.id}`)
+      .listen('.SessionExpired', () => {
+        void handleSessionExpired();
+      });
+  }
+}
+
+onUnmounted(() => {
+  if (sessionExpiryTimeout) {
+    clearTimeout(sessionExpiryTimeout);
+  }
+  if (session.value?.id) {
+    window.Echo.leave(`session.${session.value.id}`);
   }
 });
 </script>

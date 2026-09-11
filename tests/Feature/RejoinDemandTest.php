@@ -71,6 +71,17 @@ test('cannot create a rejoin demand for an expired session', function () {
     $response->assertForbidden();
 });
 
+test('cannot create a rejoin demand during the post-expiry grace window', function () {
+    $session = KangourouSession::factory()->expired()->create([
+        'paper_id' => $this->paper->id,
+        'author_id' => $this->author->id,
+        'expires_at' => now()->subMinute(),
+    ]);
+    $attempt = Attempt::factory()->create(['kangourou_session_id' => $session->id]);
+
+    $this->postJson("/api/attempts/{$attempt->id}/rejoin-demand")->assertForbidden();
+});
+
 test('session author can approve a rejoin demand', function () {
     $attempt = Attempt::factory()->create(['kangourou_session_id' => $this->session->id]);
     $demand = RejoinDemand::create(['attempt_id' => $attempt->id]);
