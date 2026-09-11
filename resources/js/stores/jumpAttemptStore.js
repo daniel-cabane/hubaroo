@@ -85,7 +85,7 @@ export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
     }
   }
 
-  async function flushAnswerChanges(attemptId, timer) {
+    async function flushAnswerChanges(attemptId, timer) {
     error.value = null;
 
     if (!attemptId) {
@@ -111,17 +111,20 @@ export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
     pendingAnswerChanges.value = {};
     isSyncingAnswers.value = true;
 
-    let shouldFlushAgain = false;
-    let nextTimer = timer;
+    let jumpClosed = false;
 
     try {
-      await axios.patch(`/api/jump-attempts/${attemptId}/sync`, {
+      const response = await axios.patch(`/api/jump-attempts/${attemptId}/sync`, {
         timer,
         changes,
       });
-      shouldFlushAgain = flushQueued && hasPendingAnswerChanges();
-      nextTimer = queuedTimer ?? timer;
-      return true;
+
+      jumpClosed = Boolean(response.data?.jump_closed);
+
+      return {
+        jumpClosed,
+        saved: response.data?.saved !== false,
+      };
     } catch (err) {
       pendingAnswerChanges.value = {
         ...changeSnapshot,
@@ -130,13 +133,15 @@ export const useJumpAttemptStore = defineStore('jumpAttempt', () => {
       error.value = err.response?.data?.message || 'Failed to update answer';
       throw err;
     } finally {
+      const shouldFlushAgain = !jumpClosed && flushQueued && Object.keys(pendingAnswerChanges.value).length > 0;
+      const nextTimer = queuedTimer ?? timer;
       isSyncingAnswers.value = false;
       flushQueued = false;
       queuedTimer = null;
-    }
 
-    if (shouldFlushAgain) {
-      void flushAnswerChanges(attemptId, nextTimer);
+      if (shouldFlushAgain) {
+        void flushAnswerChanges(attemptId, nextTimer);
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Events\JumpActivated;
+use App\Events\JumpExpired;
 use App\Models\Course;
 use App\Models\Division;
 use App\Models\Jump;
@@ -161,4 +162,36 @@ test('student cannot access course details endpoint', function () {
     $response = $this->actingAs($this->student)->getJson("/api/courses/{$this->course->id}/details");
 
     $response->assertForbidden();
+});
+
+test('teacher setting jump to expiring broadcasts JumpExpired', function () {
+    $jump = Jump::factory()->active()->create(['course_id' => $this->course->id]);
+
+    $this->actingAs($this->teacher)->patchJson("/api/jumps/{$jump->id}", [
+        'status' => 'expiring',
+        'expiration' => now()->toIso8601String(),
+    ])->assertOk();
+
+    expect($jump->fresh()->status)->toBe('expiring');
+    Event::assertDispatched(JumpExpired::class, fn (JumpExpired $event) => $event->jump->id === $jump->id);
+});
+
+test('teacher moving jump expiration into the past broadcasts JumpExpired', function () {
+    $jump = Jump::factory()->active()->create(['course_id' => $this->course->id]);
+
+    $this->actingAs($this->teacher)->patchJson("/api/jumps/{$jump->id}", [
+        'expiration' => now()->subSecond()->toIso8601String(),
+    ])->assertOk();
+
+    Event::assertDispatched(JumpExpired::class, fn (JumpExpired $event) => $event->jump->id === $jump->id);
+});
+
+test('teacher delaying jump expiration does not broadcast JumpExpired', function () {
+    $jump = Jump::factory()->active()->create(['course_id' => $this->course->id]);
+
+    $this->actingAs($this->teacher)->patchJson("/api/jumps/{$jump->id}", [
+        'expiration' => now()->addHours(3)->toIso8601String(),
+    ])->assertOk();
+
+    Event::assertNotDispatched(JumpExpired::class);
 });

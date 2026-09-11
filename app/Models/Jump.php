@@ -15,6 +15,8 @@ class Jump extends Model
     /** @use HasFactory<JumpFactory> */
     use HasFactory;
 
+    public const POST_EXPIRY_ANSWER_GRACE_SECONDS = 180;
+
     /**
      * @var list<string>
      */
@@ -69,6 +71,42 @@ class Jump extends Model
     public function isExpired(): bool
     {
         return $this->status === 'expired';
+    }
+
+    /**
+     * Learners must stop answering once expiration has passed or the jump is expiring/expired.
+     */
+    public function isClosed(): bool
+    {
+        if (in_array($this->status, ['expiring', 'expired'], true)) {
+            return true;
+        }
+
+        return $this->expiration !== null && $this->expiration->isPast();
+    }
+
+    /**
+     * Learners may still persist unsaved answers after the jump closes:
+     * while status is expiring, or for a short window after expiration.
+     */
+    public function allowsLateAnswerSave(): bool
+    {
+        if (! $this->isClosed()) {
+            return false;
+        }
+
+        if ($this->status === 'expiring') {
+            return true;
+        }
+
+        if ($this->expiration === null) {
+            return false;
+        }
+
+        return $this->expiration
+            ->copy()
+            ->addSeconds(self::POST_EXPIRY_ANSWER_GRACE_SECONDS)
+            ->isFuture();
     }
 
     public function rank(): Attribute

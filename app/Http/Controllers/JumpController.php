@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\JumpActivated;
+use App\Events\JumpExpired;
 use App\Events\JumpReopened;
 use App\Models\Course;
 use App\Models\Jump;
@@ -53,6 +54,7 @@ class JumpController extends Controller
         ]);
 
         $data = $request->only(['nb_questions', 'time', 'growth', 'expiration']);
+        $wasClosed = $jump->isClosed();
 
         if ($request->has('status') && $request->input('status') === 'active' && $jump->status === 'draft') {
             $this->activateJump($jump, $jump->course);
@@ -70,9 +72,15 @@ class JumpController extends Controller
 
         $jump->update(array_filter($data, fn ($v) => $v !== null));
 
+        $fresh = $jump->fresh();
+
+        if (! $wasClosed && $fresh->isClosed()) {
+            broadcast(new JumpExpired($fresh));
+        }
+
         return response()->json([
             'message' => 'Jump updated.',
-            'jump' => $jump->fresh(),
+            'jump' => $fresh,
         ]);
     }
 

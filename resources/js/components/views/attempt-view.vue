@@ -5,10 +5,11 @@
       v-if="isInProgress"
       class="relative bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 flex items-center justify-between gap-4"
     >
-      <div class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-error bg-error/5">
+      <div class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-error bg-error/5" v-if="blurSecurity">
         <AlertTriangle class="w-5 h-5 text-error flex-shrink-0" />
         <p class="text-md font-medium text-error">Ne pas quitter cette page</p>
       </div>
+      <div v-else></div>
       <div class="absolute left-1/2 -translate-x-1/2 text-4xl font-semibold text-secondary truncate max-w-xs text-center">
         {{ attemptStore.attempt?.name }}
       </div>

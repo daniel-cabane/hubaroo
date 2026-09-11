@@ -19,7 +19,7 @@ class JumpRejoinDemandController extends Controller
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
-        if ($jumpAttempt->jump->isExpired()) {
+        if ($jumpAttempt->jump->isClosed()) {
             return response()->json(['message' => 'Ce saut est terminé.'], 403);
         }
 

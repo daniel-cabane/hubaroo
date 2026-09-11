@@ -102,3 +102,34 @@ test('teacher myIndex returns demands with correct structure including answered_
     expect($demand['attempt']['timer'])->toBe(120);
     expect($demand['attempt']['user']['name'])->toBe($this->student->name);
 });
+
+test('student cannot create a rejoin demand for an expiring jump', function () {
+    $this->jump->update([
+        'status' => 'expiring',
+        'expiration' => now()->subMinute(),
+    ]);
+
+    $this->actingAs($this->student)->postJson("/api/jump-attempts/{$this->attempt->id}/rejoin-demand")
+        ->assertForbidden()
+        ->assertJsonPath('message', 'Ce saut est terminé.');
+});
+
+test('student cannot create a rejoin demand for an expired jump', function () {
+    $this->jump->update([
+        'status' => 'expired',
+        'expiration' => now()->subMinutes(5),
+    ]);
+
+    $this->actingAs($this->student)->postJson("/api/jump-attempts/{$this->attempt->id}/rejoin-demand")
+        ->assertForbidden();
+});
+
+test('student cannot create a rejoin demand during the post-expiry grace window', function () {
+    $this->jump->update([
+        'status' => 'expired',
+        'expiration' => now()->subMinute(),
+    ]);
+
+    $this->actingAs($this->student)->postJson("/api/jump-attempts/{$this->attempt->id}/rejoin-demand")
+        ->assertForbidden();
+});

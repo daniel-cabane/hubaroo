@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Events\JumpAttemptUpdated;
 use App\Http\Requests\SubmitJumpAttemptRequest;
 use App\Http\Requests\SyncJumpAttemptRequest;
+use App\Jobs\AnalyseJump;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
 use App\Models\Question;
 use App\Models\User;
+use App\Services\JumpGradingService;
 use App\Services\JumpQuestionSelector;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,13 +18,16 @@ use Symfony\Component\HttpFoundation\Response;
 
 class JumpAttemptController extends Controller
 {
-    public function __construct(public JumpQuestionSelector $questionSelector) {}
+    public function __construct(
+        public JumpQuestionSelector $questionSelector,
+        public JumpGradingService $jumpGradingService,
+    ) {}
 
     public function store(Jump $jump, Request $request): JsonResponse
     {
         $user = $request->user();
 
-        if (! $jump->isActive()) {
+        if ($jump->isClosed() || ! $jump->isActive()) {
             return response()->json(['message' => "Ce saut n'est pas disponible."], 403);
         }
 
@@ -112,15 +117,24 @@ class JumpAttemptController extends Controller
             return response()->json(['message' => 'Forbidden.'], 403);
         }
 
-        if ($jumpAttempt->status !== 'inProgress') {
-            return response()->json(['message' => 'This attempt is not in progress.'], 403);
-        }
+        $jump = $jumpAttempt->jump;
 
         $request->validate([
             'question_index' => ['required', 'integer', 'min:0'],
             'answer' => ['nullable', 'string', 'max:10'],
             'timer' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        if ($jump->isClosed()) {
+            if (! $this->canWriteAnswersAfterClose($jumpAttempt, $jump)) {
+                return response()->json([
+                    'jump_closed' => true,
+                    'saved' => false,
+                ]);
+            }
+        } elseif ($jumpAttempt->status !== 'inProgress') {
+            return response()->json(['message' => 'This attempt is not in progress.'], 403);
+        }
 
         $index = $request->integer('question_index');
         $questionList = $jumpAttempt->question_list ?? [];
@@ -136,75 +150,91 @@ class JumpAttemptController extends Controller
             'timer' => $request->integer('timer', $jumpAttempt->timer),
         ]);
 
+        if ($jump->isClosed()) {
+            broadcast(new JumpAttemptUpdated($jumpAttempt->fresh()));
+
+            return response()->json([
+                'jump_closed' => true,
+                'saved' => true,
+            ]);
+        }
+
         return response()->noContent();
     }
 
     public function sync(SyncJumpAttemptRequest $request, JumpAttempt $jumpAttempt): Response
     {
+        $jump = $jumpAttempt->jump;
+
+        if ($jump->isClosed()) {
+            if (! $this->canWriteAnswersAfterClose($jumpAttempt, $jump)) {
+                return response()->json([
+                    'jump_closed' => true,
+                    'saved' => false,
+                ]);
+            }
+
+            return $this->persistSyncChanges($request, $jumpAttempt, closed: true);
+        }
+
         if ($jumpAttempt->status !== 'inProgress') {
             return response()->json(['message' => 'This attempt is not in progress.'], 403);
         }
 
-        $questionList = $jumpAttempt->question_list ?? [];
-        $questionListChanged = false;
-
-        foreach ($request->validated('changes', []) as $change) {
-            $index = $change['question_index'];
-
-            if (! isset($questionList[$index])) {
-                return response()->json(['message' => 'Invalid question index.'], 422);
-            }
-
-            $newAnswer = $change['answer'];
-            $currentAnswer = $questionList[$index]['answer'] ?? null;
-
-            if ($currentAnswer !== $newAnswer) {
-                $questionList[$index]['answer'] = $newAnswer;
-                $questionListChanged = true;
-            }
-        }
-
-        $timer = $request->integer('timer', $jumpAttempt->timer);
-        $timerChanged = $timer !== $jumpAttempt->timer;
-
-        if (! $questionListChanged && ! $timerChanged) {
-            return response()->noContent();
-        }
-
-        $jumpAttempt->update([
-            'question_list' => $questionList,
-            'timer' => $timer,
-        ]);
-
-        broadcast(new JumpAttemptUpdated($jumpAttempt->fresh()));
-
-        return response()->noContent();
+        return $this->persistSyncChanges($request, $jumpAttempt, closed: false);
     }
 
     public function submit(SubmitJumpAttemptRequest $request, JumpAttempt $jumpAttempt): JsonResponse
     {
-        if ($jumpAttempt->status !== 'inProgress') {
+        $jump = $jumpAttempt->jump;
+        $alreadyFinished = $jumpAttempt->status === 'finished';
+        $jumpClosed = $jump->isClosed();
+
+        if ($alreadyFinished && ! $jumpClosed) {
             return response()->json(['message' => 'Already submitted.'], 403);
         }
 
-        $updateData = [
-            'status' => 'finished',
-            'timer' => $request->integer('timer', $jumpAttempt->timer),
-            'termination' => $request->input('termination', 'submitted'),
-        ];
+        $hasQuestionList = $request->has('question_list') && is_array($request->input('question_list'));
+        $shouldPersistQuestionList = $hasQuestionList && (! $jumpClosed || $jump->allowsLateAnswerSave());
 
-        // Persist all answers sent with the submit request
-        if ($request->has('question_list') && is_array($request->input('question_list'))) {
+        if ($alreadyFinished && ! $shouldPersistQuestionList) {
+            return $this->submitSuccessResponse($jumpAttempt, broadcast: false);
+        }
+
+        $previousQuestionList = $jumpAttempt->question_list;
+        $updateData = [];
+
+        if ($request->exists('timer')) {
+            $updateData['timer'] = $request->integer('timer', $jumpAttempt->timer);
+        }
+
+        $requestedTermination = $request->input('termination', 'submitted');
+
+        if ($jumpAttempt->status === 'inProgress' || $jumpAttempt->termination === 'timeout') {
+            $updateData['termination'] = $requestedTermination;
+        }
+
+        if ($jumpAttempt->status === 'inProgress') {
+            $updateData['status'] = 'finished';
+        }
+
+        if ($shouldPersistQuestionList) {
             $updateData['question_list'] = $request->input('question_list');
         }
 
-        $jumpAttempt->update($updateData);
+        if ($updateData !== []) {
+            $jumpAttempt->update($updateData);
+        }
 
-        $fresh = $jumpAttempt->fresh()->load('jump.course');
+        $answersChanged = $shouldPersistQuestionList
+            && $this->questionListAnswersChanged($previousQuestionList, $jumpAttempt->question_list);
 
-        broadcast(new JumpAttemptUpdated($fresh));
+        if ($jump->isExpired() && $answersChanged) {
+            $this->jumpGradingService->gradeAttempt($jumpAttempt->fresh());
+            AnalyseJump::dispatch($jump->fresh());
+        }
 
-        return response()->json(['attempt' => $this->withQuestionImages($fresh)]);
+        return $this->submitSuccessResponse($jumpAttempt, broadcast: true);
     }
 
     /**
@@ -230,6 +260,92 @@ class JumpAttemptController extends Controller
         $data['question_list'] = $questionList;
 
         return $data;
+    }
+
+    private function canWriteAnswersAfterClose(JumpAttempt $attempt, Jump $jump): bool
+    {
+        if (! $jump->allowsLateAnswerSave()) {
+            return false;
+        }
+
+        if ($attempt->status === 'inProgress') {
+            return true;
+        }
+
+        return $attempt->status === 'finished' && $attempt->termination === 'timeout';
+    }
+
+    private function persistSyncChanges(SyncJumpAttemptRequest $request, JumpAttempt $jumpAttempt, bool $closed): Response
+    {
+        $questionList = $jumpAttempt->question_list ?? [];
+        $questionListChanged = false;
+
+        foreach ($request->validated('changes', []) as $change) {
+            $index = $change['question_index'];
+
+            if (! isset($questionList[$index])) {
+                return response()->json(['message' => 'Invalid question index.'], 422);
+            }
+
+            $newAnswer = $change['answer'];
+            $currentAnswer = $questionList[$index]['answer'] ?? null;
+
+            if ($currentAnswer !== $newAnswer) {
+                $questionList[$index]['answer'] = $newAnswer;
+                $questionListChanged = true;
+            }
+        }
+
+        $timer = $request->integer('timer', $jumpAttempt->timer);
+        $timerChanged = $timer !== $jumpAttempt->timer;
+
+        if ($questionListChanged || $timerChanged) {
+            $jumpAttempt->update([
+                'question_list' => $questionList,
+                'timer' => $timer,
+            ]);
+
+            broadcast(new JumpAttemptUpdated($jumpAttempt->fresh()));
+        }
+
+        if ($closed) {
+            return response()->json([
+                'jump_closed' => true,
+                'saved' => true,
+            ]);
+        }
+
+        return response()->noContent();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>|null  $previous
+     * @param  array<int, array<string, mixed>>|null  $next
+     */
+    private function questionListAnswersChanged(?array $previous, ?array $next): bool
+    {
+        $normalize = function (?array $list): array {
+            return collect($list ?? [])
+                ->map(fn (array $item): array => [
+                    'id' => $item['id'] ?? null,
+                    'answer' => $item['answer'] ?? null,
+                ])
+                ->values()
+                ->all();
+        };
+
+        return $normalize($previous) !== $normalize($next);
+    }
+
+    private function submitSuccessResponse(JumpAttempt $jumpAttempt, bool $broadcast): JsonResponse
+    {
+        $fresh = $jumpAttempt->fresh()->load('jump.course');
+
+        if ($broadcast) {
+            broadcast(new JumpAttemptUpdated($fresh));
+        }
+
+        return response()->json(['attempt' => $this->withQuestionImages($fresh)]);
     }
 
     public function myIndex(Request $request): JsonResponse

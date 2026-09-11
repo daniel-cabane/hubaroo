@@ -18,7 +18,7 @@
       </h1>
 
       <!-- Awaiting expiry -->
-      <div v-if="!isJumpExpired" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-6 text-center space-y-4">
+      <div v-if="!scoresReady" class="bg-surface dark:bg-gray-900 border border-border rounded-xl p-6 text-center space-y-4">
         <LaptopMinimalCheck class="w-12 h-12 text-text-muted mx-auto" />
         <p class="text-6xl text-text-main">Atterrissage !</p>
         <p class="text-sm text-text-muted">Saut terminé</p>
@@ -36,7 +36,7 @@
           </router-link>
         </div>
 
-        <div v-if="jumpAttemptStore.attempt.status === 'finished' && !isJumpExpired && jumpAttemptStore.attempt.termination !== 'timeout'" class="pt-10">
+        <div v-if="jumpAttemptStore.attempt.status === 'finished' && !isJumpClosed && jumpAttemptStore.attempt.termination !== 'timeout'" class="pt-10">
           <div v-if="!rejoinDemandSent">
             <p class="text-sm text-text-muted mb-3">Avez-vous quitté par erreur ?</p>
             <button
@@ -141,12 +141,30 @@ const jumpRejoinDemandStore = useJumpRejoinDemandStore();
 
 const rejoinDemandSent = ref(false);
 const currentDemandId = ref(null);
+const jumpClosedFlag = ref(false);
 let expiryWatcher = null;
 let jumpChannel = null;
 
 const questionList = computed(() => jumpAttemptStore.attempt?.question_list ?? []);
 
-const isJumpExpired = computed(() => jumpAttemptStore.attempt?.jump?.status === 'expired');
+const scoresReady = computed(() => jumpAttemptStore.attempt?.jump?.status === 'expired');
+
+const isJumpClosed = computed(() => {
+  if (jumpClosedFlag.value) {
+    return true;
+  }
+
+  const jump = jumpAttemptStore.attempt?.jump;
+  if (!jump) {
+    return false;
+  }
+
+  if (jump.status === 'expiring' || jump.status === 'expired') {
+    return true;
+  }
+
+  return Boolean(jump.expiration && new Date(jump.expiration) <= new Date());
+});
 
 const correctCount = computed(() => questionList.value.filter(q => q.status === 'correct').length);
 
@@ -197,31 +215,46 @@ async function handleRejoinRequest() {
   }
 }
 
+async function handleJumpClosed() {
+  jumpClosedFlag.value = true;
+  try {
+    await jumpAttemptStore.fetchAttempt(route.params.attemptId);
+  } catch {
+    // keep the closed flag even if refetch fails
+  }
+}
+
 async function loadAttempt() {
   await jumpAttemptStore.fetchAttempt(route.params.attemptId);
+  startCloseWatch();
+}
 
-  if (!isJumpExpired.value && jumpAttemptStore.attempt?.jump?.id) {
-    const jumpId = jumpAttemptStore.attempt.jump.id;
+function startCloseWatch() {
+  const jump = jumpAttemptStore.attempt?.jump;
+  if (!jump?.id) {
+    return;
+  }
 
-    // Listen for real-time expiry event
-    jumpChannel = window.Echo.channel(`jump.${jumpId}`)
+  if (!scoresReady.value) {
+    jumpChannel = window.Echo.channel(`jump.${jump.id}`)
       .listen('.JumpExpired', async () => {
         if (expiryWatcher) {
           clearTimeout(expiryWatcher);
           expiryWatcher = null;
         }
-        await jumpAttemptStore.fetchAttempt(route.params.attemptId);
+        await handleJumpClosed();
       });
+  }
 
-    // Fallback timeout for jumps expiring within the hour (covers missed events)
-    const expiration = jumpAttemptStore.attempt.jump.expiration;
-    if (expiration) {
-      const msLeft = new Date(expiration).getTime() - Date.now();
-      if (msLeft > 0 && msLeft < 3_600_000) {
-        expiryWatcher = setTimeout(async () => {
-          await jumpAttemptStore.fetchAttempt(route.params.attemptId);
-        }, msLeft + 2000);
-      }
+  if (!isJumpClosed.value && jump.expiration) {
+    const delay = new Date(jump.expiration).getTime() - Date.now();
+    if (delay <= 0) {
+      void handleJumpClosed();
+    } else {
+      expiryWatcher = setTimeout(() => {
+        expiryWatcher = null;
+        void handleJumpClosed();
+      }, delay);
     }
   }
 }

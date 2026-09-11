@@ -7,6 +7,7 @@ use App\Models\Jump;
 use App\Models\JumpAttempt;
 use App\Models\Question;
 use App\Models\User;
+use App\Services\JumpGradingService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Collection;
@@ -16,8 +17,10 @@ class ExpireJumps implements ShouldQueue
 {
     use Queueable;
 
-    public function handle(): void
+    public function handle(?JumpGradingService $jumpGradingService = null): void
     {
+        $jumpGradingService ??= app(JumpGradingService::class);
+
         // Transition active jumps that have reached their expiration to 'expiring'
         Jump::where('status', 'active')
             ->where('expiration', '<=', now())
@@ -27,7 +30,7 @@ class ExpireJumps implements ShouldQueue
         $jumps = Jump::where('status', 'expiring')->get();
 
         foreach ($jumps as $jump) {
-            $this->gradeAllAttemptsForJump($jump);
+            $this->gradeAllAttemptsForJump($jump, $jumpGradingService);
             $jump->update(['status' => 'expired']);
             broadcast(new JumpExpired($jump));
             AnalyseJump::dispatch($jump->fresh());
@@ -45,13 +48,13 @@ class ExpireJumps implements ShouldQueue
             $correctAnswers = Question::whereIn('id', $questionIds)->pluck('correct_answer', 'id');
             $questions = Question::whereIn('id', $questionIds)->get()->keyBy('id');
             foreach ($attempts as $attempt) {
-                $this->gradeAttempt($attempt, $correctAnswers);
+                $jumpGradingService->gradeAttempt($attempt, $correctAnswers);
                 $this->updateMasteryAndDifficulty($attempt->fresh(), $questions);
             }
         }
     }
 
-    private function gradeAllAttemptsForJump(Jump $jump): void
+    private function gradeAllAttemptsForJump(Jump $jump, JumpGradingService $jumpGradingService): void
     {
         $attempts = JumpAttempt::where('jump_id', $jump->id)->get();
 
@@ -63,36 +66,9 @@ class ExpireJumps implements ShouldQueue
             if ($attempt->status === 'inProgress') {
                 $attempt->update(['status' => 'finished', 'termination' => 'timeout']);
             }
-            $this->gradeAttempt($attempt, $correctAnswers);
+            $jumpGradingService->gradeAttempt($attempt, $correctAnswers);
             $this->updateMasteryAndDifficulty($attempt->fresh(), $questions);
         }
-    }
-
-    /**
-     * @param  Collection<int, string>  $correctAnswers
-     */
-    private function gradeAttempt(JumpAttempt $attempt, Collection $correctAnswers): void
-    {
-        $questionList = $attempt->question_list ?? [];
-        $score = 0;
-
-        foreach ($questionList as &$item) {
-            $correct = $correctAnswers->get($item['id']);
-            $given = $item['answer'] ?? null;
-
-            if ($given !== null && $correct !== null) {
-                $item['status'] = $given === $correct ? 'correct' : 'incorrect';
-            } else {
-                $item['status'] = 'incorrect';
-            }
-
-            if ($item['status'] === 'correct') {
-                $score += (int) ($item['difficulty'] ?? 0);
-            }
-        }
-        unset($item);
-
-        $attempt->update(['question_list' => $questionList, 'score' => $score]);
     }
 
     /**

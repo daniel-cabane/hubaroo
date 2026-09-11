@@ -233,6 +233,7 @@ const showKeypad = ref(false);
 let timerInterval = null;
 let blurInterval = null;
 let answerSyncInterval = null;
+let jumpExpiryTimeout = null;
 const isSubmitting = ref(false);
 
 const questionList = computed(() => jumpAttemptStore.attempt?.question_list ?? []);
@@ -369,11 +370,20 @@ async function flushPendingAnswerChanges() {
   }
 
   try {
-    return await jumpAttemptStore.flushAnswerChanges(
+    const result = await jumpAttemptStore.flushAnswerChanges(
       jumpAttemptStore.attempt.id,
       remainingSeconds.value
     );
-  } catch {
+    if (result?.jumpClosed && !isSubmitting.value) {
+      stopAnswerSyncLoop();
+      void finalizeAttempt('timeout', { forceAfterClose: true });
+    }
+    return result;
+  } catch (err) {
+    if (err.response?.status === 403 && !isSubmitting.value) {
+      stopAnswerSyncLoop();
+      void finalizeAttempt('timeout', { forceAfterClose: isJumpClosed() });
+    }
     return false;
   }
 }
@@ -399,23 +409,7 @@ function stopAnswerSyncLoop() {
 
 async function handleSubmit() {
   showSubmitModal.value = false;
-  isSubmitting.value = true;
-  try {
-    await flushPendingAnswerChanges();
-    await jumpAttemptStore.submitAttempt(
-      jumpAttemptStore.attempt.id,
-      remainingSeconds.value,
-      'submitted',
-      questionList.value
-    );
-    router.replace({
-      name: 'JumpResults',
-      params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
-    });
-  } catch {
-    isSubmitting.value = false;
-    // handled by store
-  }
+  await finalizeAttempt('submitted', { forceAfterClose: isJumpClosed() });
 }
 
 function toggleTimer() {
@@ -474,8 +468,84 @@ function startCountdown(timeLimitMinutes, extraTimeSeconds = 0) {
 }
 
 async function autoSubmit(termination = 'timeout') {
-  if (!isInProgress.value) return;
+  await finalizeAttempt(termination, { forceAfterClose: isJumpClosed() });
+}
+
+function isJumpClosed() {
+  const jump = jumpAttemptStore.attempt?.jump;
+  if (!jump) {
+    return false;
+  }
+
+  if (jump.status === 'expiring' || jump.status === 'expired') {
+    return true;
+  }
+
+  return Boolean(jump.expiration && new Date(jump.expiration) <= new Date());
+}
+
+function goToResults() {
+  if (!jumpAttemptStore.attempt?.id) {
+    return;
+  }
+
+  router.replace({
+    name: 'JumpResults',
+    params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
+  });
+}
+
+function stopJumpExpiryDeadline() {
+  if (!jumpExpiryTimeout) {
+    return;
+  }
+
+  clearTimeout(jumpExpiryTimeout);
+  jumpExpiryTimeout = null;
+}
+
+function startJumpExpiryDeadline() {
+  stopJumpExpiryDeadline();
+
+  const expiration = jumpAttemptStore.attempt?.jump?.expiration;
+  if (!expiration || !isInProgress.value) {
+    return;
+  }
+
+  const delay = new Date(expiration).getTime() - Date.now();
+  if (delay <= 0) {
+    void finalizeAttempt('timeout', { forceAfterClose: true });
+    return;
+  }
+
+  jumpExpiryTimeout = setTimeout(() => {
+    jumpExpiryTimeout = null;
+    void finalizeAttempt('timeout', { forceAfterClose: true });
+  }, delay);
+}
+
+async function finalizeAttempt(termination = 'submitted', { forceAfterClose = false } = {}) {
+  if (isSubmitting.value) {
+    return;
+  }
+  if (!isInProgress.value && !forceAfterClose) {
+    return;
+  }
+
   isSubmitting.value = true;
+  stopAnswerSyncLoop();
+  stopJumpExpiryDeadline();
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  if (blurInterval) {
+    clearInterval(blurInterval);
+    blurInterval = null;
+  }
+  showSubmitModal.value = false;
+  showBlurAlarm.value = false;
+
   try {
     await flushPendingAnswerChanges();
     await jumpAttemptStore.submitAttempt(
@@ -484,13 +554,13 @@ async function autoSubmit(termination = 'timeout') {
       termination,
       questionList.value
     );
-    router.replace({
-      name: 'JumpResults',
-      params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
-    });
+    goToResults();
   } catch {
+    if (forceAfterClose || isJumpClosed()) {
+      goToResults();
+      return;
+    }
     isSubmitting.value = false;
-    // handled by store
   }
 }
 
@@ -631,6 +701,7 @@ onMounted(async () => {
     const jump = jumpAttemptStore.attempt?.jump;
     const extraTimeSeconds = jumpAttemptStore.attempt?.extra_time ?? 0;
     startCountdown(jump?.time ?? 15, extraTimeSeconds);
+    startJumpExpiryDeadline();
     startAnswerSyncLoop();
     window.addEventListener('keydown', handleKeydown);
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -643,22 +714,7 @@ onMounted(async () => {
 
     window.Echo.channel(`jump.${route.params.jumpId}`)
       .listen('.JumpExpired', () => {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        clearInterval(blurInterval);
-        blurInterval = null;
-        stopAnswerSyncLoop();
-        jumpAttemptStore.resetAnswerSyncState();
-        showBlurAlarm.value = false;
-        window.removeEventListener('keydown', handleKeydown);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        window.removeEventListener('pagehide', handlePageHide);
-        window.removeEventListener('blur', handleBlur);
-        window.removeEventListener('focus', handleFocus);
-        router.replace({
-          name: 'JumpResults',
-          params: { jumpId: route.params.jumpId, attemptId: jumpAttemptStore.attempt.id },
-        });
+        void finalizeAttempt('timeout', { forceAfterClose: true });
       });
   }
 });
@@ -667,6 +723,7 @@ onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
   stopAnswerSyncLoop();
+  stopJumpExpiryDeadline();
   window.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('beforeunload', handleBeforeUnload);
   window.removeEventListener('pagehide', handlePageHide);
