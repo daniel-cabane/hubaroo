@@ -600,7 +600,7 @@
               v-else-if="activeJumpRejoinableAttempt && pendingRejoinAttemptId !== activeJumpRejoinableAttempt.id"
               @click="requestRejoinForActiveJump"
               :disabled="jumpAttemptStore.isLoading"
-              class="px-4 py-2 rounded-lg bg-info hover:bg-info-hover text-surface text-sm font-medium cursor-pointer transition-colors disabled:opacity-50"
+              class="px-4 py-2 rounded-lg border border-info text-info hover:bg-info/10 text-sm font-medium cursor-pointer transition-colors disabled:opacity-50"
             >
               Demander à reprendre
             </button>
@@ -1996,7 +1996,7 @@ function jumpDetailNumber(jump) {
 
 function formatJumpDate(val) {
   if (!val) return '';
-  return new Date(val).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  return new Date(val).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 async function openJumpDetail(jump) {

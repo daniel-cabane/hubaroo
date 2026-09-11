@@ -183,12 +183,43 @@
     </div>
 
     <!-- Submit -->
-    <div v-if="isInProgress" class="bg-surface dark:bg-gray-900 border-t border-border px-4 py-3 flex items-center justify-center">
-      <button
-        @click="showSubmitModal = true"
-        class="px-6 py-2 rounded-lg bg-primary hover:bg-primary-hover text-surface cursor-pointer font-medium transition-colors"
+    <div v-if="isInProgress" class="bg-surface dark:bg-gray-900 border-t border-border px-4 py-3 flex items-center justify-between gap-3">
+      <div
+        ref="unlockTrack"
+        class="relative h-12 flex-1 max-w-xs min-w-0 rounded-lg shadow-inner select-none touch-none overflow-hidden"
+        :class="submitUnlocked ? 'bg-success/10' : 'bg-gray-100 dark:bg-gray-800'"
       >
-        Terminer la session
+        <div
+          ref="unlockHandle"
+          class="absolute top-1 left-1 z-10 h-10 px-3 rounded-md bg-surface dark:bg-gray-700 text-text-main dark:text-surface text-sm font-medium shadow border flex items-center justify-center whitespace-nowrap cursor-grab active:cursor-grabbing touch-none"
+          :class="[
+            sliderDragging ? '' : 'transition-transform duration-200 ease-out',
+            submitUnlocked ? 'border-success' : 'border-border',
+          ]"
+          :style="{ transform: `translate3d(${sliderX}px, 0, 0)` }"
+          role="slider"
+          :aria-valuenow="submitUnlocked ? 1 : 0"
+          aria-valuemin="0"
+          aria-valuemax="1"
+          aria-label="Glisser pour confirmer que vous avez fini"
+          draggable="false"
+          @pointerdown="onSliderPointerDown"
+          @pointermove="onSliderPointerMove"
+          @pointerup="onSliderPointerUp"
+          @pointercancel="onSliderPointerUp"
+        >
+          J'ai fini →
+        </div>
+      </div>
+      <button
+        @click="openSubmitModal"
+        :disabled="!submitUnlocked"
+        class="h-12 px-4 sm:px-6 rounded-lg font-medium transition-colors flex-shrink-0 whitespace-nowrap"
+        :class="submitUnlocked
+          ? 'bg-primary hover:bg-primary-hover text-surface cursor-pointer'
+          : 'bg-gray-200 dark:bg-gray-800 text-text-muted cursor-not-allowed'"
+      >
+        Quitter la session
       </button>
     </div>
 
@@ -243,7 +274,7 @@
         </p>
         <div class="flex gap-3">
           <button
-            @click="showSubmitModal = false"
+            @click="cancelSubmitModal"
             class="flex-1 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 cursor-pointer text-text-main dark:text-surface transition-colors"
           >
             Annuler
@@ -291,6 +322,11 @@ const remainingSeconds = ref(0);
 const numericInputValue = ref('');
 const showKeypad = ref(false);
 const showImageOverlay = ref(false);
+const unlockTrack = ref(null);
+const unlockHandle = ref(null);
+const sliderX = ref(0);
+const sliderDragging = ref(false);
+const submitUnlocked = ref(false);
 const questionOrder = ref([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
 const isShuffled = ref(false);
 
@@ -298,6 +334,9 @@ let timerInterval = null;
 let blurInterval = null;
 let answerSyncInterval = null;
 let sessionExpiryTimeout = null;
+let sliderPointerId = null;
+let sliderStartX = 0;
+let sliderOriginX = 0;
 const isSubmitting = ref(false);
 
 const session = computed(() => sessionStore.session);
@@ -470,6 +509,75 @@ function stopAnswerSyncLoop() {
 
   clearInterval(answerSyncInterval);
   answerSyncInterval = null;
+}
+
+function getSliderMaxX() {
+  const track = unlockTrack.value;
+  const handle = unlockHandle.value;
+  if (!track || !handle) {
+    return 0;
+  }
+
+  return Math.max(0, track.clientWidth - handle.offsetWidth - 8);
+}
+
+function resetSubmitSlider() {
+  sliderX.value = 0;
+  submitUnlocked.value = false;
+  sliderDragging.value = false;
+  sliderPointerId = null;
+}
+
+function onSliderPointerDown(e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) {
+    return;
+  }
+
+  e.preventDefault();
+  sliderDragging.value = true;
+  sliderPointerId = e.pointerId;
+  sliderStartX = e.clientX;
+  sliderOriginX = sliderX.value;
+  e.currentTarget.setPointerCapture(e.pointerId);
+}
+
+function onSliderPointerMove(e) {
+  if (!sliderDragging.value || e.pointerId !== sliderPointerId) {
+    return;
+  }
+
+  const max = getSliderMaxX();
+  const next = sliderOriginX + (e.clientX - sliderStartX);
+  sliderX.value = Math.max(0, Math.min(max, next));
+}
+
+function onSliderPointerUp(e) {
+  if (!sliderDragging.value || e.pointerId !== sliderPointerId) {
+    return;
+  }
+
+  sliderDragging.value = false;
+  sliderPointerId = null;
+  const max = getSliderMaxX();
+  if (max > 0 && sliderX.value >= max * 0.85) {
+    sliderX.value = max;
+    submitUnlocked.value = true;
+  } else {
+    sliderX.value = 0;
+    submitUnlocked.value = false;
+  }
+}
+
+function openSubmitModal() {
+  if (!submitUnlocked.value) {
+    return;
+  }
+  showSubmitModal.value = true;
+}
+
+function cancelSubmitModal() {
+  showSubmitModal.value = false;
+  resetSubmitSlider();
 }
 
 async function handleSubmit() {
