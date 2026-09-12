@@ -177,41 +177,55 @@
     </div>
 
     <!-- Submit -->
-    <div v-if="isInProgress" class="bg-surface dark:bg-gray-900 border-t border-border px-4 py-3 flex items-center justify-between gap-3">
-      <div
-        ref="unlockTrack"
-        class="relative h-12 flex-1 max-w-xs min-w-0 rounded-lg shadow-inner select-none touch-none overflow-hidden"
-        :class="submitUnlocked ? 'bg-success/10' : 'bg-gray-100 dark:bg-gray-800'"
-      >
+    <div v-if="isInProgress" class="relative z-10 bg-surface dark:bg-gray-900 border-t border-border px-4 py-3 flex items-center justify-between gap-3">
+      <div class="relative flex-1 max-w-xs min-w-0">
         <div
-          ref="unlockHandle"
-          class="absolute top-1 left-1 z-10 h-10 px-3 rounded-md bg-surface dark:bg-gray-700 text-text-main dark:text-surface text-sm font-medium shadow border flex items-center justify-center whitespace-nowrap cursor-grab active:cursor-grabbing touch-none"
-          :class="[
-            sliderDragging ? '' : 'transition-transform duration-200 ease-out',
-            submitUnlocked ? 'border-success' : 'border-border',
-          ]"
-          :style="{ transform: `translate3d(${sliderX}px, 0, 0)` }"
-          role="slider"
-          :aria-valuenow="submitUnlocked ? 1 : 0"
-          aria-valuemin="0"
-          aria-valuemax="1"
-          aria-label="Glisser pour confirmer que vous avez fini"
-          draggable="false"
-          @pointerdown="onSliderPointerDown"
-          @pointermove="onSliderPointerMove"
-          @pointerup="onSliderPointerUp"
-          @pointercancel="onSliderPointerUp"
+          v-if="showUnlockHint"
+          class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-20 px-3 py-1.5 rounded-lg bg-text-main text-surface text-xs font-medium shadow-lg whitespace-nowrap"
         >
-          J'ai fini →
+          Glissez vers la droite pour activer le bouton
+          <span class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-text-main"></span>
+        </div>
+        <div
+          ref="unlockTrack"
+          class="relative h-12 w-full rounded-lg shadow-inner select-none touch-none overflow-hidden"
+          :class="[
+            submitUnlocked ? 'bg-success/40' : 'bg-gray-100 dark:bg-gray-800',
+            showUnlockHint ? 'ring-2 ring-primary' : '',
+          ]"
+        >
+          <div
+            ref="unlockHandle"
+            class="absolute top-1 left-1 z-10 h-10 px-3 rounded-md text-sm font-medium shadow border flex items-center justify-center whitespace-nowrap cursor-grab active:cursor-grabbing touch-none"
+            :class="[
+              sliderDragging ? '' : 'transition-transform duration-200 ease-out',
+              submitUnlocked
+                ? 'bg-success text-white border-success'
+                : 'bg-surface dark:bg-gray-700 text-text-main dark:text-surface border-border',
+            ]"
+            :style="{ transform: `translate3d(${sliderX}px, 0, 0)` }"
+            role="slider"
+            :aria-valuenow="submitUnlocked ? 1 : 0"
+            aria-valuemin="0"
+            aria-valuemax="1"
+            aria-label="Glisser pour confirmer que vous avez fini"
+            draggable="false"
+            @pointerdown="onSliderPointerDown"
+            @pointermove="onSliderPointerMove"
+            @pointerup="onSliderPointerUp"
+            @pointercancel="onSliderPointerUp"
+          >
+            J'ai fini →
+          </div>
         </div>
       </div>
       <button
         @click="openSubmitModal"
-        :disabled="!submitUnlocked"
-        class="h-12 px-4 sm:px-6 rounded-lg font-medium transition-colors flex-shrink-0 whitespace-nowrap"
+        :aria-disabled="!submitUnlocked"
+        class="h-12 px-4 sm:px-6 rounded-lg font-medium transition-colors flex-shrink-0 whitespace-nowrap cursor-pointer"
         :class="submitUnlocked
-          ? 'bg-primary hover:bg-primary-hover text-surface cursor-pointer'
-          : 'bg-gray-200 dark:bg-gray-800 text-text-muted cursor-not-allowed'"
+          ? 'bg-primary hover:bg-primary-hover text-surface'
+          : 'bg-gray-200 dark:bg-gray-800 text-text-muted'"
       >
         Quitter le saut
       </button>
@@ -265,6 +279,7 @@ const unlockHandle = ref(null);
 const sliderX = ref(0);
 const sliderDragging = ref(false);
 const submitUnlocked = ref(false);
+const showUnlockHint = ref(false);
 
 let timerInterval = null;
 let blurInterval = null;
@@ -273,6 +288,7 @@ let jumpExpiryTimeout = null;
 let sliderPointerId = null;
 let sliderStartX = 0;
 let sliderOriginX = 0;
+let unlockHintTimeout = null;
 const isSubmitting = ref(false);
 
 const questionList = computed(() => jumpAttemptStore.attempt?.question_list ?? []);
@@ -456,11 +472,31 @@ function getSliderMaxX() {
   return Math.max(0, track.clientWidth - handle.offsetWidth - 8);
 }
 
+function hideUnlockHint() {
+  showUnlockHint.value = false;
+  if (unlockHintTimeout) {
+    clearTimeout(unlockHintTimeout);
+    unlockHintTimeout = null;
+  }
+}
+
+function promptUnlockSlider() {
+  showUnlockHint.value = true;
+  if (unlockHintTimeout) {
+    clearTimeout(unlockHintTimeout);
+  }
+  unlockHintTimeout = setTimeout(() => {
+    showUnlockHint.value = false;
+    unlockHintTimeout = null;
+  }, 3000);
+}
+
 function resetSubmitSlider() {
   sliderX.value = 0;
   submitUnlocked.value = false;
   sliderDragging.value = false;
   sliderPointerId = null;
+  hideUnlockHint();
 }
 
 function onSliderPointerDown(e) {
@@ -469,6 +505,7 @@ function onSliderPointerDown(e) {
   }
 
   e.preventDefault();
+  hideUnlockHint();
   sliderDragging.value = true;
   sliderPointerId = e.pointerId;
   sliderStartX = e.clientX;
@@ -505,6 +542,7 @@ function onSliderPointerUp(e) {
 
 function openSubmitModal() {
   if (!submitUnlocked.value) {
+    promptUnlockSlider();
     return;
   }
   showSubmitModal.value = true;
@@ -830,6 +868,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
+  hideUnlockHint();
   stopAnswerSyncLoop();
   stopJumpExpiryDeadline();
   window.removeEventListener('keydown', handleKeydown);

@@ -594,8 +594,8 @@ const loadingCourses = ref(false);
 const courses = ref([]);
 const createdJump = ref(null);
 const jumpForm = ref({
-  nb_questions: 7,
-  time: 15,
+  nb_questions: 8,
+  time: 12,
   growth: 3,
 });
 const isCreatingJump = ref(false);
@@ -708,8 +708,8 @@ function openCreateJumpModal() {
   loadingCourses.value = false;
   courses.value = [];
   jumpForm.value = {
-    nb_questions: 7,
-    time: 15,
+    nb_questions: 8,
+    time: 12,
     growth: 3,
   };
   createJumpError.value = '';
