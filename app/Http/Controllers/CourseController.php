@@ -120,6 +120,11 @@ class CourseController extends Controller
 
                         return $item;
                     })->all();
+
+                $breakdown = $attempt->answerBreakdown($correctAnswers);
+                $attempt->correct_count = $breakdown['correct'];
+                $attempt->incorrect_count = $breakdown['incorrect'];
+                $attempt->unanswered_count = $breakdown['unanswered'];
             });
         });
 

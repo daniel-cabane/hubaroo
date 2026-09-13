@@ -24,6 +24,16 @@ class Question extends Model
         'difficulty',
     ];
 
+    /** @var array<string, int> */
+    public const LEVEL_VALUES = [
+        'e' => 1,
+        'b' => 2,
+        'c' => 3,
+        'j' => 4,
+        'p' => 4,
+        's' => 5,
+    ];
+
     /**
      * Get the attributes that should be cast.
      *
@@ -35,6 +45,11 @@ class Question extends Model
             'tier' => 'integer',
             'difficulty' => 'integer',
         ];
+    }
+
+    public static function calculateDifficulty(int $tier, int $level = 1): int
+    {
+        return 300 * max($level, 1) + 100 * (int) round(pow(2, max($tier, 1) - 1));
     }
 
     /**

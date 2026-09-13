@@ -906,40 +906,81 @@
         <div class="flex items-center justify-between p-4 border-b border-border">
           <div>
             <h3 class="text-lg font-semibold text-text-main dark:text-surface">Saut {{ jumpNumber(observedJump) }}</h3>
-            <p class="text-sm text-text-muted">{{ selectedCourseData?.students?.length ?? 0 }} élève{{ (selectedCourseData?.students?.length ?? 0) !== 1 ? 's' : '' }}</p>
+            <p class="text-sm text-text-muted">{{ observedJump.nb_questions ?? 0 }} question{{ (observedJump.nb_questions ?? 0) !== 1 ? 's' : '' }}</p>
           </div>
           <button @click="closeJumpObservation" class="text-text-muted hover:text-text-main transition-colors cursor-pointer"><X class="w-5 h-5" /></button>
         </div>
+        <div class="px-4 py-3 border-b border-border">
+          <input
+            v-model="jumpObservationSearch"
+            type="text"
+            placeholder="Chercher un élève..."
+            class="w-full px-3 py-1.5 text-sm border border-border rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
         <div class="overflow-y-auto flex-1">
           <div v-if="!selectedCourseData?.students?.length" class="text-sm text-text-muted text-center py-8">Aucun élève.</div>
+          <div v-else-if="!jumpObservationStudents.length" class="text-sm text-text-muted text-center py-8">Aucun résultat.</div>
           <table v-else class="w-full text-sm">
             <thead class="bg-gray-50 dark:bg-gray-800 border-b border-border sticky top-0">
               <tr>
-                <th class="px-4 py-3 text-left font-semibold text-text-main dark:text-surface">Élève</th>
-                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Réponses</th>
-                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Temps restant</th>
-                <th v-if="observedJump.status === 'expired'" class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">Score</th>
+                <th class="px-4 py-3 text-left font-semibold text-text-main dark:text-surface">
+                  <button @click="setJumpObservationSort('name')" class="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer">
+                    Élève
+                    <span class="text-xs opacity-50">{{ jumpObservationSortKey === 'name' ? (jumpObservationSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">
+                  <button
+                    @click="setJumpObservationSort('answers')"
+                    class="flex items-center justify-center gap-1 hover:text-primary transition-colors cursor-pointer w-full"
+                    title="Correctes – Incorrectes – Sans réponse"
+                  >
+                    Réponses
+                    <span class="text-xs opacity-50">{{ jumpObservationSortKey === 'answers' ? (jumpObservationSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                  </button>
+                </th>
+                <th class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">
+                  <button @click="setJumpObservationSort('timer')" class="flex items-center justify-center gap-1 hover:text-primary transition-colors cursor-pointer w-full">
+                    Temps restant
+                    <span class="text-xs opacity-50">{{ jumpObservationSortKey === 'timer' ? (jumpObservationSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                  </button>
+                </th>
+                <th v-if="observedJump.status === 'expired'" class="px-4 py-3 text-center font-semibold text-text-main dark:text-surface">
+                  <button @click="setJumpObservationSort('score')" class="flex items-center justify-center gap-1 hover:text-primary transition-colors cursor-pointer w-full">
+                    Score
+                    <span class="text-xs opacity-50">{{ jumpObservationSortKey === 'score' ? (jumpObservationSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-border">
               <tr
-              v-for="student in selectedCourseData.students"
-              :key="student.id"
+              v-for="row in jumpObservationStudents"
+              :key="row.student.id"
               class="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              <td class="px-4 py-3 font-medium text-text-main dark:text-surface">{{ student.pivot?.class_name ?? student.name }}</td>
+              <td class="px-4 py-3 font-medium text-text-main dark:text-surface">{{ row.student.pivot?.class_name ?? row.student.name }}</td>
               <td class="px-4 py-3 text-center">
-                <span v-if="getAttempt(observedJump, student)" class="font-medium text-text-main dark:text-surface">
-                  {{ formatCourseObservationProgress(getAttempt(observedJump, student)) }}
+                <span
+                  v-if="row.breakdown"
+                  class="font-medium tabular-nums"
+                  title="Correctes – Incorrectes – Sans réponse"
+                >
+                  <span class="text-success">{{ row.breakdown.correct }}</span>
+                  <span class="text-text-muted">-</span>
+                  <span class="text-error">{{ row.breakdown.incorrect }}</span>
+                  <span class="text-text-muted">-</span>
+                  <span class="text-text-muted">{{ row.breakdown.unanswered }}</span>
                 </span>
                 <span v-else class="text-xs text-text-muted">—</span>
               </td>
               <td class="px-4 py-3 text-center font-mono text-sm text-text-muted">
-                <template v-if="getAttempt(observedJump, student)?.status === 'inProgress'">
-                  {{ formatCourseObservationTimer(getCourseObservationRemainingSeconds(getAttempt(observedJump, student))) }}
+                <template v-if="row.attempt?.status === 'inProgress'">
+                  {{ formatCourseObservationTimer(getCourseObservationRemainingSeconds(row.attempt)) }}
                 </template>
                 <span
-                  v-else-if="getAttempt(observedJump, student)?.status === 'finished'"
+                  v-else-if="row.attempt?.status === 'finished'"
                   class="inline-flex items-center rounded-full bg-text-muted/10 px-2 py-0.5 text-xs font-medium text-text-muted"
                 >
                   Terminé
@@ -947,7 +988,7 @@
                 <span v-else class="opacity-40">—</span>
               </td>
               <td v-if="observedJump.status === 'expired'" class="px-4 py-3 text-center font-semibold text-primary">
-                {{ getAttempt(observedJump, student)?.score ?? '—' }}
+                {{ row.attempt?.score ?? '—' }}
               </td>
             </tr>
             </tbody>
@@ -1798,6 +1839,9 @@ const deletingJump = ref(null);
 const showJumpObservationModal = ref(false);
 const observingJumpId = ref(null);
 const observedJump = computed(() => selectedCourseData.value?.jumps?.find(j => j.id === observingJumpId.value) ?? null);
+const jumpObservationSearch = ref('');
+const jumpObservationSortKey = ref('name');
+const jumpObservationSortDir = ref('asc');
 const showCourseAttemptDetailModal = ref(false);
 const selectedCourseAttemptDetail = ref(null);
 const courseAttemptDetailLoading = ref(false);
@@ -2576,6 +2620,169 @@ function formatCourseObservationProgress(attempt) {
   return `${answeredCount} / ${totalQuestions}`;
 }
 
+function hasCourseObservationAnswer(item) {
+  return item?.answer !== null && item?.answer !== undefined && item?.answer !== '';
+}
+
+function getCourseObservationAnswerBreakdown(attempt) {
+  if (!attempt) {
+    return null;
+  }
+
+  if (
+    typeof attempt.correct_count === 'number'
+    && typeof attempt.incorrect_count === 'number'
+    && typeof attempt.unanswered_count === 'number'
+  ) {
+    return {
+      correct: attempt.correct_count,
+      incorrect: attempt.incorrect_count,
+      unanswered: attempt.unanswered_count,
+    };
+  }
+
+  const items = attempt.question_list ?? [];
+  if (!items.length) {
+    return null;
+  }
+
+  let correct = 0;
+  let incorrect = 0;
+  let unanswered = 0;
+
+  for (const item of items) {
+    if (!hasCourseObservationAnswer(item)) {
+      unanswered++;
+      continue;
+    }
+
+    if (item.status === 'correct' || (item.correct_answer != null && item.answer === item.correct_answer)) {
+      correct++;
+    } else {
+      incorrect++;
+    }
+  }
+
+  return { correct, incorrect, unanswered };
+}
+
+function jumpObservationStudentName(student) {
+  return (student.pivot?.class_name ?? student.name ?? '').toLowerCase();
+}
+
+function jumpObservationTimerSortValue(attempt) {
+  if (!attempt) {
+    return -1;
+  }
+
+  if (attempt.status === 'inProgress') {
+    return getCourseObservationRemainingSeconds(attempt) ?? 0;
+  }
+
+  if (attempt.status === 'finished') {
+    return 0;
+  }
+
+  return -1;
+}
+
+function setJumpObservationSort(key) {
+  if (jumpObservationSortKey.value === key) {
+    jumpObservationSortDir.value = jumpObservationSortDir.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    jumpObservationSortKey.value = key;
+    jumpObservationSortDir.value = 'asc';
+  }
+}
+
+function resetJumpObservationTable() {
+  jumpObservationSearch.value = '';
+  jumpObservationSortKey.value = 'name';
+  jumpObservationSortDir.value = 'asc';
+}
+
+const jumpObservationStudents = computed(() => {
+  const students = selectedCourseData.value?.students ?? [];
+  const jump = observedJump.value;
+  const query = jumpObservationSearch.value.trim().toLowerCase();
+  const filtered = query
+    ? students.filter((student) => jumpObservationStudentName(student).includes(query))
+    : students;
+  const dir = jumpObservationSortDir.value === 'asc' ? 1 : -1;
+
+  return [...filtered].sort((a, b) => {
+    if (jumpObservationSortKey.value === 'name') {
+      return jumpObservationStudentName(a).localeCompare(jumpObservationStudentName(b)) * dir;
+    }
+
+    if (!jump) {
+      return 0;
+    }
+
+    const attemptA = getAttempt(jump, a);
+    const attemptB = getAttempt(jump, b);
+
+    if (jumpObservationSortKey.value === 'answers') {
+      if (!attemptA && !attemptB) {
+        return jumpObservationStudentName(a).localeCompare(jumpObservationStudentName(b));
+      }
+      if (!attemptA) {
+        return 1;
+      }
+      if (!attemptB) {
+        return -1;
+      }
+
+      const breakdownA = getCourseObservationAnswerBreakdown(attemptA) ?? { correct: -1, incorrect: -1, unanswered: -1 };
+      const breakdownB = getCourseObservationAnswerBreakdown(attemptB) ?? { correct: -1, incorrect: -1, unanswered: -1 };
+
+      if (breakdownA.correct !== breakdownB.correct) {
+        return (breakdownA.correct - breakdownB.correct) * dir;
+      }
+      if (breakdownA.incorrect !== breakdownB.incorrect) {
+        return (breakdownA.incorrect - breakdownB.incorrect) * dir;
+      }
+      if (breakdownA.unanswered !== breakdownB.unanswered) {
+        return (breakdownA.unanswered - breakdownB.unanswered) * dir;
+      }
+
+      return jumpObservationStudentName(a).localeCompare(jumpObservationStudentName(b));
+    }
+
+    if (jumpObservationSortKey.value === 'timer') {
+      const timerA = jumpObservationTimerSortValue(attemptA);
+      const timerB = jumpObservationTimerSortValue(attemptB);
+
+      if (timerA !== timerB) {
+        return (timerA - timerB) * dir;
+      }
+
+      return jumpObservationStudentName(a).localeCompare(jumpObservationStudentName(b));
+    }
+
+    if (jumpObservationSortKey.value === 'score') {
+      const scoreA = attemptA?.score ?? Number.NEGATIVE_INFINITY;
+      const scoreB = attemptB?.score ?? Number.NEGATIVE_INFINITY;
+
+      if (scoreA !== scoreB) {
+        return (scoreA - scoreB) * dir;
+      }
+
+      return jumpObservationStudentName(a).localeCompare(jumpObservationStudentName(b));
+    }
+
+    return 0;
+  }).map((student) => {
+    const attempt = jump ? getAttempt(jump, student) : null;
+
+    return {
+      student,
+      attempt,
+      breakdown: getCourseObservationAnswerBreakdown(attempt),
+    };
+  });
+});
+
 function getCourseObservationRemainingSeconds(attempt) {
   if (!attempt || attempt.status !== 'inProgress') {
     return null;
@@ -2587,6 +2794,7 @@ function getCourseObservationRemainingSeconds(attempt) {
 
 function openJumpObservation(jump) {
   observingJumpId.value = jump.id;
+  resetJumpObservationTable();
   showJumpObservationModal.value = true;
   startCourseObservationClock();
 
@@ -2627,6 +2835,7 @@ function closeJumpObservation() {
   stopCourseObservationClock();
   showJumpObservationModal.value = false;
   observingJumpId.value = null;
+  resetJumpObservationTable();
 }
 
 function subscribeToActiveCourseJumps() {

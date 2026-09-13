@@ -79,6 +79,11 @@ test('question difficulty is calculated correctly at tier 4', function () {
     expect($question->difficulty)->toBe(2300);
 });
 
+test('calculateDifficulty uses paper level and question tier', function () {
+    expect(Question::calculateDifficulty(1, 2))->toBe(700)
+        ->and(Question::calculateDifficulty(4, 5))->toBe(2300);
+});
+
 // --- UpdateMasteryAndDifficulty job tests ---
 
 test('correct answer to harder question increases user mastery and decreases question difficulty', function () {

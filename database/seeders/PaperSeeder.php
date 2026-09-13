@@ -39,11 +39,15 @@ class PaperSeeder extends Seeder
                     'year' => $paperData['year'],
                 ]);
 
+                $level = Question::LEVEL_VALUES[$paperData['level']] ?? 1;
+
                 foreach ($paperData['questions'] as $questionData) {
+                    $tier = (int) $questionData['tier'];
                     $question = Question::create([
                         'image' => $questionData['image'],
                         'correct_answer' => $questionData['correct_answer'],
-                        'tier' => $questionData['tier'],
+                        'tier' => $tier,
+                        'difficulty' => Question::calculateDifficulty($tier, $level),
                     ]);
 
                     $paper->questions()->attach($question->id, [
