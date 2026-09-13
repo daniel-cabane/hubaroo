@@ -295,6 +295,46 @@ test('student can fetch their own attempt', function () {
     $response->assertOk()->assertJsonStructure(['attempt']);
 });
 
+test('teacher can fetch a student jump attempt with question images', function () {
+    $question = Question::factory()->create(['correct_answer' => 'A', 'difficulty' => 1000]);
+    $attempt = JumpAttempt::create([
+        'jump_id' => $this->jump->id,
+        'user_id' => $this->student->id,
+        'question_list' => [
+            ['id' => $question->id, 'status' => 'pending', 'answer' => 'A', 'difficulty' => 1000],
+        ],
+        'score' => 0,
+        'status' => 'inProgress',
+        'timer' => 90,
+        'extra_time' => 0,
+        'termination' => 'none',
+    ]);
+
+    $response = $this->actingAs($this->teacher)->getJson("/api/jump-attempts/{$attempt->id}");
+
+    $response->assertOk();
+    expect($response->json('attempt.question_list.0.id'))->toBe($question->id)
+        ->and($response->json('attempt.question_list.0.image'))->toBe($question->image)
+        ->and($response->json('attempt.question_list.0.answer'))->toBe('A');
+});
+
+test('outsider cannot fetch a student jump attempt', function () {
+    $attempt = JumpAttempt::create([
+        'jump_id' => $this->jump->id,
+        'user_id' => $this->student->id,
+        'question_list' => [],
+        'score' => 0,
+        'status' => 'inProgress',
+        'timer' => 0,
+        'extra_time' => 0,
+        'termination' => 'none',
+    ]);
+
+    $outsider = User::factory()->create();
+
+    $this->actingAs($outsider)->getJson("/api/jump-attempts/{$attempt->id}")->assertForbidden();
+});
+
 test('authenticated user can fetch their jump attempts', function () {
     JumpAttempt::create([
         'jump_id' => $this->jump->id,
