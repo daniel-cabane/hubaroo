@@ -2,7 +2,8 @@
   <div v-if="totalCount > 0" class="relative" ref="container">
     <button
       @click="toggle"
-      class="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer hover:bg-surface/20 transition-colors relative"
+      :disabled="isProcessing"
+      class="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer hover:bg-surface/20 transition-colors relative disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <span class="absolute inset-0 rounded-full bg-surface/20 animate-ping"></span>
       <Bell class="w-5 h-5 relative" />
@@ -15,8 +16,20 @@
 
     <div
       v-if="isOpen"
-      class="absolute right-0 mt-2 w-96 bg-surface dark:bg-gray-900 rounded-lg shadow-xl border border-border z-50 max-h-[80vh] overflow-y-auto"
+      class="absolute right-0 mt-2 w-96 bg-surface dark:bg-gray-900 rounded-lg shadow-xl border border-border z-50 overflow-hidden"
+      :aria-busy="isProcessing"
     >
+      <div
+        v-if="isProcessing"
+        class="absolute inset-0 z-10 bg-surface/80 dark:bg-gray-900/80 flex flex-col items-center justify-center gap-2"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 class="w-6 h-6 animate-spin text-primary" />
+        <p class="text-sm font-medium text-text-muted">Envoi en cours...</p>
+      </div>
+
+      <div class="max-h-[80vh] overflow-y-auto" :class="{ 'pointer-events-none': isProcessing }">
       <div class="px-4 py-3 border-b border-border">
         <p class="text-sm font-semibold text-text-main">Centre d'alertes</p>
       </div>
@@ -49,14 +62,18 @@
           <div v-if="sd.status === 'approved'" class="flex gap-2">
             <router-link
               :to="{ name: 'Attempt', params: { code: sd.sessionCode, attemptId: sd.attemptId } }"
+              :tabindex="isProcessing ? -1 : 0"
+              :aria-disabled="isProcessing"
               @click="sessionStorage.setItem(`attempt_owner:${sd.attemptId}`, '1'); isOpen = false; demandStore.removeStudentDemand(sd.id)"
               class="flex-1 text-center px-3 py-1.5 text-xs font-medium rounded-lg bg-success text-white hover:bg-success/80 transition-colors"
+              :class="{ 'pointer-events-none opacity-50': isProcessing }"
             >
               Rejoindre
             </router-link>
             <button
               @click="demandStore.removeStudentDemand(sd.id)"
-              class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              :disabled="isProcessing"
+              class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Ignorer
             </button>
@@ -64,7 +81,8 @@
           <button
             v-else-if="sd.status === 'denied'"
             @click="demandStore.removeStudentDemand(sd.id)"
-            class="text-xs text-text-muted hover:text-text-main transition-colors"
+            :disabled="isProcessing"
+            class="text-xs text-text-muted hover:text-text-main transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Fermer
           </button>
@@ -102,7 +120,8 @@
                 min="-10"
                 max="10"
                 step="1"
-                class="flex-1 accent-primary"
+                :disabled="isProcessing"
+                class="flex-1 accent-primary disabled:opacity-50"
               />
               <span class="text-xs font-medium text-text-main w-16 text-right">
                 {{ (jumpExtraTimes[jd.id] ?? 0) > 0 ? '+' : '' }}{{ jumpExtraTimes[jd.id] ?? 0 }} min
@@ -113,13 +132,15 @@
           <div class="flex gap-2">
             <button
               @click="approveJumpDemand(jd)"
-              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
+              :disabled="isProcessing"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Accepter
             </button>
             <button
-              @click="jumpDemandStore.rejectDemand(jd.id); delete jumpExtraTimes[jd.id]"
-              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
+              @click="rejectJumpDemand(jd)"
+              :disabled="isProcessing"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Refuser
             </button>
@@ -152,14 +173,18 @@
           <div v-if="jsd.status === 'approved'" class="flex gap-2">
             <router-link
               :to="{ name: 'JumpAttempt', params: { jumpId: jsd.jumpId, attemptId: jsd.attemptId } }"
+              :tabindex="isProcessing ? -1 : 0"
+              :aria-disabled="isProcessing"
               @click="isOpen = false; jumpDemandStore.removeStudentDemand(jsd.id)"
               class="flex-1 text-center px-3 py-1.5 text-xs font-medium rounded-lg bg-success text-white hover:bg-success/80 transition-colors"
+              :class="{ 'pointer-events-none opacity-50': isProcessing }"
             >
               Rejoindre le saut
             </router-link>
             <button
               @click="jumpDemandStore.removeStudentDemand(jsd.id)"
-              class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              :disabled="isProcessing"
+              class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-text-muted hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Ignorer
             </button>
@@ -167,7 +192,8 @@
           <button
             v-else-if="jsd.status === 'denied'"
             @click="jumpDemandStore.removeStudentDemand(jsd.id)"
-            class="text-xs text-text-muted hover:text-text-main transition-colors"
+            :disabled="isProcessing"
+            class="text-xs text-text-muted hover:text-text-main transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Fermer
           </button>
@@ -223,7 +249,8 @@
                 min="-20"
                 max="20"
                 step="1"
-                class="flex-1 accent-primary"
+                :disabled="isProcessing"
+                class="flex-1 accent-primary disabled:opacity-50"
               />
               <span class="text-xs font-medium text-text-main w-16 text-right">
                 {{ (extraTimes[demand.id] ?? 0) > 0 ? '+' : '' }}{{ extraTimes[demand.id] ?? 0 }} min
@@ -235,18 +262,21 @@
           <div class="flex gap-2">
             <button
               @click="approve(demand)"
-              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
+              :disabled="isProcessing"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Accepter
             </button>
             <button
               @click="reject(demand)"
-              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
+              :disabled="isProcessing"
+              class="flex-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Refuser
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -254,7 +284,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
-import { Bell } from 'lucide-vue-next';
+import { Bell, Loader2 } from 'lucide-vue-next';
 import { useRejoinDemandStore } from '@/stores/rejoinDemandStore';
 import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -266,6 +296,7 @@ const isOpen = ref(false);
 const container = ref(null);
 const extraTimes = reactive({});
 const jumpExtraTimes = reactive({});
+const isProcessing = ref(false);
 
 const totalCount = computed(() =>
   demandStore.demands.length +
@@ -275,6 +306,9 @@ const totalCount = computed(() =>
 );
 
 function toggle() {
+  if (isProcessing.value) {
+    return;
+  }
   isOpen.value = !isOpen.value;
   if (isOpen.value) {
     demandStore.studentDemands
@@ -287,8 +321,24 @@ function toggle() {
 }
 
 function handleClickOutside(e) {
+  if (isProcessing.value) {
+    return;
+  }
   if (container.value && !container.value.contains(e.target)) {
     isOpen.value = false;
+  }
+}
+
+async function runDemandAction(action) {
+  if (isProcessing.value) {
+    return;
+  }
+
+  isProcessing.value = true;
+  try {
+    await action();
+  } finally {
+    isProcessing.value = false;
   }
 }
 
@@ -318,20 +368,33 @@ function formatTimer(timerSeconds, preferences) {
 }
 
 async function approve(demand) {
-  const extra = (extraTimes[demand.id] ?? 0) * 60;
-  await demandStore.approveDemand(demand.id, extra);
-  delete extraTimes[demand.id];
+  await runDemandAction(async () => {
+    const extra = (extraTimes[demand.id] ?? 0) * 60;
+    await demandStore.approveDemand(demand.id, extra);
+    delete extraTimes[demand.id];
+  });
 }
 
 async function reject(demand) {
-  await demandStore.rejectDemand(demand.id);
-  delete extraTimes[demand.id];
+  await runDemandAction(async () => {
+    await demandStore.rejectDemand(demand.id);
+    delete extraTimes[demand.id];
+  });
 }
 
 async function approveJumpDemand(demand) {
-  const extra = (jumpExtraTimes[demand.id] ?? 0) * 60;
-  await jumpDemandStore.approveDemand(demand.id, extra);
-  delete jumpExtraTimes[demand.id];
+  await runDemandAction(async () => {
+    const extra = (jumpExtraTimes[demand.id] ?? 0) * 60;
+    await jumpDemandStore.approveDemand(demand.id, extra);
+    delete jumpExtraTimes[demand.id];
+  });
+}
+
+async function rejectJumpDemand(demand) {
+  await runDemandAction(async () => {
+    await jumpDemandStore.rejectDemand(demand.id);
+    delete jumpExtraTimes[demand.id];
+  });
 }
 
 function listenForStudentJumpDemand(demand) {

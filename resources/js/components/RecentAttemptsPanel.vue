@@ -11,7 +11,7 @@
 
     <!-- Slide-in panel from left -->
     <div
-      class="fixed left-0 top-1/2 -translate-y-1/2 z-50 w-76 bg-surface dark:bg-gray-900 border border-border rounded-r-xl shadow-2xl transition-transform duration-300"
+      class="fixed left-0 top-1/2 -translate-y-1/2 z-50 w-76 bg-surface dark:bg-gray-900 border border-border rounded-r-xl shadow-2xl overflow-hidden transition-transform duration-300"
       :class="isOpen ? 'translate-x-0' : '-translate-x-full'"
     >
       <div class="p-3">
@@ -32,28 +32,24 @@
             :key="`${item.type}-${item.id}`"
             :to="item.route"
             @click="isOpen = false"
-            class="group flex flex-col gap-1.5 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-border hover:border-primary hover:shadow-md transition-all"
+            class="group flex min-w-0 flex-col gap-1.5 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-border hover:border-primary hover:shadow-md transition-all overflow-hidden"
           >
-            <div class="flex items-center justify-between">
-              
-              <span class="text-sm font-medium text-text-main truncate flex items-center">
+            <div class="flex items-center justify-between gap-2 min-w-0">
+              <span class="min-w-0 flex-1 text-sm font-medium text-text-main flex items-center">
                 <Sparkle v-if="item.type === 'session'" class="w-3 h-3 flex-shrink-0 mr-1 text-primary" />
                 <Zap v-if="item.type === 'jump'" class="w-3 h-3 flex-shrink-0 mr-1 text-secondary" />
-                {{ item.title }}
+                <span class="truncate">{{ item.title }}</span>
               </span>
               <span
                 :class="item.status === 'finished' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'"
-                class="px-1.5 py-0.5 rounded text-xs font-semibold flex-shrink-0 ml-2"
+                class="px-1.5 py-0.5 rounded text-xs font-semibold flex-shrink-0"
               >
                 {{ item.status === 'finished' ? 'Terminée' : 'En cours' }}
               </span>
             </div>
-            <div class="flex items-center justify-between text-xs text-text-muted">
-              <span class="flex items-center gap-1">
-                
-                <span class="truncate">{{ item.subtitle }}</span>
-              </span>
-              <span v-if="item.score !== null" class="flex-shrink-0 ml-2">{{ item.score }}</span>
+            <div class="flex items-center justify-between gap-2 min-w-0 text-xs text-text-muted">
+              <span class="min-w-0 flex-1 truncate">{{ item.subtitle }}</span>
+              <span v-if="item.score !== null" class="flex-shrink-0">{{ item.score }}</span>
             </div>
           </router-link>
         </div>
