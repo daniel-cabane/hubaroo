@@ -295,6 +295,43 @@ test('student can fetch their own attempt', function () {
     $response->assertOk()->assertJsonStructure(['attempt']);
 });
 
+test('jump attempt includes the division class name when the pivot has one', function () {
+    $this->division->students()->updateExistingPivot($this->student->id, [
+        'class_name' => 'Jean-Paul LA GLU DE COLLE',
+    ]);
+
+    $started = $this->actingAs($this->student)->postJson("/api/jumps/{$this->jump->id}/attempts");
+
+    $started->assertCreated()
+        ->assertJsonPath('attempt.class_name', 'Jean-Paul LA GLU DE COLLE');
+
+    $attemptId = $started->json('attempt.id');
+
+    $this->actingAs($this->student)
+        ->getJson("/api/jump-attempts/{$attemptId}")
+        ->assertOk()
+        ->assertJsonPath('attempt.class_name', 'Jean-Paul LA GLU DE COLLE');
+
+    $this->actingAs($this->teacher)
+        ->getJson("/api/jump-attempts/{$attemptId}")
+        ->assertOk()
+        ->assertJsonPath('attempt.class_name', 'Jean-Paul LA GLU DE COLLE');
+});
+
+test('jump attempt class name is null when the pivot has none', function () {
+    $started = $this->actingAs($this->student)->postJson("/api/jumps/{$this->jump->id}/attempts");
+
+    $started->assertCreated()
+        ->assertJsonPath('attempt.class_name', null);
+
+    $attemptId = $started->json('attempt.id');
+
+    $this->actingAs($this->student)
+        ->getJson("/api/jump-attempts/{$attemptId}")
+        ->assertOk()
+        ->assertJsonPath('attempt.class_name', null);
+});
+
 test('teacher can fetch a student jump attempt with question images', function () {
     $question = Question::factory()->create(['correct_answer' => 'A', 'difficulty' => 1000]);
     $attempt = JumpAttempt::create([

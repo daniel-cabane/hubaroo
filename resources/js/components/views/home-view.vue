@@ -52,8 +52,8 @@
                   :to="{ name: 'JumpAttempt', params: { jumpId: jump.id } }"
                   class="group flex flex-col gap-1 p-3 rounded-lg bg-surface dark:bg-gray-900 border border-success/30 hover:border-success hover:shadow-md transition-all"
                 >
-                  <div class="text-xs text-text-muted flex justify-end">{{ jump.division_name }}</div>
-                  <p class="font-medium text-text-main dark:text-surface truncate">{{ jump.course?.title }}</p>
+                  <div class="text-xs text-text-muted flex justify-end">{{ jump.division_name }} · {{ jump.course?.title }}</div>
+                  <p class="font-medium text-text-main dark:text-surface truncate">Commencer le saut</p>
                   <p class="text-xs text-text-muted">{{ jump.nb_questions }} questions · {{ jump.time }} min</p>
                 </router-link>
               </div>

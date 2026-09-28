@@ -3,14 +3,35 @@
     <!-- Countdown Timer Bar -->
     <div
       v-if="isInProgress"
-      class="relative bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 flex items-center justify-between gap-4"
+      class="relative z-20 bg-surface dark:bg-gray-900 border-b border-border px-4 py-2 flex items-center justify-between gap-4"
     >
-      <div class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-error bg-error/5">
-        <AlertTriangle class="w-5 h-5 text-error flex-shrink-0" />
-        <p class="text-md font-medium text-error">Ne pas quitter cette page</p>
+      <div
+        ref="navigationHintRoot"
+        class="relative"
+        @mouseenter="onNavigationHintEnter"
+        @mouseleave="onNavigationHintLeave"
+      >
+        <button
+          type="button"
+          class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-error bg-error/5 cursor-pointer"
+          :aria-expanded="navigationHintVisible"
+          aria-controls="navigation-forbidden-hint"
+          @click="navigationHintPinned = !navigationHintPinned"
+        >
+          <AlertTriangle class="w-5 h-5 text-error flex-shrink-0" />
+          <span class="text-md font-medium text-error">Navigation Interdite</span>
+        </button>
+        <p
+          v-if="navigationHintVisible"
+          id="navigation-forbidden-hint"
+          role="tooltip"
+          class="absolute left-0 top-full z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-surface px-3 py-2 text-left text-sm font-normal leading-snug text-text-main shadow-lg dark:border-border/50 dark:bg-gray-900 dark:text-surface"
+        >
+          <b>Attention !</b> Ne changez pas d'onglet, de fenêtre ou d'application pendant le saut. Si vous quittez cette fenêtre, votre saut sera automatiquement soumis sous 10 secondes. Quitter ou fermer cette page soumet aussi le saut.
+        </p>
       </div>
-      <div class="absolute left-1/2 -translate-x-1/2 text-4xl font-semibold text-secondary truncate max-w-xs text-center">
-        {{ authStore.user?.name }}
+      <div class="pointer-events-none absolute left-1/2 -translate-x-1/2 text-4xl font-semibold text-secondary truncate max-w-xs text-center">
+        {{ studentDisplayName }}
       </div>
       <button
         @click="toggleTimer"
@@ -280,6 +301,11 @@ const sliderX = ref(0);
 const sliderDragging = ref(false);
 const submitUnlocked = ref(false);
 const showUnlockHint = ref(false);
+const navigationHintRoot = ref(null);
+const navigationHintHovered = ref(false);
+const navigationHintPinned = ref(false);
+const navigationHintVisible = computed(() => navigationHintHovered.value || navigationHintPinned.value);
+const navigationHintHoverMedia = window.matchMedia('(hover: hover) and (pointer: fine)');
 
 let timerInterval = null;
 let blurInterval = null;
@@ -293,6 +319,11 @@ const isSubmitting = ref(false);
 
 const questionList = computed(() => jumpAttemptStore.attempt?.question_list ?? []);
 const isInProgress = computed(() => jumpAttemptStore.isInProgress);
+const studentDisplayName = computed(() =>
+  jumpAttemptStore.attempt?.class_name
+  || jumpAttemptStore.attempt?.user?.name
+  || authStore.user?.name
+);
 const isExpired = computed(() => jumpAttemptStore.attempt?.jump?.status === 'expired');
 
 const currentQuestion = computed(() => {
@@ -753,6 +784,22 @@ onBeforeRouteLeave(async () => {
   return false;
 });
 
+function onNavigationHintEnter() {
+  if (navigationHintHoverMedia.matches) {
+    navigationHintHovered.value = true;
+  }
+}
+
+function onNavigationHintLeave() {
+  navigationHintHovered.value = false;
+}
+
+function closeNavigationHintOnOutsidePointer(event) {
+  if (!navigationHintRoot.value?.contains(event.target)) {
+    navigationHintPinned.value = false;
+  }
+}
+
 function handleBlur() {
   if (isInProgress.value) {
     showBlurAlarm.value = true;
@@ -789,6 +836,8 @@ watch(currentIndex, (newIdx) => {
 });
 
 onMounted(async () => {
+  document.addEventListener('pointerdown', closeNavigationHintOnOutsidePointer);
+
   const attemptId = route.params.attemptId;
   const jumpId = route.params.jumpId;
 
@@ -866,6 +915,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener('pointerdown', closeNavigationHintOnOutsidePointer);
   if (timerInterval) clearInterval(timerInterval);
   if (blurInterval) clearInterval(blurInterval);
   hideUnlockHint();

@@ -107,6 +107,7 @@ class JumpAttemptController extends Controller
 
         $attemptData = $attempt->toArray();
         $attemptData['question_list'] = $questionList;
+        $attemptData['class_name'] = $this->classNameFor($attempt);
 
         return response()->json(['attempt' => $attemptData]);
     }
@@ -258,8 +259,27 @@ class JumpAttemptController extends Controller
 
         $data = $attempt->toArray();
         $data['question_list'] = $questionList;
+        $data['class_name'] = $this->classNameFor($attempt);
 
         return $data;
+    }
+
+    private function classNameFor(JumpAttempt $attempt): ?string
+    {
+        $attempt->loadMissing('jump.course');
+
+        $divisionId = $attempt->jump?->course?->division_id;
+
+        if ($divisionId === null) {
+            return null;
+        }
+
+        return $attempt->user
+            ?->divisions()
+            ->where('divisions.id', $divisionId)
+            ->first()
+            ?->pivot
+            ?->class_name;
     }
 
     private function canWriteAnswersAfterClose(JumpAttempt $attempt, Jump $jump): bool
