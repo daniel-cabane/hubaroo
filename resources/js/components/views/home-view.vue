@@ -446,7 +446,7 @@
             class="w-full px-4 py-2 border border-border dark:border-border/50 rounded-lg dark:bg-gray-800 dark:text-surface focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="">-- Choisir une classe --</option>
-            <option v-for="division in divisionStore.divisions" :key="division.id" :value="division.id">
+            <option v-for="division in activeDivisions" :key="division.id" :value="division.id">
               {{ division.name }}
             </option>
           </select>
@@ -656,6 +656,10 @@ const activeJumps = computed(() => {
   });
   return jumps;
 });
+
+const activeDivisions = computed(() =>
+  divisionStore.divisions.filter(division => !division.archived)
+);
 
 const availableCourses = computed(() => {
   return courses.value;
