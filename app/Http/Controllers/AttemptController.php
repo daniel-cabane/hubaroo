@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\AttemptNameUpdated;
 use App\Events\AttemptUpdated;
+use App\Events\PocketChanged;
 use App\Http\Requests\SubmitAttemptRequest;
 use App\Http\Requests\SyncAttemptRequest;
 use App\Http\Requests\UpdateAnswerRequest;
@@ -281,6 +282,10 @@ class AttemptController extends Controller
 
         if ($session->isExpired() && $answersChanged) {
             $this->sessionAnalysisService->compute($session);
+        }
+
+        if (! $delayGrading && $score !== null && $attempt->user_id !== null) {
+            broadcast(new PocketChanged(userId: (int) $attempt->user_id));
         }
 
         return $this->submitSuccessResponse($attempt, $score, $delayGrading, broadcast: true);

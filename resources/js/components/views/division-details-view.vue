@@ -552,16 +552,24 @@
       <div v-if="!divisionStore.division.kangourou_sessions?.length" class="text-text-muted">
         Aucune session disponible pour le moment.
       </div>
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <router-link
+      <div v-else class="space-y-3">
+        <div
           v-for="session in divisionStore.division.kangourou_sessions"
           :key="session.id"
-          :to="{ name: 'Session', params: { code: session.code } }"
-          class="block p-5 rounded-xl border border-border bg-surface dark:bg-gray-900 hover:border-primary hover:shadow-md transition-all"
+          class="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4 shadow-2xl motion-safe:animate-levitate dark:bg-gray-900"
         >
-          <p class="font-semibold text-text-main dark:text-surface">Session Kangourou</p>
-          <p class="text-sm text-text-muted mt-1">{{ formatTimeUntilExpiration(session.expires_at) }}</p>
-        </router-link>
+          <div class="min-w-0">
+            <p class="text-lg font-bold text-text-main dark:text-surface">Nouvelle session</p>
+            <p class="text-sm text-text-muted">{{ formatTimeUntilExpiration(session.expires_at) }}</p>
+          </div>
+          <router-link
+            :to="{ name: 'Session', params: { code: session.code } }"
+            class="relative shrink-0 overflow-hidden rounded-xl bg-primary px-5 py-4 text-lg font-bold text-white"
+          >
+            <span class="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-linear-to-r from-transparent via-white/50 to-transparent motion-safe:animate-swipe" aria-hidden="true" />
+            <span class="relative">Rejoindre la session</span>
+          </router-link>
+        </div>
       </div>
 
       <!-- Courses (student view) -->
@@ -589,15 +597,8 @@
           <div class="flex items-center justify-between mb-5">
             <p class="text-3xl font-semibold text-text-main dark:text-surface">{{ activeCourse.title }}</p>
             <p class="text-3xl font-bold text-primary">{{ activeCourseTotal }} pts</p>
-            <router-link
-              v-if="canStartActiveJump"
-              :to="{ name: 'JumpAttempt', params: { jumpId: activeCourseActiveJump.id } }"
-              class="px-4 py-2 rounded-lg bg-primary text-surface hover:bg-primary-hover transition-colors text-sm font-medium"
-            >
-              Saut actif — Commencer
-            </router-link>
             <button
-              v-else-if="activeJumpRejoinableAttempt && pendingRejoinAttemptId !== activeJumpRejoinableAttempt.id"
+              v-if="activeJumpRejoinableAttempt && pendingRejoinAttemptId !== activeJumpRejoinableAttempt.id"
               @click="requestRejoinForActiveJump"
               :disabled="jumpAttemptStore.isLoading"
               class="px-4 py-2 rounded-lg border border-info text-info hover:bg-info/10 text-sm font-medium cursor-pointer transition-colors disabled:opacity-50"
@@ -605,7 +606,24 @@
               Demander à reprendre
             </button>
             <span v-else-if="activeJumpRejoinableAttempt" class="text-sm text-text-muted">Demande envoyée</span>
-            <span v-else class="text-sm text-text-muted">Aucun saut actif</span>
+            <span v-else-if="!canStartActiveJump" class="text-sm text-text-muted">Aucun saut actif</span>
+          </div>
+
+          <div
+            v-if="canStartActiveJump"
+            class="mb-5 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4 shadow-2xl motion-safe:animate-levitate dark:bg-gray-900"
+          >
+            <div class="min-w-0">
+              <p class="text-lg font-bold text-text-main dark:text-surface">{{ activeCourse.title }}</p>
+              <p class="text-sm text-text-muted">{{ activeCourseActiveJump.nb_questions }} questions · {{ activeCourseActiveJump.time }} min</p>
+            </div>
+            <router-link
+              :to="{ name: 'JumpAttempt', params: { jumpId: activeCourseActiveJump.id } }"
+              class="relative shrink-0 overflow-hidden rounded-xl bg-success px-5 py-4 text-lg font-bold text-white"
+            >
+              <span class="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-linear-to-r from-transparent via-white/50 to-transparent motion-safe:animate-swipe" aria-hidden="true" />
+              <span class="relative">{{ activeCourseActiveJump.attempts?.[0]?.status === 'inProgress' ? 'Reprendre le saut' : 'Commencer le saut' }}</span>
+            </router-link>
           </div>
 
           <!-- Graph toggle -->
@@ -660,84 +678,13 @@
       </template>
     </template>
 
-    <!-- Jump Detail Modal (student) -->
-    <div
-      v-if="showJumpDetailModal && selectedJumpDetail"
-      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-      @click.self="showJumpDetailModal = false"
-    >
-      <div class="bg-surface dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div class="flex items-center justify-between p-4 border-b border-border">
-          <div>
-            <h3 class="text-lg font-semibold text-text-main dark:text-surface">Saut {{ jumpDetailNumber(selectedJumpDetail.jump) }}</h3>
-            <p class="text-sm text-text-muted">{{ formatJumpDate(selectedJumpDetail.jump.created_at) }}</p>
-          </div>
-          <button @click="showJumpDetailModal = false" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
-            <X class="w-5 h-5" />
-          </button>
-        </div>
-        <div v-if="jumpDetailLoading" class="flex items-center justify-center p-10">
-          <RefreshCw class="w-6 h-6 animate-spin text-text-muted" />
-        </div>
-        <div v-else class="p-4 overflow-y-auto flex-1 space-y-3">
-          <p class="text-center text-3xl font-bold text-primary mb-1">Score : {{ selectedJumpDetail.attempt.score }}</p>
-          <div
-            v-for="(item, idx) in selectedJumpDetail.attempt.question_list"
-            :key="idx"
-            class="flex flex-col rounded-lg border overflow-hidden"
-            :class="{
-              'border-success': item.status === 'correct',
-              'border-error': item.status === 'incorrect',
-              'border-border': item.status === 'pending',
-            }"
-          >
-            <img
-              v-if="item.image"
-              :src="'/' + item.image"
-              :alt="'Question ' + (idx + 1)"
-              class="w-full object-contain bg-gray-50 dark:bg-gray-800 select-none pointer-events-none"
-              draggable="false"
-              oncontextmenu="return false;"
-            />
-            <div
-              class="flex items-center justify-between p-3"
-              :class="{
-                'bg-success/5': item.status === 'correct',
-                'bg-error/5': item.status === 'incorrect',
-              }"
-            >
-              <div class="flex items-center gap-3">
-                <span
-                  class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                  :class="{
-                    'bg-success text-white': item.status === 'correct',
-                    'bg-error text-white': item.status === 'incorrect',
-                    'bg-gray-200 dark:bg-gray-700 text-text-muted': item.status === 'pending',
-                  }"
-                >{{ idx + 1 }}</span>
-                <div>
-                  <p class="text-sm font-medium text-text-main dark:text-surface">Question #{{ item.id }}</p>
-                  <p class="text-xs text-text-muted">Difficulté : {{ item.difficulty }}</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <p class="text-sm font-medium"
-                  :class="{
-                    'text-success': item.status === 'correct',
-                    'text-error': item.status === 'incorrect',
-                    'text-text-muted': item.status === 'pending',
-                  }"
-                >
-                  {{ item.status === 'correct' ? '+' + item.difficulty : item.status === 'incorrect' ? '0' : '—' }}
-                </p>
-                <p v-if="item.answer" class="text-xs text-text-muted">Réponse : {{ item.answer }}</p>
-                <p v-if="item.status === 'incorrect' && item.correct_answer" class="text-xs text-success font-medium">Correcte : {{ item.correct_answer }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <JumpAttemptDetailModal
+      :open="showJumpDetailModal"
+      :attempt-id="jumpDetailAttemptId"
+      :number="jumpDetailDisplayNumber"
+      :date="jumpDetailDate"
+      @close="showJumpDetailModal = false"
+    />
 
     <!-- Expired Session Attempts Modal -->
     <div
@@ -1544,50 +1491,13 @@
       </div>
     </div>
 
-    <!-- Suggested Question Overlay (teacher) -->
-    <div
-      v-if="showSuggestedQuestionOverlay && selectedSuggestedQuestion"
-      class="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]"
-      @click.self="closeSuggestedQuestionOverlay"
-    >
-      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-2xl p-6 w-full max-w-[80vw] flex flex-col items-center gap-4">
-        <button @click="closeSuggestedQuestionOverlay" class="self-end text-text-muted hover:text-text-main transition-colors cursor-pointer">
-          <X class="w-5 h-5" />
-        </button>
-        <img
-          v-if="selectedSuggestedQuestion.question.image"
-          :src="'/' + selectedSuggestedQuestion.question.image"
-          class="max-h-64 object-contain"
-          alt="Question"
-        />
-        <div v-if="revealSuggestedAnswer" class="text-xl font-bold text-success">
-          Réponse : {{ selectedSuggestedQuestion.question.correct_answer }}
-        </div>
-        <div class="flex gap-3">
-          <button
-            v-if="!revealSuggestedAnswer"
-            @click="revealSuggestedAnswer = true"
-            class="px-4 py-2 bg-primary hover:bg-primary-hover text-surface rounded-lg text-sm font-medium transition-colors cursor-pointer"
-          >
-            Révéler la réponse
-          </button>
-          <button
-            @click="handleToggleSuggestedPublic(selectedSuggestedQuestion)"
-            :class="['px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2', selectedSuggestedQuestion.is_public ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'bg-gray-100 dark:bg-gray-800 text-text-muted hover:text-primary']"
-          >
-            <Globe class="w-4 h-4" />
-            {{ selectedSuggestedQuestion.is_public ? 'Retirer' : 'Rendre public' }}
-          </button>
-          <button
-            @click="handleDeleteSuggestedQuestion(selectedSuggestedQuestion); closeSuggestedQuestionOverlay()"
-            class="px-4 py-2 bg-error/10 text-error hover:bg-error/20 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-2"
-          >
-            <Trash2 class="w-4 h-4" />
-            Supprimer
-          </button>
-        </div>
-      </div>
-    </div>
+    <SuggestedQuestionOverlay
+      v-if="showSuggestedQuestionOverlay"
+      :question="selectedSuggestedQuestion"
+      @close="closeSuggestedQuestionOverlay"
+      @updated="applySuggestedQuestionUpdate"
+      @deleted="removeSuggestedQuestion"
+    />
 
     <!-- Public Question Overlay (student) -->
     <div
@@ -1626,6 +1536,8 @@ import { useCourseStore } from '@/stores/courseStore';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 import DivisionAttemptsTable from '@/components/DivisionAttemptsTable.vue';
+import JumpAttemptDetailModal from '@/components/JumpAttemptDetailModal.vue';
+import SuggestedQuestionOverlay from '@/components/SuggestedQuestionOverlay.vue';
 import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, Lightbulb, Star, Trash2, Globe, MoreVertical, Archive, ArchiveRestore, Plus, Clock, RotateCcw, CheckCircle2 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -1662,8 +1574,9 @@ const activeCourseId = ref(null);
 const graphCumulative = ref(true);
 
 const showJumpDetailModal = ref(false);
-const selectedJumpDetail = ref(null);
-const jumpDetailLoading = ref(false);
+const jumpDetailAttemptId = ref(null);
+const jumpDetailDisplayNumber = ref('');
+const jumpDetailDate = ref('');
 
 const activeCourse = computed(() => {
   if (!courseStore.courses.length) return null;
@@ -1920,7 +1833,6 @@ const suggestedQuestionsTab = ref(1);
 const isLoadingSuggestedQuestions = ref(false);
 const showSuggestedQuestionOverlay = ref(false);
 const selectedSuggestedQuestion = ref(null);
-const revealSuggestedAnswer = ref(false);
 
 // Public Suggested Questions (student)
 const publicSuggestedQuestions = ref([]);
@@ -2106,18 +2018,15 @@ function formatJumpDate(val) {
   return new Date(val).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-async function openJumpDetail(jump) {
+function openJumpDetail(jump) {
   const attempt = jump?.attempts?.[0];
-  if (!attempt?.id) return;
-  showJumpDetailModal.value = true;
-  jumpDetailLoading.value = true;
-  selectedJumpDetail.value = { jump, attempt };
-  try {
-    const res = await axios.get(`/api/jump-attempts/${attempt.id}`);
-    selectedJumpDetail.value = { jump, attempt: res.data.attempt };
-  } finally {
-    jumpDetailLoading.value = false;
+  if (!attempt?.id) {
+    return;
   }
+  jumpDetailAttemptId.value = attempt.id;
+  jumpDetailDisplayNumber.value = jumpDetailNumber(jump);
+  jumpDetailDate.value = formatJumpDate(jump.created_at);
+  showJumpDetailModal.value = true;
 }
 
 async function handleChangeCode() {
@@ -3054,14 +2963,23 @@ function closeSuggestedQuestionsModal() {
 
 function openSuggestedQuestionOverlay(sq) {
   selectedSuggestedQuestion.value = sq;
-  revealSuggestedAnswer.value = false;
   showSuggestedQuestionOverlay.value = true;
 }
 
 function closeSuggestedQuestionOverlay() {
   showSuggestedQuestionOverlay.value = false;
   selectedSuggestedQuestion.value = null;
-  revealSuggestedAnswer.value = false;
+}
+
+function applySuggestedQuestionUpdate(question) {
+  const idx = suggestedQuestions.value.findIndex(item => item.id === question.id);
+  if (idx !== -1) {
+    suggestedQuestions.value[idx] = { ...suggestedQuestions.value[idx], is_public: question.is_public };
+  }
+}
+
+function removeSuggestedQuestion(id) {
+  suggestedQuestions.value = suggestedQuestions.value.filter(item => item.id !== id);
 }
 
 async function handleToggleSuggestedPublic(sq) {

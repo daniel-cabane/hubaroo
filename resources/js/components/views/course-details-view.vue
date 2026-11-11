@@ -44,6 +44,13 @@
             Supprimer
           </button>
           <button
+            @click.stop="openSuggestedQuestionsModal"
+            class="px-3 py-1.5 text-sm border border-border text-text-muted rounded-lg hover:text-primary hover:border-primary transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <Lightbulb class="w-4 h-4" />
+            Questions suggérées
+          </button>
+          <button
             @click="showNewJumpModal = true"
             class="px-3 py-1.5 text-sm bg-primary text-surface rounded-lg hover:bg-primary-hover transition-colors cursor-pointer flex items-center gap-1"
           >
@@ -497,6 +504,97 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="showSuggestedQuestionsModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click.self="closeSuggestedQuestionsModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-2xl h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface flex items-center gap-2">
+            <Lightbulb class="w-5 h-5 text-primary" />
+            Questions suggérées — {{ courseData?.course?.title }}
+          </h3>
+          <button @click="closeSuggestedQuestionsModal" class="text-text-muted hover:text-text-main transition-colors cursor-pointer">
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+        <div v-if="isLoadingSuggestedQuestions" class="flex justify-center py-8">
+          <span class="text-text-muted text-sm">Chargement...</span>
+        </div>
+        <div v-else-if="!suggestedQuestions.length" class="py-8 text-center text-text-muted text-sm">
+          Aucune question suggérée pour l'instant.
+        </div>
+        <div v-else class="flex flex-col min-h-0 flex-1">
+          <div class="flex border-b border-border mb-4">
+            <button
+              v-for="level in [1, 2, 3]"
+              :key="level"
+              @click="suggestedQuestionsTab = level"
+              class="flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors cursor-pointer border-b-2 -mb-px"
+              :class="suggestedQuestionsTab === level
+                ? 'border-primary text-primary'
+                : 'border-transparent text-text-muted hover:text-text-main'"
+            >
+              <Star v-for="n in level" :key="n" class="w-3.5 h-3.5 fill-warning text-warning" />
+              <span>Niveau {{ level }}</span>
+              <span
+                class="ml-1 text-xs px-1.5 py-0.5 rounded-full"
+                :class="suggestedQuestionsTab === level ? 'bg-primary/10 text-primary' : 'bg-gray-100 dark:bg-gray-800 text-text-muted'"
+              >{{ suggestedQuestionsByLevel(level).length }}</span>
+            </button>
+          </div>
+          <div class="overflow-y-auto space-y-2">
+            <div v-if="suggestedQuestionsByLevel(suggestedQuestionsTab).length === 0" class="py-8 text-center text-text-muted text-sm">
+              Aucune question pour ce niveau.
+            </div>
+            <div
+              v-for="sq in suggestedQuestionsByLevel(suggestedQuestionsTab)"
+              :key="sq.id"
+              class="rounded-lg border border-border hover:border-primary/40 transition-colors overflow-hidden"
+            >
+              <button
+                @click="openSuggestedQuestionOverlay(sq)"
+                class="w-full cursor-pointer group"
+              >
+                <img
+                  v-if="sq.question.image"
+                  :src="'/' + sq.question.image"
+                  class="w-full object-contain group-hover:opacity-80 transition-opacity"
+                  alt="Question"
+                />
+                <span v-else class="text-sm text-text-muted p-3 block">Question #{{ sq.question.id }}</span>
+              </button>
+              <div class="flex justify-end gap-1 px-2 py-1.5 border-t border-border">
+                <button
+                  @click="handleToggleSuggestedPublic(sq)"
+                  :class="['p-1.5 rounded-lg transition-colors cursor-pointer', sq.is_public ? 'text-primary bg-primary/10' : 'text-text-muted hover:text-primary hover:bg-primary/10']"
+                  :title="sq.is_public ? 'Retirer de la vue élèves' : 'Rendre public'"
+                >
+                  <Globe class="w-4 h-4" />
+                </button>
+                <button
+                  @click="handleDeleteSuggestedQuestion(sq)"
+                  class="p-1.5 rounded-lg text-text-muted hover:text-error hover:bg-error/10 transition-colors cursor-pointer"
+                  title="Supprimer"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <SuggestedQuestionOverlay
+      v-if="showSuggestedQuestionOverlay"
+      :question="selectedSuggestedQuestion"
+      @close="closeSuggestedQuestionOverlay"
+      @updated="applySuggestedQuestionUpdate"
+      @deleted="removeSuggestedQuestion"
+    />
   </div>
 </template>
 
@@ -504,7 +602,9 @@
 import axios from 'axios';
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, Plus, X, Clock, Trash2, Eye, RotateCcw } from 'lucide-vue-next';
+import { ChevronLeft, Plus, X, Clock, Trash2, Eye, RotateCcw, Lightbulb, Star, Globe } from 'lucide-vue-next';
+import JumpAttemptDetailModal from '@/components/JumpAttemptDetailModal.vue';
+import SuggestedQuestionOverlay from '@/components/SuggestedQuestionOverlay.vue';
 import { useCourseStore } from '@/stores/courseStore';
 import { JUMP_ATTEMPT_SYNC_INTERVAL_MS } from '@/stores/jumpAttemptStore';
 
@@ -517,6 +617,12 @@ const divisionId = computed(() => route.params.id);
 const courseData = ref(null);
 
 const showNewJumpModal = ref(false);
+const showSuggestedQuestionsModal = ref(false);
+const suggestedQuestions = ref([]);
+const suggestedQuestionsTab = ref(1);
+const isLoadingSuggestedQuestions = ref(false);
+const showSuggestedQuestionOverlay = ref(false);
+const selectedSuggestedQuestion = ref(null);
 const showJumpObservationModal = ref(false);
 const observingJumpId = ref(null);
 const observedJump = computed(() => courseData.value?.jumps?.find(j => j.id === observingJumpId.value) ?? null);
@@ -976,6 +1082,80 @@ watch(
     }
   },
 );
+
+function suggestedQuestionsByLevel(level) {
+  return suggestedQuestions.value.filter(sq => sq.level === level);
+}
+
+async function openSuggestedQuestionsModal() {
+  const course = courseData.value?.course;
+  if (!course) {
+    return;
+  }
+  showSuggestedQuestionsModal.value = true;
+  suggestedQuestionsTab.value = 1;
+  isLoadingSuggestedQuestions.value = true;
+  suggestedQuestions.value = [];
+  try {
+    const res = await axios.get(`/api/courses/${course.id}/suggested-questions`);
+    suggestedQuestions.value = res.data.suggested_questions ?? [];
+  } catch {
+    // The empty state covers a failed load.
+  } finally {
+    isLoadingSuggestedQuestions.value = false;
+  }
+}
+
+function closeSuggestedQuestionsModal() {
+  showSuggestedQuestionsModal.value = false;
+  suggestedQuestions.value = [];
+}
+
+function openSuggestedQuestionOverlay(sq) {
+  selectedSuggestedQuestion.value = sq;
+  showSuggestedQuestionOverlay.value = true;
+}
+
+function closeSuggestedQuestionOverlay() {
+  showSuggestedQuestionOverlay.value = false;
+  selectedSuggestedQuestion.value = null;
+}
+
+function applySuggestedQuestionUpdate(question) {
+  const idx = suggestedQuestions.value.findIndex(item => item.id === question.id);
+  if (idx !== -1) {
+    suggestedQuestions.value[idx] = { ...suggestedQuestions.value[idx], is_public: question.is_public };
+  }
+}
+
+function removeSuggestedQuestion(id) {
+  suggestedQuestions.value = suggestedQuestions.value.filter(question => question.id !== id);
+}
+
+async function handleToggleSuggestedPublic(sq) {
+  try {
+    const res = await axios.patch(`/api/suggested-questions/${sq.id}/toggle-public`);
+    const updated = res.data.suggested_question;
+    const idx = suggestedQuestions.value.findIndex(question => question.id === sq.id);
+    if (idx !== -1) {
+      suggestedQuestions.value[idx] = { ...suggestedQuestions.value[idx], is_public: updated.is_public };
+    }
+    if (selectedSuggestedQuestion.value?.id === sq.id) {
+      selectedSuggestedQuestion.value = { ...selectedSuggestedQuestion.value, is_public: updated.is_public };
+    }
+  } catch {
+    // Leave the current public state in place.
+  }
+}
+
+async function handleDeleteSuggestedQuestion(sq) {
+  try {
+    await axios.delete(`/api/suggested-questions/${sq.id}`);
+    suggestedQuestions.value = suggestedQuestions.value.filter(question => question.id !== sq.id);
+  } catch {
+    // Leave the question in the list.
+  }
+}
 
 onMounted(async () => {
   await loadDetails();

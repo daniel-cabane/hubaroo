@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PocketChanged;
 use App\Events\SessionExpired;
 use App\Events\SessionOpenedForDivision;
 use App\Http\Requests\CreateKangourouSessionRequest;
@@ -118,6 +119,7 @@ class KangourouSessionController extends Controller
 
         if ($request->has('expires_at') && $wasActive && $fresh->isExpired()) {
             broadcast(new SessionExpired($fresh));
+            PocketChanged::broadcastToDivisions($fresh->divisions()->pluck('divisions.id'));
         }
 
         return response()->json([
@@ -190,6 +192,7 @@ class KangourouSessionController extends Controller
     {
         $this->authorize('view', $kangourouSession);
 
+        PocketChanged::broadcastToDivisions($kangourouSession->divisions()->pluck('divisions.id'));
         $kangourouSession->delete();
 
         return response()->json(['message' => 'Session deleted.']);

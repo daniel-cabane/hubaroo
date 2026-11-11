@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Events\JumpExpired;
+use App\Events\PocketChanged;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
 use App\Models\Question;
@@ -21,20 +22,32 @@ class ExpireJumps implements ShouldQueue
     {
         $jumpGradingService ??= app(JumpGradingService::class);
 
-        // Transition active jumps that have reached their expiration to 'expiring'
-        Jump::where('status', 'active')
+        $expiringDivisionIds = Jump::query()
+            ->where('jumps.status', 'active')
+            ->where('jumps.expiration', '<=', now())
+            ->join('courses', 'courses.id', '=', 'jumps.course_id')
+            ->distinct()
+            ->pluck('courses.division_id');
+
+        Jump::query()
+            ->where('status', 'active')
             ->where('expiration', '<=', now())
             ->update(['status' => 'expiring']);
 
-        // Grade all expiring jumps (auto-expired above + manually set to 'expiring' by teacher)
-        $jumps = Jump::where('status', 'expiring')->get();
+        PocketChanged::broadcastToDivisions($expiringDivisionIds);
+
+        $jumps = Jump::query()->where('status', 'expiring')->with('course:id,division_id')->get();
+        $expiredDivisionIds = [];
 
         foreach ($jumps as $jump) {
             $this->gradeAllAttemptsForJump($jump, $jumpGradingService);
             $jump->update(['status' => 'expired']);
             broadcast(new JumpExpired($jump));
             AnalyseJump::dispatch($jump->fresh());
+            $expiredDivisionIds[] = $jump->course?->division_id;
         }
+
+        PocketChanged::broadcastToDivisions($expiredDivisionIds);
 
         // Also grade any finished attempts for already-expired jumps that were missed
         $ungradedAttempts = JumpAttempt::where('status', 'finished')

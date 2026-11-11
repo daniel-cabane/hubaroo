@@ -309,7 +309,6 @@ Both commands include comprehensive error handling, validation, and logging to h
 
 
 ## Review prompts
-### Preprompt
 I've outlined a new feature spec in the attached file/section. Please act as a Senior Product Manager and Software Architect to review it for clarity, completeness, and feasibility.
 
 Review Goals:
@@ -325,6 +324,5 @@ Please organize your feedback into four distinct sections:
 
 Be candid, direct, and focused on making this spec production-ready.
 
-### Postprompt
-Update the .md file with your suggestion. Format this file so that it can serve as a detailed and thourough plan for implementation by an AI agent.
+Update the .md file directly with your suggestion. Format this file so that it can serve as a detailed and thourough plan for implementation by an AI agent.
 Ask me questions whenever anything is ambiguous.

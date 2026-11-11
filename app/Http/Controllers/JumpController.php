@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\JumpActivated;
 use App\Events\JumpExpired;
 use App\Events\JumpReopened;
+use App\Events\PocketChanged;
 use App\Models\Course;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
@@ -76,6 +77,7 @@ class JumpController extends Controller
 
         if (! $wasClosed && $fresh->isClosed()) {
             broadcast(new JumpExpired($fresh));
+            PocketChanged::broadcastToDivisions([$fresh->course()->value('division_id')]);
         }
 
         return response()->json([
@@ -88,6 +90,7 @@ class JumpController extends Controller
     {
         $this->authorize('update', $jump->course->division);
 
+        PocketChanged::broadcastToDivisions([$jump->course->division_id]);
         $jump->delete();
 
         return response()->json(['message' => 'Jump deleted.']);

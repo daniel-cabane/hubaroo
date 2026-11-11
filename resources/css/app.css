@@ -11,6 +11,52 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    --animate-swipe: swipe 2.4s ease-in-out infinite;
+    --animate-swipe-shadow: swipe-shadow 2.4s ease-in-out infinite;
+    --animate-levitate: levitate 2.8s ease-in-out infinite;
+    --animate-badge-shadow: badge-shadow 2s ease-in-out infinite;
+
+    @keyframes swipe {
+        0% {
+            transform: translateX(-140%);
+        }
+        45%,
+        100% {
+            transform: translateX(440%);
+        }
+    }
+
+    @keyframes swipe-shadow {
+        0% {
+            box-shadow: -14px 18px 36px -8px rgb(0 0 0 / 0.5);
+        }
+        45%,
+        100% {
+            box-shadow: 18px 18px 36px -8px rgb(0 0 0 / 0.5);
+        }
+    }
+
+    @keyframes levitate {
+        0%,
+        100% {
+            transform: translateY(0);
+            box-shadow: 0 8px 16px -6px rgb(0 0 0 / 0.35);
+        }
+        50% {
+            transform: translateY(-6px);
+            box-shadow: 0 26px 42px -10px rgb(0 0 0 / 0.4);
+        }
+    }
+
+    @keyframes badge-shadow {
+        0% {
+            box-shadow: 0 0 0 0 hsl(20 88% 44% / 0.7);
+        }
+        70%,
+        100% {
+            box-shadow: 0 0 0 8px hsl(20 88% 44% / 0);
+        }
+    }
 }
 
 @theme inline {

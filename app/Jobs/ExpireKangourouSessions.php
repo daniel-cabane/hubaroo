@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\PocketChanged;
 use App\Events\SessionExpired;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
@@ -17,6 +18,7 @@ class ExpireKangourouSessions implements ShouldQueue
     public function handle(GradingService $gradingService, ?SessionAnalysisService $sessionAnalysisService = null): void
     {
         $sessionAnalysisService ??= app(SessionAnalysisService::class);
+        $divisionIds = [];
         $sessions = KangourouSession::where('status', 'active')
             ->where('expires_at', '<=', now())
             ->with([
@@ -47,6 +49,12 @@ class ExpireKangourouSessions implements ShouldQueue
             $sessionAnalysisService->compute($session);
 
             broadcast(new SessionExpired($session));
+
+            foreach ($session->divisions as $division) {
+                $divisionIds[] = $division->id;
+            }
         }
+
+        PocketChanged::broadcastToDivisions($divisionIds);
     }
 }

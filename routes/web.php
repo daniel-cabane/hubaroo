@@ -13,6 +13,7 @@ use App\Http\Controllers\JumpController;
 use App\Http\Controllers\JumpRejoinDemandController;
 use App\Http\Controllers\KangourouSessionController;
 use App\Http\Controllers\PaperController;
+use App\Http\Controllers\PocketController;
 use App\Http\Controllers\RejoinDemandController;
 use App\Http\Controllers\SuggestedQuestionController;
 use Illuminate\Support\Facades\Route;
@@ -75,6 +76,7 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/api/kangourou-sessions/{kangourouSession}/change-code', [KangourouSessionController::class, 'changeCode'])->name('kangourou-sessions.changeCode');
     Route::patch('/api/kangourou-sessions/{kangourouSession}/activate', [KangourouSessionController::class, 'activate'])->name('kangourou-sessions.activate');
     Route::get('/api/my/divisions', [DivisionController::class, 'myIndex'])->name('divisions.myIndex');
+    Route::get('/api/my/pocket', PocketController::class)->name('pocket.show');
     Route::post('/api/divisions', [DivisionController::class, 'store'])->name('divisions.store');
     Route::get('/api/divisions/{division}', [DivisionController::class, 'show'])->name('divisions.show');
     Route::patch('/api/divisions/{division}', [DivisionController::class, 'update'])->name('divisions.update');
