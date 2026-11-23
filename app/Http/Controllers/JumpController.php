@@ -9,6 +9,7 @@ use App\Events\PocketChanged;
 use App\Models\Course;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
+use App\Models\JumpRejoinDemand;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -76,6 +77,7 @@ class JumpController extends Controller
         $fresh = $jump->fresh();
 
         if (! $wasClosed && $fresh->isClosed()) {
+            JumpRejoinDemand::deleteForJump($fresh);
             broadcast(new JumpExpired($fresh));
             PocketChanged::broadcastToDivisions([$fresh->course()->value('division_id')]);
         }

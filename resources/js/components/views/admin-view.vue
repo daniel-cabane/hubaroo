@@ -1,6 +1,15 @@
 <template>
   <div class="container mx-auto p-6 max-w-5xl">
-    <h2 class="text-2xl font-bold mb-6 text-text-main dark:text-surface">Administration</h2>
+    <div class="flex items-center justify-between gap-4 mb-6">
+      <h2 class="text-2xl font-bold text-text-main dark:text-surface">Administration</h2>
+      <button
+        type="button"
+        @click="openRegradeModal"
+        class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium cursor-pointer hover:bg-primary-hover transition-colors"
+      >
+        Recalculer les scores
+      </button>
+    </div>
 
     <!-- Tabs -->
     <div class="flex border-b border-border mb-6">
@@ -169,11 +178,66 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="showRegradeModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      @click.self="closeRegradeModal"
+    >
+      <div class="bg-surface dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md p-6">
+        <div class="flex items-start justify-between gap-4">
+          <h3 class="text-lg font-semibold text-text-main dark:text-surface">Recalculer les scores des sauts</h3>
+          <button
+            type="button"
+            @click="closeRegradeModal"
+            class="text-text-muted hover:text-text-main cursor-pointer"
+          >
+            <X class="w-5 h-5" />
+          </button>
+        </div>
+
+        <p v-if="regradeLoading" class="mt-4 text-sm text-text-muted">Chargement...</p>
+        <p v-else-if="regradeStatus.state === 'running'" class="mt-4 text-sm text-text-main dark:text-surface">Recalcul en cours…</p>
+        <p v-else-if="regradeStatus.state === 'done'" class="mt-4 text-sm text-text-main dark:text-surface">
+          {{ regradeStatus.attempts }} copies mises à jour.
+        </p>
+        <p v-else-if="regradeStatus.state === 'failed'" class="mt-4 text-sm text-error">
+          Le recalcul a échoué. Vous pouvez le relancer.
+        </p>
+        <p v-else-if="regradeCount && regradeCount.attempts > 0" class="mt-4 text-sm text-text-main dark:text-surface">
+          {{ regradeCount.jumps }} sauts expirés, {{ regradeCount.attempts }} copies déjà notées. Les scores seront recalculés. La maîtrise des élèves et la difficulté des questions ne changent pas.
+        </p>
+        <p v-else class="mt-4 text-sm text-text-muted">Aucun saut à recalculer.</p>
+
+        <p v-if="regradeError" class="mt-3 text-sm text-error">{{ regradeError }}</p>
+
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            @click="closeRegradeModal"
+            :disabled="regradeStatus.state === 'running'"
+            class="px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-main dark:text-surface cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            @click="confirmRegrade"
+            :disabled="confirmDisabled"
+            class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium cursor-pointer hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Recalculer
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import axios from 'axios';
+import { X } from 'lucide-vue-next';
 import { useAdminStore } from '@/stores/adminStore';
 
 const adminStore = useAdminStore();
@@ -236,4 +300,99 @@ async function changeBugReportStatus(report, status) {
 async function deleteBugReport(id) {
   await adminStore.destroyBugReport(id);
 }
+
+const showRegradeModal = ref(false);
+const regradeLoading = ref(false);
+const regradeCount = ref(null);
+const regradeStatus = ref({ state: 'idle' });
+const regradeError = ref('');
+let regradePollTimer = null;
+
+const confirmDisabled = computed(() =>
+  regradeLoading.value
+  || regradeStatus.value.state === 'running'
+  || regradeStatus.value.state === 'done'
+  || !regradeCount.value
+  || regradeCount.value.attempts === 0,
+);
+
+function stopRegradePolling() {
+  if (regradePollTimer) {
+    clearInterval(regradePollTimer);
+    regradePollTimer = null;
+  }
+}
+
+function startRegradePolling() {
+  stopRegradePolling();
+  regradePollTimer = setInterval(() => {
+    void refreshRegradeStatus();
+  }, 2000);
+}
+
+async function refreshRegradeStatus() {
+  try {
+    const response = await axios.get('/api/admin/jump-scores/regrade');
+    regradeStatus.value = response.data;
+
+    if (response.data.state === 'done' || response.data.state === 'failed') {
+      stopRegradePolling();
+    }
+  } catch {
+    // keep polling; the job may still be running
+  }
+}
+
+async function openRegradeModal() {
+  showRegradeModal.value = true;
+  regradeError.value = '';
+  regradeStatus.value = { state: 'idle' };
+  regradeCount.value = null;
+  regradeLoading.value = true;
+
+  try {
+    const [countResponse, statusResponse] = await Promise.all([
+      axios.get('/api/admin/jump-scores'),
+      axios.get('/api/admin/jump-scores/regrade'),
+    ]);
+    regradeCount.value = countResponse.data;
+
+    if (statusResponse.data.state === 'running') {
+      regradeStatus.value = statusResponse.data;
+      startRegradePolling();
+    }
+  } catch {
+    regradeError.value = 'Impossible de charger le recalcul.';
+  } finally {
+    regradeLoading.value = false;
+  }
+}
+
+async function confirmRegrade() {
+  regradeError.value = '';
+
+  try {
+    await axios.post('/api/admin/jump-scores/regrade');
+    regradeStatus.value = { state: 'running' };
+    startRegradePolling();
+  } catch (error) {
+    if (error.response?.status === 409) {
+      regradeError.value = 'Un recalcul est déjà en cours.';
+      regradeStatus.value = { state: 'running' };
+      startRegradePolling();
+      return;
+    }
+
+    regradeError.value = 'Le recalcul a échoué. Vous pouvez le relancer.';
+  }
+}
+
+function closeRegradeModal() {
+  stopRegradePolling();
+  showRegradeModal.value = false;
+}
+
+onUnmounted(() => {
+  stopRegradePolling();
+});
 </script>

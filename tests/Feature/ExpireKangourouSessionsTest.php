@@ -1,11 +1,13 @@
 <?php
 
+use App\Events\RejoinDemandsDeleted;
 use App\Events\SessionExpired;
 use App\Jobs\ExpireKangourouSessions;
 use App\Models\Attempt;
 use App\Models\Division;
 use App\Models\KangourouSession;
 use App\Models\Paper;
+use App\Models\RejoinDemand;
 use App\Models\User;
 use App\Services\GradingService;
 use Illuminate\Support\Facades\Event;
@@ -208,4 +210,74 @@ test('job computes analysis from delayed attempts that were submitted before exp
     expect($pivot->analysis)->toBeArray()
         ->and($pivot->analysis[0]['success_ratio'])->toEqual(1.0)
         ->and($pivot->analysis[1]['success_ratio'])->toEqual(0.0);
+});
+
+test('expiring a session deletes its rejoin demands', function () {
+    $author = User::factory()->create();
+    $session = KangourouSession::factory()->withAuthor($author)->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->subMinute(),
+    ]);
+    $otherSession = KangourouSession::factory()->withAuthor($author)->create([
+        'paper_id' => $this->paper->id,
+        'status' => 'active',
+        'expires_at' => now()->addHour(),
+    ]);
+    $student = User::factory()->create();
+    $secondStudent = User::factory()->create();
+
+    $attempt = Attempt::factory()->finished()->withUser($student)->create([
+        'kangourou_session_id' => $session->id,
+        'score' => 0,
+        'termination' => 'blurred',
+    ]);
+    $secondAttempt = Attempt::factory()->finished()->withUser($secondStudent)->create([
+        'kangourou_session_id' => $session->id,
+        'score' => 0,
+        'termination' => 'submitted',
+    ]);
+    $otherAttempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $otherSession->id,
+        'score' => 0,
+        'termination' => 'blurred',
+    ]);
+
+    $demand = RejoinDemand::create(['attempt_id' => $attempt->id]);
+    $secondDemand = RejoinDemand::create(['attempt_id' => $secondAttempt->id]);
+    $otherDemand = RejoinDemand::create(['attempt_id' => $otherAttempt->id]);
+
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
+
+    expect(RejoinDemand::find($demand->id))->toBeNull()
+        ->and(RejoinDemand::find($secondDemand->id))->toBeNull()
+        ->and(RejoinDemand::find($otherDemand->id))->not->toBeNull();
+
+    Event::assertDispatched(RejoinDemandsDeleted::class, function (RejoinDemandsDeleted $event) use ($author, $session, $demand, $secondDemand) {
+        return $event->authorId === $author->id
+            && $event->sessionId === $session->id
+            && $event->demandIds === [(int) $demand->id, (int) $secondDemand->id];
+    });
+});
+
+test('rejoin demands on an already expired session are deleted', function () {
+    $author = User::factory()->create();
+    $session = KangourouSession::factory()->expired()->withAuthor($author)->create([
+        'paper_id' => $this->paper->id,
+    ]);
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $session->id,
+        'score' => 0,
+        'termination' => 'blurred',
+    ]);
+    $demand = RejoinDemand::create(['attempt_id' => $attempt->id]);
+
+    (new ExpireKangourouSessions)->handle(app(GradingService::class));
+
+    expect(RejoinDemand::find($demand->id))->toBeNull();
+    Event::assertDispatched(RejoinDemandsDeleted::class, function (RejoinDemandsDeleted $event) use ($author, $session, $demand) {
+        return $event->authorId === $author->id
+            && $event->sessionId === $session->id
+            && $event->demandIds === [(int) $demand->id];
+    });
 });

@@ -6,6 +6,7 @@ use App\Events\PocketChanged;
 use App\Events\SessionExpired;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
+use App\Models\RejoinDemand;
 use App\Services\GradingService;
 use App\Services\SessionAnalysisService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -56,5 +57,17 @@ class ExpireKangourouSessions implements ShouldQueue
         }
 
         PocketChanged::broadcastToDivisions($divisionIds);
+
+        $this->deleteRejoinDemandsForExpiredSessions();
+    }
+
+    private function deleteRejoinDemandsForExpiredSessions(): void
+    {
+        KangourouSession::query()
+            ->where('status', 'expired')
+            ->whereHas('attempts.rejoinDemand')
+            ->each(function (KangourouSession $session): void {
+                RejoinDemand::deleteForSession($session);
+            });
     }
 }

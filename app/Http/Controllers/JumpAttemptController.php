@@ -81,24 +81,26 @@ class JumpAttemptController extends Controller
         $jump = $attempt->jump;
         $jump->rank = Jump::where('course_id', $jump->course_id)->where('id', '<=', $jump->id)->count();
 
-        $shouldHideCorrectAnswers = ! $jump->isExpired();
+        $revealCorrection = $jump->isExpired();
+        $display = $this->jumpGradingService->displayQuestionList($attempt->question_list ?? [], $revealCorrection);
 
-        $questionIds = collect($attempt->question_list)->pluck('id');
+        $questionIds = collect($display['question_list'])->pluck('id');
         $questions = Question::whereIn('id', $questionIds)->get()->keyBy('id');
 
-        $questionList = collect($attempt->question_list)->map(function ($item) use ($shouldHideCorrectAnswers, $attempt, $questions) {
-            $question = $questions->get($item['id']);
+        $questionList = collect($display['question_list'])->map(function ($item) use ($revealCorrection, $questions) {
+            $question = $questions->get($item['id'] ?? null);
             if ($question) {
                 $item['image'] = $question->image;
                 $item['tier'] = $question->tier;
             }
 
-            if ($shouldHideCorrectAnswers && $attempt->status === 'inProgress') {
+            if (! $revealCorrection) {
+                unset($item['correct_answer']);
+
                 return $item;
             }
-            if ($shouldHideCorrectAnswers) {
-                unset($item['correct_answer']);
-            } elseif ($question) {
+
+            if ($question) {
                 $item['correct_answer'] = $question->correct_answer;
             }
 
@@ -107,6 +109,9 @@ class JumpAttemptController extends Controller
 
         $attemptData = $attempt->toArray();
         $attemptData['question_list'] = $questionList;
+        if ($display['score'] !== null) {
+            $attemptData['score'] = $display['score'];
+        }
         $attemptData['class_name'] = $this->classNameFor($attempt);
 
         return response()->json(['attempt' => $attemptData]);
@@ -244,11 +249,15 @@ class JumpAttemptController extends Controller
      */
     private function withQuestionImages(JumpAttempt $attempt): array
     {
-        $questionIds = collect($attempt->question_list)->pluck('id');
+        $attempt->loadMissing('jump');
+        $revealCorrection = (bool) $attempt->jump?->isExpired();
+        $display = $this->jumpGradingService->displayQuestionList($attempt->question_list ?? [], $revealCorrection);
+
+        $questionIds = collect($display['question_list'])->pluck('id');
         $questions = Question::whereIn('id', $questionIds)->get()->keyBy('id');
 
-        $questionList = collect($attempt->question_list)->map(function ($item) use ($questions) {
-            $question = $questions->get($item['id']);
+        $questionList = collect($display['question_list'])->map(function ($item) use ($questions) {
+            $question = $questions->get($item['id'] ?? null);
             if ($question) {
                 $item['image'] = $question->image;
                 $item['tier'] = $question->tier;
@@ -259,6 +268,9 @@ class JumpAttemptController extends Controller
 
         $data = $attempt->toArray();
         $data['question_list'] = $questionList;
+        if ($display['score'] !== null) {
+            $data['score'] = $display['score'];
+        }
         $data['class_name'] = $this->classNameFor($attempt);
 
         return $data;

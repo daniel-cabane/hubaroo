@@ -993,61 +993,8 @@
                   v-if="jumpObservationDetail.attempt.status === 'finished' || observedJump.status === 'expired'"
                   class="text-center text-3xl font-bold text-primary mb-1"
                 >Score : {{ jumpObservationDetail.attempt.score }}</p>
-                <div v-if="!jumpObservationDetailQuestions.length" class="py-8 text-center text-sm text-text-muted">Aucune question.</div>
-                <div
-                  v-for="(item, idx) in jumpObservationDetailQuestions"
-                  :key="idx"
-                  class="flex flex-col rounded-lg border overflow-hidden"
-                  :class="{
-                    'border-success': item.displayStatus === 'correct',
-                    'border-error': item.displayStatus === 'incorrect',
-                    'border-border': item.displayStatus === 'pending',
-                  }"
-                >
-                  <img
-                    v-if="item.image"
-                    :src="'/' + item.image"
-                    :alt="'Question ' + (idx + 1)"
-                    class="w-full object-contain bg-gray-50 dark:bg-gray-800 select-none pointer-events-none"
-                    draggable="false"
-                    oncontextmenu="return false;"
-                  />
-                  <div
-                    class="flex items-center justify-between p-3"
-                    :class="{
-                      'bg-success/5': item.displayStatus === 'correct',
-                      'bg-error/5': item.displayStatus === 'incorrect',
-                    }"
-                  >
-                    <div class="flex items-center gap-3">
-                      <span
-                        class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                        :class="{
-                          'bg-success text-white': item.displayStatus === 'correct',
-                          'bg-error text-white': item.displayStatus === 'incorrect',
-                          'bg-gray-200 dark:bg-gray-700 text-text-muted': item.displayStatus === 'pending',
-                        }"
-                      >{{ idx + 1 }}</span>
-                      <div>
-                        <p class="text-sm font-medium text-text-main dark:text-surface">Question #{{ item.id }}</p>
-                        <p class="text-xs text-text-muted">Difficulté : {{ item.difficulty }}</p>
-                      </div>
-                    </div>
-                    <div class="text-right">
-                      <p class="text-sm font-medium"
-                        :class="{
-                          'text-success': item.displayStatus === 'correct',
-                          'text-error': item.displayStatus === 'incorrect',
-                          'text-text-muted': item.displayStatus === 'pending',
-                        }"
-                      >
-                        {{ item.displayStatus === 'correct' ? '+' + item.difficulty : item.displayStatus === 'incorrect' ? '0' : '—' }}
-                      </p>
-                      <p v-if="item.answer" class="text-xs text-text-muted">Réponse : {{ item.answer }}</p>
-                      <p v-if="item.displayStatus === 'incorrect' && item.correct_answer" class="text-xs text-success font-medium">Correcte : {{ item.correct_answer }}</p>
-                    </div>
-                  </div>
-                </div>
+                <div v-if="!jumpObservationBreakdown.length" class="py-8 text-center text-sm text-text-muted">Aucune question.</div>
+                <JumpQuestionBreakdown v-else :items="jumpObservationBreakdown" />
               </template>
             </div>
           </div>
@@ -1537,6 +1484,7 @@ import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 import DivisionAttemptsTable from '@/components/DivisionAttemptsTable.vue';
 import JumpAttemptDetailModal from '@/components/JumpAttemptDetailModal.vue';
+import JumpQuestionBreakdown from '@/components/JumpQuestionBreakdown.vue';
 import SuggestedQuestionOverlay from '@/components/SuggestedQuestionOverlay.vue';
 import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, Lightbulb, Star, Trash2, Globe, MoreVertical, Archive, ArchiveRestore, Plus, Clock, RotateCcw, CheckCircle2 } from 'lucide-vue-next';
 
@@ -2648,6 +2596,7 @@ function mergeCourseAttemptQuestionDetails(fetched, local) {
         image: item.image ?? localItem.image,
         correct_answer: item.correct_answer ?? localItem.correct_answer,
         difficulty: item.difficulty ?? localItem.difficulty,
+        points: item.points ?? localItem.points,
       };
     }),
   };
@@ -2657,6 +2606,16 @@ const jumpObservationDetailQuestions = computed(() =>
   (jumpObservationDetail.value?.attempt?.question_list ?? []).map((item) => ({
     ...item,
     displayStatus: courseAttemptQuestionStatus(item),
+  }))
+);
+
+const jumpObservationBreakdown = computed(() =>
+  jumpObservationDetailQuestions.value.map((item) => ({
+    image: item.image,
+    answer: item.answer,
+    points: item.points,
+    correct_answer: item.correct_answer,
+    status: item.displayStatus,
   }))
 );
 

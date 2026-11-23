@@ -1,11 +1,13 @@
 <?php
 
 use App\Events\JumpExpired;
+use App\Events\JumpRejoinDemandsDeleted;
 use App\Jobs\ExpireJumps;
 use App\Models\Course;
 use App\Models\Division;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
+use App\Models\JumpRejoinDemand;
 use App\Models\Question;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
@@ -85,6 +87,85 @@ test('in-progress attempts are marked as timed out during expiry grading', funct
         ->and($attempt->termination)->toBe('timeout');
 });
 
+test('expiring a jump deletes its rejoin demands', function () {
+    $jump = Jump::factory()->create([
+        'course_id' => $this->course->id,
+        'status' => 'active',
+        'expiration' => now()->subMinute(),
+        'nb_questions' => 1,
+    ]);
+    $otherJump = Jump::factory()->active()->create([
+        'course_id' => $this->course->id,
+        'nb_questions' => 1,
+    ]);
+    $otherStudent = User::factory()->create();
+
+    $attempt = JumpAttempt::create([
+        'jump_id' => $jump->id,
+        'user_id' => $this->student->id,
+        'status' => 'finished',
+        'termination' => 'blurred',
+        'question_list' => [],
+        'score' => 0,
+    ]);
+    $secondAttempt = JumpAttempt::create([
+        'jump_id' => $jump->id,
+        'user_id' => $otherStudent->id,
+        'status' => 'finished',
+        'termination' => 'submitted',
+        'question_list' => [],
+        'score' => 0,
+    ]);
+    $otherAttempt = JumpAttempt::create([
+        'jump_id' => $otherJump->id,
+        'user_id' => $this->student->id,
+        'status' => 'finished',
+        'termination' => 'blurred',
+        'question_list' => [],
+        'score' => 0,
+    ]);
+
+    $demand = JumpRejoinDemand::create(['jump_attempt_id' => $attempt->id]);
+    $secondDemand = JumpRejoinDemand::create(['jump_attempt_id' => $secondAttempt->id]);
+    $otherDemand = JumpRejoinDemand::create(['jump_attempt_id' => $otherAttempt->id]);
+
+    (new ExpireJumps)->handle();
+
+    expect(JumpRejoinDemand::find($demand->id))->toBeNull()
+        ->and(JumpRejoinDemand::find($secondDemand->id))->toBeNull()
+        ->and(JumpRejoinDemand::find($otherDemand->id))->not->toBeNull();
+
+    Event::assertDispatched(JumpRejoinDemandsDeleted::class, function (JumpRejoinDemandsDeleted $event) use ($jump, $demand, $secondDemand) {
+        return $event->teacherId === $this->teacher->id
+            && $event->jumpId === $jump->id
+            && $event->demandIds === [(int) $demand->id, (int) $secondDemand->id];
+    });
+});
+
+test('rejoin demands on an already expired jump are deleted', function () {
+    $jump = Jump::factory()->expired()->create([
+        'course_id' => $this->course->id,
+        'nb_questions' => 1,
+    ]);
+    $attempt = JumpAttempt::create([
+        'jump_id' => $jump->id,
+        'user_id' => $this->student->id,
+        'status' => 'finished',
+        'termination' => 'blurred',
+        'question_list' => [],
+        'score' => 0,
+    ]);
+    $demand = JumpRejoinDemand::create(['jump_attempt_id' => $attempt->id]);
+
+    (new ExpireJumps)->handle();
+
+    expect(JumpRejoinDemand::find($demand->id))->toBeNull();
+    Event::assertDispatched(JumpRejoinDemandsDeleted::class, function (JumpRejoinDemandsDeleted $event) use ($jump, $demand) {
+        return $event->jumpId === $jump->id
+            && $event->demandIds === [(int) $demand->id];
+    });
+});
+
 test('attempts are graded with correct score when jump expires', function () {
     $jump = Jump::factory()->expiring()->create(['course_id' => $this->course->id, 'nb_questions' => 1]);
     $question = Question::first();
@@ -102,5 +183,6 @@ test('attempts are graded with correct score when jump expires', function () {
 
     $attempt->refresh();
     expect($attempt->question_list[0]['status'])->toBe('correct')
-        ->and($attempt->score)->toBe($question->difficulty);
+        ->and($attempt->question_list[0]['points'])->toBe(10)
+        ->and($attempt->score)->toBe(10);
 });

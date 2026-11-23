@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use App\Models\Division;
 use App\Models\Question;
+use App\Services\JumpGradingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -91,7 +92,7 @@ class CourseController extends Controller
         return response()->json(['message' => 'Course deleted.']);
     }
 
-    public function details(Course $course, Request $request): JsonResponse
+    public function details(Course $course, Request $request, JumpGradingService $grading): JsonResponse
     {
         $this->authorize('update', $course->division);
 
@@ -111,12 +112,14 @@ class CourseController extends Controller
         $images = Question::whereIn('id', $allQuestionIds)->pluck('image', 'id');
         $correctAnswers = Question::whereIn('id', $allQuestionIds)->pluck('correct_answer', 'id');
 
-        $jumps->each(function ($jump) use ($images, $correctAnswers): void {
-            $jump->attempts->each(function ($attempt) use ($images, $correctAnswers): void {
+        $jumps->each(function ($jump) use ($images, $correctAnswers, $grading): void {
+            $jump->attempts->each(function ($attempt) use ($images, $correctAnswers, $grading): void {
                 $attempt->question_list = collect($attempt->question_list)
-                    ->map(function ($item) use ($images, $correctAnswers) {
+                    ->map(function ($item) use ($images, $correctAnswers, $grading) {
                         $item['image'] = $images->get($item['id']);
-                        $item['correct_answer'] = $correctAnswers->get($item['id']);
+                        $correctAnswer = $correctAnswers->get($item['id']);
+                        $item['correct_answer'] = $correctAnswer;
+                        $item['points'] = $grading->previewPoints($item, $correctAnswer);
 
                         return $item;
                     })->all();

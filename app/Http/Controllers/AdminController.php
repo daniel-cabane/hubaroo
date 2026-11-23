@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateBugReportRequest;
+use App\Jobs\RegradeJumpScores;
 use App\Models\BugReport;
 use App\Models\Paper;
 use App\Models\User;
+use App\Services\JumpGradingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
+use Throwable;
 
 class AdminController extends Controller
 {
@@ -98,5 +102,41 @@ class AdminController extends Controller
         $bugReport->delete();
 
         return response()->json(['message' => 'Bug report deleted.']);
+    }
+
+    public function jumpScorePreview(JumpGradingService $grading): JsonResponse
+    {
+        return response()->json($grading->regradeCounts());
+    }
+
+    public function jumpScoreRegradeStatus(): JsonResponse
+    {
+        $status = Cache::get(RegradeJumpScores::STATUS, ['state' => 'idle']);
+
+        return response()->json($status);
+    }
+
+    public function regradeJumpScores(): JsonResponse
+    {
+        $lock = Cache::lock(RegradeJumpScores::LOCK, 1800);
+
+        if (! $lock->get()) {
+            return response()->json([
+                'message' => 'Un recalcul est déjà en cours.',
+            ], 409);
+        }
+
+        Cache::put(RegradeJumpScores::STATUS, ['state' => 'running'], now()->addHour());
+
+        try {
+            RegradeJumpScores::dispatch();
+        } catch (Throwable $exception) {
+            Cache::put(RegradeJumpScores::STATUS, ['state' => 'failed'], now()->addHour());
+            $lock->release();
+
+            throw $exception;
+        }
+
+        return response()->json(['state' => 'running'], 202);
     }
 }

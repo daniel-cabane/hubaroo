@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateKangourouSessionRequest;
 use App\Http\Resources\QuestionResource;
 use App\Models\KangourouSession;
 use App\Models\Paper;
+use App\Models\RejoinDemand;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -118,6 +119,7 @@ class KangourouSessionController extends Controller
         $fresh = $kangourouSession->fresh()->load('paper');
 
         if ($request->has('expires_at') && $wasActive && $fresh->isExpired()) {
+            RejoinDemand::deleteForSession($fresh);
             broadcast(new SessionExpired($fresh));
             PocketChanged::broadcastToDivisions($fresh->divisions()->pluck('divisions.id'));
         }

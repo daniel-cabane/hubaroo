@@ -155,10 +155,16 @@ test('course details includes attempt data with correct answers for teacher obse
     $questionItem = $jumpData['attempts'][0]['question_list'][0];
     expect($questionItem['correct_answer'])->toBe('A')
         ->and($questionItem['answer'])->toBe('A')
+        ->and($questionItem['points'])->toBe(10)
+        ->and($jumpData['attempts'][0]['score'])->toBe(1000)
         ->and($jumpData['attempts'][0]['timer'])->toBe(120)
         ->and($jumpData['attempts'][0]['correct_count'])->toBe(1)
         ->and($jumpData['attempts'][0]['incorrect_count'])->toBe(0)
         ->and($jumpData['attempts'][0]['unanswered_count'])->toBe(0);
+
+    $stored = JumpAttempt::first();
+    expect($stored->score)->toBe(1000)
+        ->and($stored->question_list[0])->not->toHaveKey('points');
 });
 
 test('student cannot access course details endpoint', function () {

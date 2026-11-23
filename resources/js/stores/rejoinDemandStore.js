@@ -60,6 +60,11 @@ export const useRejoinDemandStore = defineStore('rejoinDemand', () => {
     }
   }
 
+  function removeDemands(demandIds = []) {
+    const ids = new Set(demandIds.map((id) => Number(id)));
+    demands.value = demands.value.filter((demand) => !ids.has(Number(demand.id)));
+  }
+
   const studentDemands = ref([]);
 
   function addStudentDemand({ id, attemptId, sessionCode, sessionTitle }) {
@@ -70,6 +75,11 @@ export const useRejoinDemandStore = defineStore('rejoinDemand', () => {
   }
 
   function resolveStudentDemand(demandId, resolution, extraTime = 0) {
+    if (resolution === 'expired') {
+      removeStudentDemand(demandId);
+      return;
+    }
+
     const idx = studentDemands.value.findIndex(d => d.id === demandId);
     if (idx !== -1) {
       studentDemands.value.splice(idx, 1, { ...studentDemands.value[idx], status: resolution, extraTime });
@@ -90,6 +100,7 @@ export const useRejoinDemandStore = defineStore('rejoinDemand', () => {
     approveDemand,
     rejectDemand,
     addDemand,
+    removeDemands,
     addStudentDemand,
     resolveStudentDemand,
     removeStudentDemand,

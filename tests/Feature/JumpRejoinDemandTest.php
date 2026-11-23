@@ -3,6 +3,7 @@
 use App\Events\JumpAttemptUpdated;
 use App\Events\JumpRejoinDemandCreated;
 use App\Events\JumpRejoinDemandResolved;
+use App\Events\JumpRejoinDemandsDeleted;
 use App\Models\Course;
 use App\Models\Division;
 use App\Models\Jump;
@@ -101,6 +102,49 @@ test('teacher myIndex returns demands with correct structure including answered_
     expect($demand['attempt']['jump']['rank'])->toBe(1);
     expect($demand['attempt']['timer'])->toBe(120);
     expect($demand['attempt']['user']['name'])->toBe($this->student->name);
+});
+
+test('closing a jump deletes its rejoin demands', function () {
+    $demand = JumpRejoinDemand::create(['jump_attempt_id' => $this->attempt->id]);
+
+    $otherJump = Jump::factory()->active()->create(['course_id' => $this->course->id]);
+    $otherStudent = User::factory()->create();
+    $otherAttempt = JumpAttempt::create([
+        'jump_id' => $otherJump->id,
+        'user_id' => $otherStudent->id,
+        'question_list' => [],
+        'score' => 0,
+        'status' => 'finished',
+        'timer' => 60,
+        'extra_time' => 0,
+        'termination' => 'blurred',
+    ]);
+    $otherDemand = JumpRejoinDemand::create(['jump_attempt_id' => $otherAttempt->id]);
+
+    $this->actingAs($this->teacher)->patchJson("/api/jumps/{$this->jump->id}", [
+        'status' => 'expiring',
+    ])->assertOk();
+
+    expect(JumpRejoinDemand::find($demand->id))->toBeNull()
+        ->and(JumpRejoinDemand::find($otherDemand->id))->not->toBeNull();
+
+    Event::assertDispatched(JumpRejoinDemandsDeleted::class, function (JumpRejoinDemandsDeleted $event) use ($demand) {
+        return $event->teacherId === $this->teacher->id
+            && $event->jumpId === $this->jump->id
+            && $event->demandIds === [(int) $demand->id];
+    });
+    Event::assertDispatched(JumpRejoinDemandResolved::class, fn (JumpRejoinDemandResolved $event) => $event->resolution === 'expired' && $event->demand->id === $demand->id);
+});
+
+test('updating an open jump does not delete its rejoin demands', function () {
+    $demand = JumpRejoinDemand::create(['jump_attempt_id' => $this->attempt->id]);
+
+    $this->actingAs($this->teacher)->patchJson("/api/jumps/{$this->jump->id}", [
+        'expiration' => now()->addHours(3)->toIso8601String(),
+    ])->assertOk();
+
+    expect(JumpRejoinDemand::find($demand->id))->not->toBeNull();
+    Event::assertNotDispatched(JumpRejoinDemandsDeleted::class);
 });
 
 test('student cannot create a rejoin demand for an expiring jump', function () {

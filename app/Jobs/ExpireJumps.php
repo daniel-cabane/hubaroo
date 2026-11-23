@@ -6,6 +6,7 @@ use App\Events\JumpExpired;
 use App\Events\PocketChanged;
 use App\Models\Jump;
 use App\Models\JumpAttempt;
+use App\Models\JumpRejoinDemand;
 use App\Models\Question;
 use App\Models\User;
 use App\Services\JumpGradingService;
@@ -49,6 +50,8 @@ class ExpireJumps implements ShouldQueue
 
         PocketChanged::broadcastToDivisions($expiredDivisionIds);
 
+        $this->deleteRejoinDemandsForExpiredJumps();
+
         // Also grade any finished attempts for already-expired jumps that were missed
         $ungradedAttempts = JumpAttempt::where('status', 'finished')
             ->with('jump')
@@ -65,6 +68,17 @@ class ExpireJumps implements ShouldQueue
                 $this->updateMasteryAndDifficulty($attempt->fresh(), $questions);
             }
         }
+    }
+
+    private function deleteRejoinDemandsForExpiredJumps(): void
+    {
+        Jump::query()
+            ->where('status', 'expired')
+            ->whereHas('attempts.rejoinDemand')
+            ->with('course.division')
+            ->each(function (Jump $jump): void {
+                JumpRejoinDemand::deleteForJump($jump);
+            });
     }
 
     private function gradeAllAttemptsForJump(Jump $jump, JumpGradingService $jumpGradingService): void

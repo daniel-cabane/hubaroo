@@ -536,7 +536,8 @@ test('expired timeout-finished submit overwrites question list inside the window
     $fresh = $attempt->fresh();
     expect($fresh->question_list[0]['answer'])->toBe('A')
         ->and($fresh->question_list[0]['status'])->toBe('correct')
-        ->and($fresh->score)->toBe(1000)
+        ->and($fresh->question_list[0]['points'])->toBe(10)
+        ->and($fresh->score)->toBe(10)
         ->and($this->student->fresh()->mastery)->toBe(500);
     Queue::assertPushed(AnalyseJump::class, fn (AnalyseJump $job) => $job->jump->is($jump));
 });
@@ -577,7 +578,8 @@ test('late submit after ExpireJumps grades new answers without applying mastery 
         ],
     ])->assertOk();
 
-    expect($attempt->fresh()->score)->toBe(1000)
+    expect($attempt->fresh()->score)->toBe(10)
+        ->and($attempt->fresh()->question_list[0]['points'])->toBe(10)
         ->and($this->student->fresh()->mastery)->toBe($masteryAfterJob);
 });
 

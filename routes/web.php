@@ -110,6 +110,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/bug-reports', [AdminController::class, 'bugReports'])->name('admin.bug-reports.index');
         Route::patch('/bug-reports/{bugReport}', [AdminController::class, 'updateBugReport'])->name('admin.bug-reports.update');
         Route::delete('/bug-reports/{bugReport}', [AdminController::class, 'destroyBugReport'])->name('admin.bug-reports.destroy');
+        Route::get('/jump-scores', [AdminController::class, 'jumpScorePreview'])->name('admin.jump-scores');
+        Route::post('/jump-scores/regrade', [AdminController::class, 'regradeJumpScores'])->name('admin.jump-scores.regrade');
+        Route::get('/jump-scores/regrade', [AdminController::class, 'jumpScoreRegradeStatus'])->name('admin.jump-scores.regrade.status');
     });
 
     // Courses & Jumps

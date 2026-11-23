@@ -440,6 +440,20 @@ async function setupTeacherChannel() {
     })
     .listen('.JumpRejoinDemandCreated', (event) => {
       jumpDemandStore.addDemand(event.demand);
+    })
+    .listen('.JumpRejoinDemandsDeleted', (event) => {
+      const ids = event.demand_ids ?? [];
+      jumpDemandStore.removeDemands(ids);
+      ids.forEach((id) => {
+        delete jumpExtraTimes[id];
+      });
+    })
+    .listen('.RejoinDemandsDeleted', (event) => {
+      const ids = event.demand_ids ?? [];
+      demandStore.removeDemands(ids);
+      ids.forEach((id) => {
+        delete extraTimes[id];
+      });
     });
 }
 
@@ -476,7 +490,9 @@ onUnmounted(() => {
   if (authStore.user?.id) {
     window.Echo.private(`App.Models.User.${authStore.user.id}`)
       .stopListening('.RejoinDemandCreated')
-      .stopListening('.JumpRejoinDemandCreated');
+      .stopListening('.JumpRejoinDemandCreated')
+      .stopListening('.JumpRejoinDemandsDeleted')
+      .stopListening('.RejoinDemandsDeleted');
   }
 });
 </script>

@@ -3,6 +3,7 @@
 use App\Events\AttemptUpdated;
 use App\Events\RejoinDemandCreated;
 use App\Events\RejoinDemandResolved;
+use App\Events\RejoinDemandsDeleted;
 use App\Models\Attempt;
 use App\Models\KangourouSession;
 use App\Models\Paper;
@@ -57,6 +58,53 @@ test('cannot create a rejoin demand for a timed-out attempt', function () {
     $response = $this->postJson("/api/attempts/{$attempt->id}/rejoin-demand");
 
     $response->assertUnprocessable();
+});
+
+test('expiring a session deletes its rejoin demands', function () {
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $this->session->id,
+        'termination' => 'blurred',
+    ]);
+    $demand = RejoinDemand::create(['attempt_id' => $attempt->id]);
+
+    $otherSession = KangourouSession::factory()->create([
+        'paper_id' => $this->paper->id,
+        'author_id' => $this->author->id,
+    ]);
+    $otherAttempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $otherSession->id,
+        'termination' => 'blurred',
+    ]);
+    $otherDemand = RejoinDemand::create(['attempt_id' => $otherAttempt->id]);
+
+    $this->actingAs($this->author)->patchJson("/api/kangourou-sessions/{$this->session->id}", [
+        'expires_at' => now()->subSecond()->toIso8601String(),
+    ])->assertOk();
+
+    expect(RejoinDemand::find($demand->id))->toBeNull()
+        ->and(RejoinDemand::find($otherDemand->id))->not->toBeNull();
+
+    Event::assertDispatched(RejoinDemandsDeleted::class, function (RejoinDemandsDeleted $event) use ($demand) {
+        return $event->authorId === $this->author->id
+            && $event->sessionId === $this->session->id
+            && $event->demandIds === [(int) $demand->id];
+    });
+    Event::assertDispatched(RejoinDemandResolved::class, fn (RejoinDemandResolved $event) => $event->resolution === 'expired' && $event->demand->id === $demand->id);
+});
+
+test('delaying session expiry does not delete rejoin demands', function () {
+    $attempt = Attempt::factory()->finished()->create([
+        'kangourou_session_id' => $this->session->id,
+        'termination' => 'blurred',
+    ]);
+    $demand = RejoinDemand::create(['attempt_id' => $attempt->id]);
+
+    $this->actingAs($this->author)->patchJson("/api/kangourou-sessions/{$this->session->id}", [
+        'expires_at' => now()->addHours(3)->toIso8601String(),
+    ])->assertOk();
+
+    expect(RejoinDemand::find($demand->id))->not->toBeNull();
+    Event::assertNotDispatched(RejoinDemandsDeleted::class);
 });
 
 test('cannot create a rejoin demand for an expired session', function () {

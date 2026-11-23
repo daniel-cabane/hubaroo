@@ -64,63 +64,7 @@
           </p>
         </div>
 
-        <!-- Question breakdown -->
-        <div class="space-y-3">
-          <div
-            v-for="(item, idx) in questionList"
-            :key="idx"
-            class="flex flex-col rounded-xl border overflow-hidden"
-            :class="{
-              'border-success': item.status === 'correct',
-              'border-error': item.status === 'incorrect',
-              'border-border': item.status === 'pending',
-            }"
-          >
-            <img
-              v-if="item.image"
-              :src="'/' + item.image"
-              :alt="'Question ' + (idx + 1)"
-              class="w-full object-contain bg-gray-50 dark:bg-gray-800 select-none pointer-events-none"
-              draggable="false"
-              oncontextmenu="return false;"
-            />
-            <div
-              class="flex items-center justify-between p-4"
-              :class="{
-                'bg-success/5': item.status === 'correct',
-                'bg-error/5': item.status === 'incorrect',
-              }"
-            >
-              <div class="flex items-center gap-3">
-                <span
-                  class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                  :class="{
-                    'bg-success text-white': item.status === 'correct',
-                    'bg-error text-white': item.status === 'incorrect',
-                    'bg-gray-200 dark:bg-gray-700 text-text-muted': item.status === 'pending',
-                  }"
-                >{{ idx + 1 }}</span>
-                <div>
-                  <p class="text-sm font-medium text-text-main dark:text-surface">Question #{{ item.id }}</p>
-                  <p class="text-xs text-text-muted">Difficulté : {{ item.difficulty }}</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <p class="font-semibold text-sm"
-                  :class="{
-                    'text-success': item.status === 'correct',
-                    'text-error': item.status === 'incorrect',
-                    'text-text-muted': item.status === 'pending',
-                  }"
-                >
-                  {{ item.status === 'correct' ? '+' + item.difficulty : item.status === 'incorrect' ? '0' : '—' }}
-                </p>
-                <p v-if="item.answer" class="text-xs text-text-muted">Réponse : {{ item.answer }}</p>
-                <p v-if="item.status === 'incorrect' && item.correct_answer" class="text-xs text-success font-medium">Correcte : {{ item.correct_answer }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <JumpQuestionBreakdown :items="questionList" />
       </div>
     </template>
 
@@ -131,6 +75,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ChevronLeft, LaptopMinimalCheck } from 'lucide-vue-next';
+import JumpQuestionBreakdown from '@/components/JumpQuestionBreakdown.vue';
 import { useJumpAttemptStore } from '@/stores/jumpAttemptStore';
 import { useJumpRejoinDemandStore } from '@/stores/jumpRejoinDemandStore';
 
