@@ -6,7 +6,7 @@ class ClassNameFormatter
 {
     public static function format(string $firstName, string $lastName): string
     {
-        $firstParts = preg_split('/\s+/u', mb_strtolower(trim($firstName)));
+        $firstParts = preg_split('/[\s\-]+/u', mb_strtolower(trim($firstName)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $formattedFirst = implode('-', array_map(
             fn (string $part) => mb_strtoupper(mb_substr($part, 0, 1)).mb_substr($part, 1),
             $firstParts,

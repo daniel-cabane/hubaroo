@@ -1486,6 +1486,7 @@ import DivisionAttemptsTable from '@/components/DivisionAttemptsTable.vue';
 import JumpAttemptDetailModal from '@/components/JumpAttemptDetailModal.vue';
 import JumpQuestionBreakdown from '@/components/JumpQuestionBreakdown.vue';
 import SuggestedQuestionOverlay from '@/components/SuggestedQuestionOverlay.vue';
+import { compareStudentsByLastName } from '@/lib/studentNameSort';
 import { ChevronLeft, RefreshCw, X, Eye, Pencil, Fullscreen, ChevronRight, Lightbulb, Star, Trash2, Globe, MoreVertical, Archive, ArchiveRestore, Plus, Clock, RotateCcw, CheckCircle2 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -2362,7 +2363,7 @@ const courseFilteredSortedStudents = computed(() => {
   const dir = courseSortDir.value === 'asc' ? 1 : -1;
   return [...students].sort((a, b) => {
     if (courseSortKey.value === 'name') {
-      return (a.pivot?.class_name ?? a.name).toLowerCase().localeCompare((b.pivot?.class_name ?? b.name).toLowerCase()) * dir;
+      return compareStudentsByLastName(a, b) * dir;
     }
     if (courseSortKey.value === 'total') {
       return (courseStudentTotal(a) - courseStudentTotal(b)) * dir;

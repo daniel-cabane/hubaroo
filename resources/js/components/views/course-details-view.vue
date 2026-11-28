@@ -554,6 +554,7 @@ import JumpQuestionBreakdown from '@/components/JumpQuestionBreakdown.vue';
 import SuggestedQuestionOverlay from '@/components/SuggestedQuestionOverlay.vue';
 import { useCourseStore } from '@/stores/courseStore';
 import { JUMP_ATTEMPT_SYNC_INTERVAL_MS } from '@/stores/jumpAttemptStore';
+import { compareStudentsByLastName } from '@/lib/studentNameSort';
 
 const route = useRoute();
 const router = useRouter();
@@ -921,9 +922,7 @@ const filteredSortedStudents = computed(() => {
 
   return [...students].sort((a, b) => {
     if (sortKey.value === 'name') {
-      const na = (a.pivot?.class_name ?? a.name).toLowerCase();
-      const nb = (b.pivot?.class_name ?? b.name).toLowerCase();
-      return na.localeCompare(nb) * dir;
+      return compareStudentsByLastName(a, b) * dir;
     }
     if (sortKey.value === 'total') {
       return (studentTotal(a) - studentTotal(b)) * dir;

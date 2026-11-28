@@ -20,6 +20,12 @@ test('normalises mixed case in first name', function () {
     expect(ClassNameFormatter::format('MARIE claire', 'dupont'))->toBe('Marie-Claire DUPONT');
 });
 
+test('capitalises each part of a hyphenated first name', function () {
+    expect(ClassNameFormatter::format('jean-paul', 'dupont'))->toBe('Jean-Paul DUPONT');
+    expect(ClassNameFormatter::format('MARIE-CLAIRE', 'dupont'))->toBe('Marie-Claire DUPONT');
+    expect(ClassNameFormatter::format('élie-anne', 'côte'))->toBe('Élie-Anne CÔTE');
+});
+
 test('formats last name entirely in uppercase', function () {
     expect(ClassNameFormatter::format('alice', 'martin'))->toBe('Alice MARTIN');
 });
